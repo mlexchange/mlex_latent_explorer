@@ -7,15 +7,8 @@ services:
     build:
       context: "."
       dockerfile: "docker/Dockerfile"
-#     environment:
-#       DATA_DIR: "${PWD}/data/"
     volumes:
       - ./data:/app/work/data
     ports:
       - "8070:8070"
-#     networks:
-#       - computing_api_default
-# 
-# networks:
-#   computing_api_default:
-#     external: true
+
