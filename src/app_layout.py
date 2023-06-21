@@ -9,19 +9,19 @@ import templates
 from latentxp_utils import generate_cluster_dropdown_options, generate_label_dropdown_options
 
 
-label_names = {"Disc":0, "Triangle": 1, "Rectangle":2, "Annulus":3}
-latent_vectors = np.load("/app/work/data/pacmacX.npy")
-obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
-clusters = obj.fit_predict(latent_vectors)
-
 external_stylesheets = [dbc.themes.BOOTSTRAP, "../assets/segmentation-style.css"]
 app = Dash(__name__, external_stylesheets=external_stylesheets, suppress_callback_exceptions=True)
 
 server = app.server
-app.title = "MLExchange Labeling | Latent Space"
+
+#--------------------------------- IO ----------------------------------
+label_names = {"Disc":0, "Triangle": 1, "Rectangle":2, "Annulus":3}
+latent_vectors = np.load("/app/work/data/pacmacX.npy")
+
+obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
+clusters = obj.fit_predict(latent_vectors)
 
 header = templates.header()
-
 body = html.Div([
     html.Div([
         # individual image
@@ -108,6 +108,6 @@ body = html.Div([
 ], style={'display': 'grid', 'gridTemplateRows': '1fr 1fr', 'height': '100vh'})
 
 
-app.layout = html.Div ([ header, body])
+app.layout = html.Div ([header, body])
 
 
