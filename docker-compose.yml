@@ -1,0 +1,21 @@
+version: "3"
+
+services:
+  front-end:
+    restart: "unless-stopped"
+    container_name: "latentxp"
+    build:
+      context: "."
+      dockerfile: "docker/Dockerfile"
+#     environment:
+#       DATA_DIR: "${PWD}/data/"
+    volumes:
+      - ./data:/app/work/data
+    ports:
+      - "8070:8070"
+#     networks:
+#       - computing_api_default
+# 
+# networks:
+#   computing_api_default:
+#     external: true
