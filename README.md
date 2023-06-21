@@ -2,7 +2,8 @@
 
 A prototype app to visulize latent vectors in 2D.
  
-To run this demo, install docker, then run `docker-compose` in the main folder.
+To run this demo, install docker, then run `docker-compose` in the main folder.  
+Go to `http://0.0.0.0:8070/` in a brower.
 
 
 ## Copyright
