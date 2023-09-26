@@ -24,16 +24,16 @@ clusters = obj.fit_predict(latent_vectors)
 header = templates.header()
 body = html.Div([
     html.Div([
-        # individual image
-        html.Div([
-            dcc.Graph(id='heatmap-a', figure=go.Figure(go.Heatmap()), style={'padding-bottom': '5%'}),
-        ], className='column', style={'flex': '50%', 'padding': '10px'}),
-
         # latent plot
         html.Div([
             dcc.Graph(id='scatter-b',
                       figure=go.Figure(go.Scattergl(mode='markers')),
                       style={'padding-bottom': '5%'}),
+        ], className='column', style={'flex': '50%', 'padding': '10px'}),
+
+        # individual image
+        html.Div([
+            dcc.Graph(id='heatmap-a', figure=go.Figure(go.Heatmap()), style={'padding-bottom': '5%'}),
         ], className='column', style={'flex': '50%', 'padding': '10px'}),
 
     ], className='row', style={'display': 'flex'}),
