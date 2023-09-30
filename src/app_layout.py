@@ -8,6 +8,7 @@ from sklearn.cluster import DBSCAN
 
 
 import templates
+import ids
 from latentxp_utils import generate_cluster_dropdown_options, generate_label_dropdown_options
 
 external_stylesheets = [dbc.themes.BOOTSTRAP, "../assets/segmentation-style.css"]
@@ -18,7 +19,6 @@ server = app.server
 #--------------------------------- IO ----------------------------------
 f = open("/Users/runbojiang/Desktop/mlex_latent_explorer/data/label_schema.json")
 LABEL_NAMES = json.load(f)
-print("label names: ", LABEL_NAMES)
 #latent_vectors = np.load("/app/work/data/pacmacX.npy")
 latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pacmacX.npy")
 
@@ -30,14 +30,14 @@ body = html.Div([
     html.Div([
         # latent plot
         html.Div([
-            dcc.Graph(id='scatter-b',
+            dcc.Graph(id=ids.SCATTER,
                       figure=go.Figure(go.Scattergl(mode='markers')),
                       style={'padding-bottom': '5%'}),
         ], className='column', style={'flex': '50%', 'padding': '10px'}),
 
         # individual image
         html.Div([
-            dcc.Graph(id='heatmap-a', figure=go.Figure(go.Heatmap()), style={'padding-bottom': '5%'}),
+            dcc.Graph(id=ids.HEATMAP, figure=go.Figure(go.Heatmap()), style={'padding-bottom': '5%'}),
         ], className='column', style={'flex': '50%', 'padding': '10px'}),
 
     ], className='row', style={'display': 'flex'}),
@@ -49,25 +49,25 @@ body = html.Div([
 
             # Add a radio button for toggling coloring options
             html.Label('Scatter Colors:'),
-            dcc.RadioItems(id='scatter-color', options=[{'label': 'cluster', 'value': 'cluster'},
+            dcc.RadioItems(id=ids.SCATTER_COLOR, options=[{'label': 'cluster', 'value': 'cluster'},
                                                         {'label': 'label', 'value': 'label'}],
                            value='cluster'),
             html.Br(),
 
             html.Label('Select cluster:'),
-            dcc.Dropdown(id='cluster-dropdown',
+            dcc.Dropdown(id=ids.CLUSTER_DROPDOWN,
                          options=generate_cluster_dropdown_options(clusters),
                          value=-1),
             html.Br(),
 
             html.Label('Select label:'),
-            dcc.Dropdown(id='label-dropdown',
+            dcc.Dropdown(id=ids.LABEL_DROPDOWN,
                          options=generate_label_dropdown_options(LABEL_NAMES),
                          value=-2),
 
             # # Add a radio button for toggling mean and standard deviation
             # html.Label('Display Image Options:'),
-            # dcc.RadioItems(id='mean-std-toggle', options=[{'label': 'Mean', 'value': 'mean'},
+            # dcc.RadioItems(id=ids.MEAN_STD_TOGGLE, options=[{'label': 'Mean', 'value': 'mean'},
             #                                               {'label': 'Standard Deviation', 'value': 'sigma'}],
             #                value='mean'),
         ], className='column', style={'flex': '50%', 'padding-bottom': '5%'}),
@@ -85,19 +85,19 @@ body = html.Div([
             html.Br(),
             # Add a radio button for toggling mean and standard deviation
             html.Label('Display Image Options:'),
-            dcc.RadioItems(id='mean-std-toggle', options=[{'label': 'Mean', 'value': 'mean'},
+            dcc.RadioItems(id=ids.MEAN_STD_TOGGLE, options=[{'label': 'Mean', 'value': 'mean'},
                                                           {'label': 'Standard Deviation', 'value': 'sigma'}],
                            value='mean'),
             html.Br(),
 
-            html.Div(id='stats-div', children=[
+            html.Div(id=ids.STATS_DIV, children=[
                 html.P("Number of images selected: 0"),
                 html.P("Clusters represented: N/A"),
                 html.P("Labels represented: N/A"),
             ]),
 
             html.Label('Assign Label:'),
-            dcc.Dropdown(id='labeler',
+            dcc.Dropdown(id=ids.LABELER,
                          options=generate_label_dropdown_options(LABEL_NAMES, False),
                          value=-1),
 
@@ -118,7 +118,7 @@ body = html.Div([
                     document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('assign-labels-button').onclick = function() {
                             setTimeout(function() {
-                                document.getElementById('scatter-b').focus();
+                                document.getElementById(ids.SCATTER).focus();
                             }, 100);
                         };
                     });

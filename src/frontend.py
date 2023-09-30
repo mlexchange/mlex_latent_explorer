@@ -4,7 +4,7 @@ import numpy as np
 
 from app_layout import app, LABEL_NAMES, clusters, latent_vectors
 from latentxp_utils import hex_to_rgba, generate_colors, generate_scattergl_plot, generate_scatter_data, compute_mean_std_images
-
+import ids
 
 #images = np.load("/app/work/data/Demoshapes.npz")['arr_0']
 #assigned_labels = np.load("/app/work/data/DemoLabels.npy")
@@ -15,13 +15,13 @@ cluster_names = {a: a for a in np.unique(clusters).astype(int)}
 # ------------------------------------------------
 # SCATTER PLOT CALLBACKs
 @app.callback(
-    Output('scatter-b', 'figure'),
-    Input('cluster-dropdown', 'value'),
-    Input('label-dropdown', 'value'),
-    Input('scatter-color', 'value'),
-    State('labeler', 'value'),
-    State('scatter-b', 'figure'),
-    State('scatter-b', 'selectedData')
+    Output(ids.SCATTER, 'figure'),
+    Input(ids.CLUSTER_DROPDOWN, 'value'),
+    Input(ids.LABEL_DROPDOWN, 'value'),
+    Input(ids.SCATTER_COLOR, 'value'),
+    State(ids.LABELER, 'value'),
+    State(ids.SCATTER, 'figure'),
+    State(ids.SCATTER, 'selectedData')
 )
 def update_scatter_plot(cluster_selection, label_selection, scatter_color, labeler_value, current_figure,
                         selected_data):
@@ -65,11 +65,11 @@ def update_scatter_plot(cluster_selection, label_selection, scatter_color, label
 # -------------------------------------------------
 # IMAGE PANEL
 @app.callback(
-    Output('heatmap-a', 'figure'),
-    Input('scatter-b', 'clickData'),
-    Input('scatter-b', 'selectedData'),
-    Input('mean-std-toggle', 'value'),
-    State('heatmap-a', 'figure')
+    Output(ids.HEATMAP, 'figure'),
+    Input(ids.SCATTER, 'clickData'),
+    Input(ids.SCATTER, 'selectedData'),
+    Input(ids.MEAN_STD_TOGGLE, 'value'),
+    State(ids.HEATMAP, 'figure')
 )
 def update_panel_a(click_data, selected_data, display_option, current_figure):
     if selected_data is not None and len(selected_data['points']) > 0:
@@ -104,8 +104,8 @@ def update_panel_a(click_data, selected_data, display_option, current_figure):
 # -------------------------------------------------
 # DISPLAY SELECTION STATISTICS
 @app.callback(
-    Output('stats-div', 'children'),
-    Input('scatter-b', 'selectedData'),
+    Output(ids.STATS_DIV, 'children'),
+    Input(ids.SCATTER, 'selectedData'),
     Input('assign-labels-button', 'n_clicks'),
 )
 def update_statistics(selected_data, n_clicks):
@@ -121,7 +121,9 @@ def update_statistics(selected_data, n_clicks):
 
         # Format the clusters and labels as comma-separated strings
         clusters_str = ", ".join(str(cluster) for cluster in unique_clusters)
-        labels_str = ", ".join(str(LABEL_NAMES[label]) for label in unique_labels if label in LABEL_NAMES)
+        label_int_to_str_map = {val: key for key, val in LABEL_NAMES.items()}
+        labels_str = ", ".join(str(label_int_to_str_map[label]) for label in unique_labels)
+        print('labels_str: ', labels_str)
     else:
         num_images = 0
         clusters_str = "N/A"
@@ -136,8 +138,8 @@ def update_statistics(selected_data, n_clicks):
 @app.callback(
     Output("scatter-update-trigger", "children"),
     Input("assign-labels-button", "n_clicks"),
-    State('labeler', 'value'),
-    State('scatter-b', 'selectedData')
+    State(ids.LABELER, 'value'),
+    State(ids.SCATTER, 'selectedData')
 )
 def trigger_scatter_update(n_clicks, labeler_value, selected_data):
     if n_clicks is not None:
@@ -161,7 +163,7 @@ def trigger_scatter_update(n_clicks, labeler_value, selected_data):
 
 @app.callback(
     Output('scatter-axis-range', 'data'),
-    Input('scatter-b', 'relayoutData')
+    Input(ids.SCATTER, 'relayoutData')
 )
 def store_scatter_axis_range(relayout_data):
     if relayout_data and ('xaxis.range[0]' in relayout_data or 'yaxis.range[0]' in relayout_data):
@@ -171,12 +173,12 @@ def store_scatter_axis_range(relayout_data):
         }
     return {}
 
-# @app.callback(
-#     Output('label-assign-output', 'children'),
-#     Input('label-assign-message', 'children')
-# )
-# def update_label_assign_output(message):
-#     return message
+@app.callback(
+    Output('label-assign-output', 'children'),
+    Input('label-assign-message', 'children')
+)
+def update_label_assign_output(message):
+    return message
     
     
 if __name__ == '__main__':
