@@ -2,7 +2,7 @@ from dash import html, Input, Output, State
 import plotly.graph_objects as go
 import numpy as np
 
-from app_layout import app, label_names, clusters, latent_vectors
+from app_layout import app, LABEL_NAMES, clusters, latent_vectors
 from latentxp_utils import hex_to_rgba, generate_colors, generate_scattergl_plot, generate_scatter_data, compute_mean_std_images
 
 
@@ -36,7 +36,7 @@ def update_scatter_plot(cluster_selection, label_selection, scatter_color, label
                                          cluster_names,
                                          label_selection,
                                          assigned_labels,
-                                         label_names,
+                                         LABEL_NAMES,
                                          scatter_color)
 
     fig = go.Figure(scatter_data)
@@ -121,7 +121,7 @@ def update_statistics(selected_data, n_clicks):
 
         # Format the clusters and labels as comma-separated strings
         clusters_str = ", ".join(str(cluster) for cluster in unique_clusters)
-        labels_str = ", ".join(str(label_names[label]) for label in unique_labels if label in label_names)
+        labels_str = ", ".join(str(LABEL_NAMES[label]) for label in unique_labels if label in LABEL_NAMES)
     else:
         num_images = 0
         clusters_str = "N/A"
@@ -133,31 +133,31 @@ def update_statistics(selected_data, n_clicks):
         html.P(f"Labels represented: {labels_str}"),
     ]
 
-# @app.callback(
-#     Output("scatter-update-trigger", "children"),
-#     Input("assign-labels-button", "n_clicks"),
-#     State('labeler', 'value'),
-#     State('scatter-b', 'selectedData')
-# )
-# def trigger_scatter_update(n_clicks, labeler_value, selected_data):
-#     if n_clicks is not None:
-#         if n_clicks > 0:
-#             if selected_data is not None and len(selected_data['points']) > 0:
-#                 selected_indices = [point['customdata'][0] for point in selected_data['points']]
-#                 for idx in selected_indices:
-#                     if labeler_value != -1:
-#                         assigned_labels[idx] = label_names[labeler_value]
-#                     else:
-#                         assigned_labels[idx] = -1
+@app.callback(
+    Output("scatter-update-trigger", "children"),
+    Input("assign-labels-button", "n_clicks"),
+    State('labeler', 'value'),
+    State('scatter-b', 'selectedData')
+)
+def trigger_scatter_update(n_clicks, labeler_value, selected_data):
+    if n_clicks is not None:
+        if n_clicks > 0:
+            if selected_data is not None and len(selected_data['points']) > 0:
+                selected_indices = [point['customdata'][0] for point in selected_data['points']]
+                for idx in selected_indices:
+                    if labeler_value != -1:
+                        assigned_labels[idx] = LABEL_NAMES[labeler_value]
+                    else:
+                        assigned_labels[idx] = -1
 
-#             return n_clicks
-#         else:
-#             return n_clicks
+            return n_clicks
+        else:
+            return n_clicks
 
-#     else:
-#         return n_clicks
+    else:
+        return n_clicks
 
-#     return n_clicks
+    return n_clicks
 
 @app.callback(
     Output('scatter-axis-range', 'data'),

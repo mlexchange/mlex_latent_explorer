@@ -1,13 +1,14 @@
 from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
-
+from dash_iconify import DashIconify
 import plotly.graph_objects as go
 import numpy as np
+import json
 from sklearn.cluster import DBSCAN
+
 
 import templates
 from latentxp_utils import generate_cluster_dropdown_options, generate_label_dropdown_options
-
 
 external_stylesheets = [dbc.themes.BOOTSTRAP, "../assets/segmentation-style.css"]
 app = Dash(__name__, external_stylesheets=external_stylesheets, suppress_callback_exceptions=True)
@@ -15,7 +16,9 @@ app = Dash(__name__, external_stylesheets=external_stylesheets, suppress_callbac
 server = app.server
 
 #--------------------------------- IO ----------------------------------
-label_names = {"Disc":0, "Triangle": 1, "Rectangle":2, "Annulus":3}
+f = open("/Users/runbojiang/Desktop/mlex_latent_explorer/data/label_schema.json")
+LABEL_NAMES = json.load(f)
+print("label names: ", LABEL_NAMES)
 #latent_vectors = np.load("/app/work/data/pacmacX.npy")
 latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pacmacX.npy")
 
@@ -44,33 +47,48 @@ body = html.Div([
             # Add controls and human interactions here
             # Example: dcc.Slider(), dcc.Dropdown(), etc.
 
-            html.Label('Select cluster:'),
-            dcc.Dropdown(id='cluster-dropdown',
-                         options=generate_cluster_dropdown_options(clusters),
-                         value=-1),
-
-            html.Label('Select label:'),
-            dcc.Dropdown(id='label-dropdown',
-                         options=generate_label_dropdown_options(label_names),
-                         value=-2),
-
-            # Add a radio button for toggling mean and standard deviation
-            html.Label('Display Image Options:'),
-            dcc.RadioItems(id='mean-std-toggle', options=[{'label': 'Mean', 'value': 'mean'},
-                                                          {'label': 'Standard Deviation', 'value': 'sigma'}],
-                           value='mean'),
-
             # Add a radio button for toggling coloring options
             html.Label('Scatter Colors:'),
             dcc.RadioItems(id='scatter-color', options=[{'label': 'cluster', 'value': 'cluster'},
                                                         {'label': 'label', 'value': 'label'}],
                            value='cluster'),
+            html.Br(),
 
+            html.Label('Select cluster:'),
+            dcc.Dropdown(id='cluster-dropdown',
+                         options=generate_cluster_dropdown_options(clusters),
+                         value=-1),
+            html.Br(),
+
+            html.Label('Select label:'),
+            dcc.Dropdown(id='label-dropdown',
+                         options=generate_label_dropdown_options(LABEL_NAMES),
+                         value=-2),
+
+            # # Add a radio button for toggling mean and standard deviation
+            # html.Label('Display Image Options:'),
+            # dcc.RadioItems(id='mean-std-toggle', options=[{'label': 'Mean', 'value': 'mean'},
+            #                                               {'label': 'Standard Deviation', 'value': 'sigma'}],
+            #                value='mean'),
         ], className='column', style={'flex': '50%', 'padding-bottom': '5%'}),
 
         # Labeler
         # Add a new div for displaying statistics
         html.Div([
+            html.Label([
+                            'Select a Group of Points using ',
+                            html.Span(html.I(DashIconify(icon="lucide:lasso")), className='icon'),
+                            ' or ',
+                            html.Span(html.I(DashIconify(icon="lucide:box-select")), className='icon'),
+                            ' Tools :'
+                        ]),
+            html.Br(),
+            # Add a radio button for toggling mean and standard deviation
+            html.Label('Display Image Options:'),
+            dcc.RadioItems(id='mean-std-toggle', options=[{'label': 'Mean', 'value': 'mean'},
+                                                          {'label': 'Standard Deviation', 'value': 'sigma'}],
+                           value='mean'),
+            html.Br(),
 
             html.Div(id='stats-div', children=[
                 html.P("Number of images selected: 0"),
@@ -80,7 +98,7 @@ body = html.Div([
 
             html.Label('Assign Label:'),
             dcc.Dropdown(id='labeler',
-                         options=generate_label_dropdown_options(label_names, False),
+                         options=generate_label_dropdown_options(LABEL_NAMES, False),
                          value=-1),
 
             html.Button('Assign Labels', id='assign-labels-button'),
