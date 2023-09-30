@@ -16,7 +16,8 @@ server = app.server
 
 #--------------------------------- IO ----------------------------------
 label_names = {"Disc":0, "Triangle": 1, "Rectangle":2, "Annulus":3}
-latent_vectors = np.load("/app/work/data/pacmacX.npy")
+#latent_vectors = np.load("/app/work/data/pacmacX.npy")
+latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pacmacX.npy")
 
 obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
 clusters = obj.fit_predict(latent_vectors)

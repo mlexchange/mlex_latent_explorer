@@ -9,6 +9,7 @@ services:
       dockerfile: "docker/Dockerfile"
     volumes:
       - ./data:/app/work/data
+      - ./src:/app/work/src
     ports:
       - "8070:8070"
 

@@ -6,8 +6,10 @@ from app_layout import app, label_names, clusters, latent_vectors
 from latentxp_utils import hex_to_rgba, generate_colors, generate_scattergl_plot, generate_scatter_data, compute_mean_std_images
 
 
-images = np.load("/app/work/data/Demoshapes.npz")['arr_0']
-assigned_labels = np.load("/app/work/data/DemoLabels.npy")
+#images = np.load("/app/work/data/Demoshapes.npz")['arr_0']
+#assigned_labels = np.load("/app/work/data/DemoLabels.npy")
+images = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/Demoshapes.npz")['arr_0']
+assigned_labels = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/DemoLabels.npy")
 cluster_names = {a: a for a in np.unique(clusters).astype(int)}
 
 # ------------------------------------------------
@@ -99,8 +101,6 @@ def update_panel_a(click_data, selected_data, display_option, current_figure):
         )
     )
 
-    return go.Figure(heatmap_data)
-
 # -------------------------------------------------
 # DISPLAY SELECTION STATISTICS
 @app.callback(
@@ -133,31 +133,31 @@ def update_statistics(selected_data, n_clicks):
         html.P(f"Labels represented: {labels_str}"),
     ]
 
-@app.callback(
-    Output("scatter-update-trigger", "children"),
-    Input("assign-labels-button", "n_clicks"),
-    State('labeler', 'value'),
-    State('scatter-b', 'selectedData')
-)
-def trigger_scatter_update(n_clicks, labeler_value, selected_data):
-    if n_clicks is not None:
-        if n_clicks > 0:
-            if selected_data is not None and len(selected_data['points']) > 0:
-                selected_indices = [point['customdata'][0] for point in selected_data['points']]
-                for idx in selected_indices:
-                    if labeler_value != -1:
-                        assigned_labels[idx] = label_names[labeler_value]
-                    else:
-                        assigned_labels[idx] = -1
+# @app.callback(
+#     Output("scatter-update-trigger", "children"),
+#     Input("assign-labels-button", "n_clicks"),
+#     State('labeler', 'value'),
+#     State('scatter-b', 'selectedData')
+# )
+# def trigger_scatter_update(n_clicks, labeler_value, selected_data):
+#     if n_clicks is not None:
+#         if n_clicks > 0:
+#             if selected_data is not None and len(selected_data['points']) > 0:
+#                 selected_indices = [point['customdata'][0] for point in selected_data['points']]
+#                 for idx in selected_indices:
+#                     if labeler_value != -1:
+#                         assigned_labels[idx] = label_names[labeler_value]
+#                     else:
+#                         assigned_labels[idx] = -1
 
-            return n_clicks
-        else:
-            return n_clicks
+#             return n_clicks
+#         else:
+#             return n_clicks
 
-    else:
-        return n_clicks
+#     else:
+#         return n_clicks
 
-    return n_clicks
+#     return n_clicks
 
 @app.callback(
     Output('scatter-axis-range', 'data'),
@@ -171,12 +171,12 @@ def store_scatter_axis_range(relayout_data):
         }
     return {}
 
-@app.callback(
-    Output('label-assign-output', 'children'),
-    Input('label-assign-message', 'children')
-)
-def update_label_assign_output(message):
-    return message
+# @app.callback(
+#     Output('label-assign-output', 'children'),
+#     Input('label-assign-message', 'children')
+# )
+# def update_label_assign_output(message):
+#     return message
     
     
 if __name__ == '__main__':
