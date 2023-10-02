@@ -2,6 +2,8 @@ SCATTER = "scatter"
 HEATMAP = "heatmap"
 SCATTER_COLOR = "scatter_color"
 
+TABS = "tabs"
+
 CLUSTER_DROPDOWN = "cluster_dropdown"
 LABEL_DROPDOWN = "label_dropdown"
 

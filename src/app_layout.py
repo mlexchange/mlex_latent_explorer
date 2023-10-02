@@ -21,13 +21,26 @@ f = open("/Users/runbojiang/Desktop/mlex_latent_explorer/data/label_schema.json"
 LABEL_NAMES = json.load(f)
 #latent_vectors = np.load("/app/work/data/pacmacX.npy")
 latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pacmacX.npy")
+pca_latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pca.npz")['array']
+umap_latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/umap.npz")['array']
+latent_vector_options = {'PCA': pca_latent_vectors, 'UMAP': umap_latent_vectors}
 
 obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
-clusters = obj.fit_predict(latent_vectors)
+pca_clusters = obj.fit_predict(pca_latent_vectors)
+umap_clusters = obj.fit_predict(umap_latent_vectors)
+#clusters = obj.fit_predict(latent_vectors)
+cluster_options = {'PCA': pca_clusters, 'UMAP': umap_clusters}
 
 header = templates.header()
 body = html.Div([
     html.Div([
+        # tabs
+        html.Div([
+            dcc.Tabs(id=ids.TABS, value='PCA', children=[
+                dcc.Tab(label='PCA', value='PCA'),
+                dcc.Tab(label='UMAP', value='UMAP'),
+            ]),
+        ], className='column'),
         # latent plot
         html.Div([
             dcc.Graph(id=ids.SCATTER,
@@ -56,7 +69,7 @@ body = html.Div([
 
             html.Label('Select cluster:'),
             dcc.Dropdown(id=ids.CLUSTER_DROPDOWN,
-                         options=generate_cluster_dropdown_options(clusters),
+                         options=generate_cluster_dropdown_options(pca_clusters),
                          value=-1),
             html.Br(),
 
@@ -64,12 +77,6 @@ body = html.Div([
             dcc.Dropdown(id=ids.LABEL_DROPDOWN,
                          options=generate_label_dropdown_options(LABEL_NAMES),
                          value=-2),
-
-            # # Add a radio button for toggling mean and standard deviation
-            # html.Label('Display Image Options:'),
-            # dcc.RadioItems(id=ids.MEAN_STD_TOGGLE, options=[{'label': 'Mean', 'value': 'mean'},
-            #                                               {'label': 'Standard Deviation', 'value': 'sigma'}],
-            #                value='mean'),
         ], className='column', style={'flex': '50%', 'padding-bottom': '5%'}),
 
         # Labeler

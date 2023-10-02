@@ -2,20 +2,22 @@ from dash import html, Input, Output, State
 import plotly.graph_objects as go
 import numpy as np
 
-from app_layout import app, LABEL_NAMES, clusters, latent_vectors
+from app_layout import app, LABEL_NAMES, cluster_options, latent_vector_options
 from latentxp_utils import hex_to_rgba, generate_colors, generate_scattergl_plot, generate_scatter_data, compute_mean_std_images
 import ids
+from latentxp_utils import generate_cluster_dropdown_options
 
 #images = np.load("/app/work/data/Demoshapes.npz")['arr_0']
 #assigned_labels = np.load("/app/work/data/DemoLabels.npy")
 images = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/Demoshapes.npz")['arr_0']
 assigned_labels = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/DemoLabels.npy")
-cluster_names = {a: a for a in np.unique(clusters).astype(int)}
+
 
 # ------------------------------------------------
 # SCATTER PLOT CALLBACKs
 @app.callback(
     Output(ids.SCATTER, 'figure'),
+    Input(ids.TABS, 'value'),
     Input(ids.CLUSTER_DROPDOWN, 'value'),
     Input(ids.LABEL_DROPDOWN, 'value'),
     Input(ids.SCATTER_COLOR, 'value'),
@@ -23,8 +25,12 @@ cluster_names = {a: a for a in np.unique(clusters).astype(int)}
     State(ids.SCATTER, 'figure'),
     State(ids.SCATTER, 'selectedData')
 )
-def update_scatter_plot(cluster_selection, label_selection, scatter_color, labeler_value, current_figure,
-                        selected_data):
+def update_scatter_plot(selected_tab, cluster_selection, label_selection, scatter_color, 
+                        labeler_value, current_figure, selected_data):
+    clusters = cluster_options[selected_tab]
+    cluster_names = {a: a for a in np.unique(clusters).astype(int)}
+    latent_vectors = latent_vector_options[selected_tab]
+
     if selected_data is not None and len(selected_data.get('points', [])) > 0:
         selected_indices = [point['customdata'][0] for point in selected_data['points']]
     else:
@@ -61,6 +67,17 @@ def update_scatter_plot(cluster_selection, label_selection, scatter_color, label
                 trace.marker.color = [hex_to_rgba('grey', 0.3) if i not in selected_indices else 'red' for i in
                                       range(len(trace.marker.color))]
     return fig
+
+# -------------------------------------------------
+# TABS
+@app.callback(
+        Output(ids.CLUSTER_DROPDOWN, 'options'),
+        Input(ids.TABS, 'value')
+)
+def update_cluster_dropdown(selected_tab):
+    clusters = cluster_options[selected_tab]
+    return generate_cluster_dropdown_options(clusters)
+
 
 # -------------------------------------------------
 # IMAGE PANEL
@@ -105,10 +122,12 @@ def update_panel_a(click_data, selected_data, display_option, current_figure):
 # DISPLAY SELECTION STATISTICS
 @app.callback(
     Output(ids.STATS_DIV, 'children'),
+    Input(ids.TABS, 'value'),
     Input(ids.SCATTER, 'selectedData'),
     Input('assign-labels-button', 'n_clicks'),
 )
-def update_statistics(selected_data, n_clicks):
+def update_statistics(selected_tab, selected_data, n_clicks):
+    clusters = cluster_options[selected_tab]
     if selected_data is not None and len(selected_data['points']) > 0:
         selected_indices = [point['customdata'][0] for point in
                             selected_data['points']]  # Access customdata for the original indices
