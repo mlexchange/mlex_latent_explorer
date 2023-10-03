@@ -135,7 +135,8 @@ def generate_scatter3d_plot(x_coords, y_coords, z_coords, labels, label_to_strin
                 z=trace_z,
                 customdata=np.array(trace_custom_indices).reshape(-1, 1),
                 mode='markers',
-                name=str(label_to_string_map[label])
+                name=str(label_to_string_map[label]),
+                marker=dict(size=3),
             )
         )
 
