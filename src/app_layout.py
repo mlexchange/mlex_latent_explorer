@@ -24,14 +24,16 @@ LABEL_NAMES = json.load(f)
 pca_latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pca.npz")['array']
 pca_latent_vectors_3d = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pca_3d.npz")['array']
 umap_latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/umap.npz")['array']
-latent_vector_options = {'PCA': pca_latent_vectors, 'UMAP': umap_latent_vectors, 'PCA_3d': pca_latent_vectors_3d}
+umap_latent_vectors_3d = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/umap_3d.npz")['array']
+latent_vector_options = {'PCA': pca_latent_vectors, 'UMAP': umap_latent_vectors, 'PCA_3d': pca_latent_vectors_3d, 'UMAP_3d': umap_latent_vectors_3d}
 
 obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
 #clusters = obj.fit_predict(latent_vectors)
 pca_clusters = obj.fit_predict(pca_latent_vectors)
 pca_clusters_3d = obj.fit_predict(pca_latent_vectors_3d)
 umap_clusters = obj.fit_predict(umap_latent_vectors)
-cluster_options = {'PCA': pca_clusters, 'UMAP': umap_clusters, 'PCA_3d': pca_clusters_3d}
+umap_clusters_3d = obj.fit_predict(umap_latent_vectors_3d)
+cluster_options = {'PCA': pca_clusters, 'UMAP': umap_clusters, 'PCA_3d': pca_clusters_3d, 'UMAP_3d': umap_clusters_3d}
 
 header = templates.header()
 body = html.Div([
@@ -73,7 +75,6 @@ body = html.Div([
         # control panel
         html.Div([
             # Add controls and human interactions here
-            # Example: dcc.Slider(), dcc.Dropdown(), etc.
 
             # Add a radio button for toggling coloring options
             html.Label('Scatter Colors:'),

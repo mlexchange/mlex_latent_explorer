@@ -28,14 +28,14 @@ assigned_labels = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/D
 def update_scatter_plot(selected_tab, n_components, 
                         cluster_selection, label_selection, scatter_color,
                         labeler_value, current_figure, selected_data):
-    clusters = cluster_options[selected_tab]
-    if n_components == '3':
-        clusters = cluster_options['PCA_3d']
+    if n_components == '2':
+        latent_vectors = latent_vector_options[selected_tab]
+        clusters = cluster_options[selected_tab]
+    elif n_components == '3':
+        print("selectedtab: ", type(selected_tab))
+        latent_vectors = latent_vector_options[selected_tab+'_3d']
+        clusters = cluster_options[selected_tab+'_3d']
     cluster_names = {a: a for a in np.unique(clusters).astype(int)}
-    
-    latent_vectors = latent_vector_options[selected_tab]
-    if n_components == '3':
-        latent_vectors = latent_vector_options['PCA_3d']
    
     if selected_data is not None and len(selected_data.get('points', [])) > 0:
         selected_indices = [point['customdata'][0] for point in selected_data['points']]
