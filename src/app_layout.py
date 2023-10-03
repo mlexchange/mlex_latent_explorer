@@ -1,6 +1,6 @@
 from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
-from dash_iconify import DashIconify
+# from dash_iconify import DashIconify
 import plotly.graph_objects as go
 import numpy as np
 import json
@@ -17,14 +17,13 @@ app = Dash(__name__, external_stylesheets=external_stylesheets, suppress_callbac
 server = app.server
 
 #--------------------------------- IO ----------------------------------
-f = open("/Users/runbojiang/Desktop/mlex_latent_explorer/data/label_schema.json")
+f = open("/app/work/data/label_schema.json")
 LABEL_NAMES = json.load(f)
 #latent_vectors = np.load("/app/work/data/pacmacX.npy")
-#latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pacmacX.npy")
-pca_latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pca.npz")['array']
-pca_latent_vectors_3d = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pca_3d.npz")['array']
-umap_latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/umap.npz")['array']
-umap_latent_vectors_3d = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/umap_3d.npz")['array']
+pca_latent_vectors = np.load("/app/work/data/pca.npz")['array']
+pca_latent_vectors_3d = np.load("/app/work/data/pca_3d.npz")['array']
+umap_latent_vectors = np.load("/app/work/data/umap.npz")['array']
+umap_latent_vectors_3d = np.load("/app/work/data/umap_3d.npz")['array']
 latent_vector_options = {'PCA': pca_latent_vectors, 'UMAP': umap_latent_vectors, 'PCA_3d': pca_latent_vectors_3d, 'UMAP_3d': umap_latent_vectors_3d}
 
 obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
@@ -100,9 +99,9 @@ body = html.Div([
         html.Div([
             html.Label([
                         'Select a Group of Points using ',
-                        html.Span(html.I(DashIconify(icon="lucide:lasso")), className='icon'),
-                        ' or ',
-                        html.Span(html.I(DashIconify(icon="lucide:box-select")), className='icon'),
+                        # html.Span(html.I(DashIconify(icon="lucide:lasso")), className='icon'),
+                        # ' or ',
+                        # html.Span(html.I(DashIconify(icon="lucide:box-select")), className='icon'),
                         ' Tools :'
                         ]),
             html.Br(),

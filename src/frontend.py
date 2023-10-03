@@ -9,8 +9,8 @@ from latentxp_utils import generate_cluster_dropdown_options
 
 #images = np.load("/app/work/data/Demoshapes.npz")['arr_0']
 #assigned_labels = np.load("/app/work/data/DemoLabels.npy")
-images = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/Demoshapes.npz")['arr_0']
-assigned_labels = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/DemoLabels.npy")
+images = np.load("/app/work/data/Demoshapes.npz")['arr_0']
+assigned_labels = np.load("/app/work/data/DemoLabels.npy")
 
 # ------------------------------------------------
 # SCATTER PLOT CALLBACKs
