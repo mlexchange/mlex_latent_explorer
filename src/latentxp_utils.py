@@ -2,6 +2,7 @@ import plotly.graph_objects as go
 import numpy as np
 import colorsys
 
+
 def hex_to_rgba(hex_color, alpha=1.0):
     """
     Converts a hex color string to an RGBA color string.
@@ -40,7 +41,7 @@ def generate_colors(num_colors):
 
 def generate_scattergl_plot(x_coords, y_coords, labels, label_to_string_map, show_legend=False, custom_indices=None):
     """
-    Generates a Scattergl plot.
+    Generates a two dimensional Scattergl plot.
 
     Parameters:
     x_coords (list): The x-coordinates of the points.
@@ -93,7 +94,68 @@ def generate_scattergl_plot(x_coords, y_coords, labels, label_to_string_map, sho
         )
     return fig
 
+
+def generate_scatter3d_plot(x_coords, y_coords, z_coords, labels, label_to_string_map, show_legend=False, custom_indices=None):
+    """
+    Generates a three-dimensional Scatter3d plot.
+
+    Parameters:
+    x_coords (list): The x-coordinates of the points.
+    y_coords (list): The y-coordinates of the points.
+    z_coords (list): The z-coordinates of the points.
+    labels (list): The labels of the points.
+    label_to_string_map (dict): A mapping from labels to strings.
+    show_legend (bool, optional): Whether to show a legend. Default is False.
+    custom_indices (list, optional): Custom indices for the points. Default is None.
+
+    Returns:
+    go.Figure: The generated Scatter3d plot.
+    """
+    # Create a set of unique labels
+    unique_labels = set(labels)
+
+    # Create a trace for each unique label
+    traces = []
+    for label in unique_labels:
+        # Find the indices of the points with the current label
+        trace_indices = [i for i, l in enumerate(labels) if l == label]
+        trace_x = [x_coords[i] for i in trace_indices]
+        trace_y = [y_coords[i] for i in trace_indices]
+        trace_z = [z_coords[i] for i in trace_indices]
+
+        if custom_indices is not None:
+            trace_custom_indices = [custom_indices[i] for i in trace_indices]
+        else:
+            trace_custom_indices = trace_indices
+
+        traces.append(
+            go.Scatter3d(
+                x=trace_x,
+                y=trace_y,
+                z=trace_z,
+                customdata=np.array(trace_custom_indices).reshape(-1, 1),
+                mode='markers',
+                name=str(label_to_string_map[label])
+            )
+        )
+
+    # Create the plot with the Scatter3d traces
+    fig = go.Figure(data=traces)
+    if show_legend:
+        fig.update_layout(
+            legend=dict(
+                x=0,
+                y=1,
+                bgcolor='rgba(255, 255, 255, 0.9)',
+                bordercolor='rgba(255, 255, 255, 0.9)',
+                orientation='h'
+            )
+        )
+    return fig
+
+
 def generate_scatter_data(latent_vectors,
+                          n_components=2,
                           cluster_selection=-1,
                           clusters=None,
                           cluster_names=None,
@@ -111,6 +173,7 @@ def generate_scatter_data(latent_vectors,
 
     Parameters:
     latent_vectors (numpy.ndarray, Nx2, floats): [Description]
+    n_components: number principal components
     cluster_selection (int): The cluster w want to select. Defaults to -1: all clusters
     clusters (numpy.ndarray, N, ints optional): The cluster number for each data point
     cluster_names (dict, optional): [Description]. A dictionary with cluster names
@@ -137,11 +200,19 @@ def generate_scatter_data(latent_vectors,
         vals = labels
 
     if (cluster_selection == -1) & (label_selection == -2):
-        scatter_data = generate_scattergl_plot(latent_vectors[:, 0],
-                                               latent_vectors[:, 1],
-                                               vals,
-                                               vals_names)
-        return scatter_data
+        if n_components == '2':
+            scatter_data = generate_scattergl_plot(latent_vectors[:, 0],
+                                                latent_vectors[:, 1],
+                                                vals,
+                                                vals_names)
+            return scatter_data
+        else:
+            scatter_data = generate_scatter3d_plot(latent_vectors[:, 0],
+                                                latent_vectors[:, 1],
+                                                latent_vectors[:, 2],
+                                                vals,
+                                                vals_names)
+            return scatter_data
 
     selected_indices = None
     if (cluster_selection == -1) & (label_selection != -2):  # all clusters
@@ -164,6 +235,7 @@ def generate_scatter_data(latent_vectors,
                                            vals[selected_indices],
                                            vals_names,
                                            custom_indices=selected_indices)
+    # TODO: implement for 3d
     return scatter_data
 
 

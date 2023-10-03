@@ -1,9 +1,9 @@
-from dash import html, Input, Output, State
+from dash import html, dcc, Input, Output, State
 import plotly.graph_objects as go
 import numpy as np
 
 from app_layout import app, LABEL_NAMES, cluster_options, latent_vector_options
-from latentxp_utils import hex_to_rgba, generate_colors, generate_scattergl_plot, generate_scatter_data, compute_mean_std_images
+from latentxp_utils import hex_to_rgba, generate_scatter_data
 import ids
 from latentxp_utils import generate_cluster_dropdown_options
 
@@ -12,12 +12,12 @@ from latentxp_utils import generate_cluster_dropdown_options
 images = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/Demoshapes.npz")['arr_0']
 assigned_labels = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/DemoLabels.npy")
 
-
 # ------------------------------------------------
 # SCATTER PLOT CALLBACKs
 @app.callback(
     Output(ids.SCATTER, 'figure'),
     Input(ids.TABS, 'value'),
+    Input(ids.N_COMPONENTS, 'value'),
     Input(ids.CLUSTER_DROPDOWN, 'value'),
     Input(ids.LABEL_DROPDOWN, 'value'),
     Input(ids.SCATTER_COLOR, 'value'),
@@ -25,18 +25,25 @@ assigned_labels = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/D
     State(ids.SCATTER, 'figure'),
     State(ids.SCATTER, 'selectedData')
 )
-def update_scatter_plot(selected_tab, cluster_selection, label_selection, scatter_color, 
+def update_scatter_plot(selected_tab, n_components, 
+                        cluster_selection, label_selection, scatter_color,
                         labeler_value, current_figure, selected_data):
     clusters = cluster_options[selected_tab]
+    if n_components == '3':
+        clusters = cluster_options['PCA_3d']
     cluster_names = {a: a for a in np.unique(clusters).astype(int)}
+    
     latent_vectors = latent_vector_options[selected_tab]
-
+    if n_components == '3':
+        latent_vectors = latent_vector_options['PCA_3d']
+   
     if selected_data is not None and len(selected_data.get('points', [])) > 0:
         selected_indices = [point['customdata'][0] for point in selected_data['points']]
     else:
         selected_indices = None
 
     scatter_data = generate_scatter_data(latent_vectors,
+                                         n_components,
                                          cluster_selection,
                                          clusters,
                                          cluster_names,
@@ -78,6 +85,37 @@ def update_cluster_dropdown(selected_tab):
     clusters = cluster_options[selected_tab]
     return generate_cluster_dropdown_options(clusters)
 
+# -------------------------------------------------
+# Dimension reduction parameters, dependes on which tab (pca or umap) is clicked
+@app.callback(
+        Output(ids.DR_PARAMETERS, 'children'),
+        Input(ids.TABS, 'value')
+)
+def update_dimension_reduction_parameters(selected_tab):
+    if selected_tab == 'PCA':
+        return [
+            html.Label('Select parameters for PCA: '),
+            html.Label('Number of principal components to keep:'),
+            dcc.RadioItems(id=ids.N_COMPONENTS, 
+                           options=[{'label': '2', 'value': '2'},
+                                    {'label': '3', 'value': '3'}],
+            value='2')]
+    elif selected_tab == 'UMAP':
+        return [
+            html.Label('Select parameters for UMAP: '),
+            html.Label('Number of principal components to keep:'),
+            dcc.RadioItems(id=ids.N_COMPONENTS, 
+                           options=[{'label': '2', 'value': '2'},
+                                    {'label': '3', 'value': '3'}], value='2'),
+            html.Label('Min distance between points:'),
+            html.Div(dcc.Slider(min=0.1, max=0.9, step=0.1, value=0.1, id=ids.MIN_DIST), 
+                     style={'width': '50%'}),
+            html.Label('Number of nearest neighbors:'),
+            html.Div(dcc.Slider(min=5, max=50, step=5, value=15, id=ids.N_NEIGIBORS),
+                    style={'width': '50%'})
+            ]
+    else:
+        return None
 
 # -------------------------------------------------
 # IMAGE PANEL

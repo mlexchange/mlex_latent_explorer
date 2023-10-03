@@ -20,16 +20,18 @@ server = app.server
 f = open("/Users/runbojiang/Desktop/mlex_latent_explorer/data/label_schema.json")
 LABEL_NAMES = json.load(f)
 #latent_vectors = np.load("/app/work/data/pacmacX.npy")
-latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pacmacX.npy")
+#latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pacmacX.npy")
 pca_latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pca.npz")['array']
+pca_latent_vectors_3d = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/pca_3d.npz")['array']
 umap_latent_vectors = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/umap.npz")['array']
-latent_vector_options = {'PCA': pca_latent_vectors, 'UMAP': umap_latent_vectors}
+latent_vector_options = {'PCA': pca_latent_vectors, 'UMAP': umap_latent_vectors, 'PCA_3d': pca_latent_vectors_3d}
 
 obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
-pca_clusters = obj.fit_predict(pca_latent_vectors)
-umap_clusters = obj.fit_predict(umap_latent_vectors)
 #clusters = obj.fit_predict(latent_vectors)
-cluster_options = {'PCA': pca_clusters, 'UMAP': umap_clusters}
+pca_clusters = obj.fit_predict(pca_latent_vectors)
+pca_clusters_3d = obj.fit_predict(pca_latent_vectors_3d)
+umap_clusters = obj.fit_predict(umap_latent_vectors)
+cluster_options = {'PCA': pca_clusters, 'UMAP': umap_clusters, 'PCA_3d': pca_clusters_3d}
 
 header = templates.header()
 body = html.Div([
@@ -40,6 +42,19 @@ body = html.Div([
                 dcc.Tab(label='PCA', value='PCA'),
                 dcc.Tab(label='UMAP', value='UMAP'),
             ]),
+        ], className='column'),
+        # parameters for dimension reduction methods
+        html.Div(id=ids.DR_PARAMETERS, children = [
+            html.Label('Select parameters for PCA: '),
+            html.Label('Select number of principal components to keep:'),
+            dcc.RadioItems(
+                id=ids.N_COMPONENTS,
+                options=[
+                    {'label': '2', 'value': '2'},
+                    {'label': '3', 'value': '3'}
+                ],
+                value='2'
+            ),
         ], className='column'),
         # latent plot
         html.Div([

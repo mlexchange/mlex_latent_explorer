@@ -32,3 +32,10 @@ label {
     margin: 0;
     border-style: solid;
 }
+
+.inline-radio-items {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px; /* Adjust the gap between the text and radio items */
+}
