@@ -99,11 +99,11 @@ body = html.Div([
         # Add a new div for displaying statistics
         html.Div([
             html.Label([
-                            'Select a Group of Points using ',
-                            html.Span(html.I(DashIconify(icon="lucide:lasso")), className='icon'),
-                            ' or ',
-                            html.Span(html.I(DashIconify(icon="lucide:box-select")), className='icon'),
-                            ' Tools :'
+                        'Select a Group of Points using ',
+                        html.Span(html.I(DashIconify(icon="lucide:lasso")), className='icon'),
+                        ' or ',
+                        html.Span(html.I(DashIconify(icon="lucide:box-select")), className='icon'),
+                        ' Tools :'
                         ]),
             html.Br(),
             # Add a radio button for toggling mean and standard deviation

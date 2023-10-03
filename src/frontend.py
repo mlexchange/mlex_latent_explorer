@@ -31,11 +31,12 @@ def update_scatter_plot(selected_tab, n_components,
     if n_components == '2':
         latent_vectors = latent_vector_options[selected_tab]
         clusters = cluster_options[selected_tab]
+        cluster_names = {a: a for a in np.unique(clusters).astype(int)}
+   
     elif n_components == '3':
-        print("selectedtab: ", type(selected_tab))
         latent_vectors = latent_vector_options[selected_tab+'_3d']
         clusters = cluster_options[selected_tab+'_3d']
-    cluster_names = {a: a for a in np.unique(clusters).astype(int)}
+        cluster_names = {a: a for a in np.unique(clusters).astype(int)}
    
     if selected_data is not None and len(selected_data.get('points', [])) > 0:
         selected_indices = [point['customdata'][0] for point in selected_data['points']]
@@ -79,10 +80,16 @@ def update_scatter_plot(selected_tab, n_components,
 # TABS
 @app.callback(
         Output(ids.CLUSTER_DROPDOWN, 'options'),
-        Input(ids.TABS, 'value')
+        Input(ids.TABS, 'value'),
+        Input(ids.N_COMPONENTS, 'value')
 )
-def update_cluster_dropdown(selected_tab):
-    clusters = cluster_options[selected_tab]
+def update_cluster_dropdown(selected_tab, n_components):
+    if n_components == '2':
+        clusters = cluster_options[selected_tab]
+    elif n_components == '3':
+        clusters = cluster_options[selected_tab+'_3d']
+    else:
+        clusters = None
     return generate_cluster_dropdown_options(clusters)
 
 # -------------------------------------------------
