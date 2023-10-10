@@ -1,6 +1,6 @@
 from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
-# from dash_iconify import DashIconify
+from dash_iconify import DashIconify
 import plotly.graph_objects as go
 import numpy as np
 import json
@@ -99,9 +99,9 @@ body = html.Div([
         html.Div([
             html.Label([
                         'Select a Group of Points using ',
-                        # html.Span(html.I(DashIconify(icon="lucide:lasso")), className='icon'),
-                        # ' or ',
-                        # html.Span(html.I(DashIconify(icon="lucide:box-select")), className='icon'),
+                        html.Span(html.I(DashIconify(icon="lucide:lasso")), className='icon'),
+                        ' or ',
+                        html.Span(html.I(DashIconify(icon="lucide:box-select")), className='icon'),
                         ' Tools :'
                         ]),
             html.Br(),

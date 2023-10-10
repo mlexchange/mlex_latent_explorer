@@ -13,8 +13,7 @@ RUN apt-get update && apt-get install -y \
     libxext6 
 
 RUN pip3 install --upgrade pip &&\
-    pip3 install --timeout=2000 -r requirements.txt\
-    pip3 install dash-iconify
+    pip3 install --timeout=2000 -r requirements.txt
 
 EXPOSE 8000
 
