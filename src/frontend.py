@@ -1,16 +1,16 @@
-from dash import html, dcc, Input, Output, State
+from dash import html, dcc , Input, Output, State
 import plotly.graph_objects as go
 import numpy as np
 
-from app_layout import app, LABEL_NAMES, cluster_options, latent_vector_options
+from new_app_layout import app #, LABEL_NAMES, cluster_options, latent_vector_options
 from latentxp_utils import hex_to_rgba, generate_scatter_data
 import ids
 from latentxp_utils import generate_cluster_dropdown_options
 
 #images = np.load("/app/work/data/Demoshapes.npz")['arr_0']
 #assigned_labels = np.load("/app/work/data/DemoLabels.npy")
-images = np.load("/app/work/data/Demoshapes.npz")['arr_0']
-assigned_labels = np.load("/app/work/data/DemoLabels.npy")
+# images = np.load("/app/work/data/Demoshapes.npz")['arr_0']
+# assigned_labels = np.load("/app/work/data/DemoLabels.npy")
 
 # ------------------------------------------------
 # SCATTER PLOT CALLBACKs
