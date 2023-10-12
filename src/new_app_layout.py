@@ -96,7 +96,32 @@ algo_panel = html.Div(
                                     ]
                                 ),
                                 
-                                html.Div(id='additional-algo-params',),
+                                html.Div(id='additional-algo-params',
+                                        children = [
+                                            dbc.FormGroup([
+                                                dbc.Label('Number of Components', className='mr-3'),
+                                                dcc.Dropdown(id='ncomponents-dropdown',
+                                                                options=[
+                                                                    {'label': '2 components', 'value': '2'},
+                                                                    {'label': '3 components', 'value': '3'},
+                                                                ],
+                                                                value='2',
+                                                                style={'min-width': '250px'},
+                                                                ),
+                                                dbc.Label('Min distance between points', id='invisible1', className='mr-3'),
+                                                dcc.Dropdown(id='mindist-dropdown',
+                                                                options=[{'label': str(round(0.1*i, 1)), 'value': str(round(0.1*i, 1))} for i in range(1,10)],
+                                                                value='0.1',
+                                                                style={'min-width': '250px', 'display': 'none'},
+                                                                ),
+                                                dbc.Label('Number of Nearest Neighbors', id='invisible2', className='mr-3'),
+                                                dcc.Dropdown(id='nneighbors-dropdown',
+                                                                options=[{'label': str(i), 'value': str(i)} for i in range(5, 51, 5)],
+                                                                value='15',
+                                                                style={'min-width': '250px', 'display': 'none'},
+                                                                ),
+                                            ])
+                                        ]),
                                 html.Hr(),
                                 html.Div(
                                     [
