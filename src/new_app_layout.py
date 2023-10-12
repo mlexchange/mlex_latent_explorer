@@ -40,7 +40,7 @@ image_panel = [
             dbc.CardHeader(
                 [
                     du.Upload(
-                        id="dash-uploader",
+                        id='dash-uploader',
                         max_file_size=1800,
                         cancel_button=True,
                         pause_button=True
@@ -87,7 +87,7 @@ algo_panel = html.Div(
                             [
                                 dbc.FormGroup(
                                     [
-                                        dbc.Label("Choose Algorithm"),
+                                        dbc.Label("Algorithm", className='mr-2'),
                                         dcc.Dropdown(id="algo-dropdown",
                                                      options=[{"label": entry, "value": entry} for entry in ALGORITHM_DATABASE],
                                                      style={'min-width': '250px'},
@@ -95,21 +95,8 @@ algo_panel = html.Div(
                                                      ),
                                     ]
                                 ),
-                                html.Div(id='additional-algo-params'),
-                                dbc.FormGroup(
-                                    [
-                                        dbc.Label('Choose Number of Components'),
-                                        dcc.Dropdown(id='ncomponents-dropdown',
-                                                     options=[
-                                                         {'label': '2 components', 'value': '2'},
-                                                         {'label': '3 components', 'value': '3'},
-                                                     ],
-                                                     value='2',
-                                                     style={'min-width': '250px'},
-                                                     )
-
-                                    ]
-                                ),
+                                
+                                html.Div(id='additional-algo-params',),
                                 html.Hr(),
                                 html.Div(
                                     [
@@ -141,6 +128,26 @@ algo_panel = html.Div(
 
 control_panel = [algo_panel] #TODO: add controls for scatter plot and statistics
 
+# metadata
+meta = [
+    html.Div(
+        id="no-display",
+        children=[
+            # Store for user created contents
+            dcc.Store(id='image-length', data=0),
+            dcc.Store(id='uploader-filename', data=[]),
+            dcc.Store(id='dataset-options', data=DATA_OPTION),
+            dcc.Store(id='run-counter', data=0),
+            # data_label_schema, latent vectors, clusters
+            dcc.Store(id='input_data', data=None),
+            dcc.Store(id='input_labels', data=None),
+            dcc.Store(id='label_schema', data=None),
+            dcc.Store(id='latent_vectors', data=None),
+            dcc.Store(id='clusters', data=[]),
+        ],
+    )
+]
+
 
 ##### DEFINE LAYOUT ####
 app.layout = html.Div(
@@ -149,6 +156,7 @@ app.layout = html.Div(
         dbc.Container(
             [
                 dbc.Row([dbc.Col(image_panel, width=7), dbc.Col(control_panel, width=4)]),
+                dbc.Row(dbc.Col(meta)),
             ]
         )
     ]
