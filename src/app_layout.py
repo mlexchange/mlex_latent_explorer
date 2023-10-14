@@ -10,7 +10,8 @@ import templates
 ### GLOBAL VARIABLES
 ALGORITHM_DATABASE = {"PCA": "PCA",
                       "UMAP": "UMAP",
-                      "tSNE": "tSNE"} ## TODO: update value to compute api link
+                      #"tSNE": "tSNE",
+                      } ## TODO: update value to compute api link
 
 DATA_OPTION = [
     {"label": "Synthetic Shapes", "value": "data/Demoshapes.npz"}
