@@ -156,11 +156,11 @@ def generate_scatter3d_plot(x_coords, y_coords, z_coords, labels, label_to_strin
 
 
 def generate_scatter_data(latent_vectors,
-                          n_components=2,
-                          cluster_selection=-1,
+                          n_components,
+                          cluster_selection=-1, #"All"
                           clusters=None,
                           cluster_names=None,
-                          label_selection=-2,
+                          label_selection=-2, #"All"
                           labels=None,
                           label_names=None,
                           color_by=None,
@@ -190,7 +190,7 @@ def generate_scatter_data(latent_vectors,
     #  all data: cluster_selection =-1, label_selection=-2
     #  all clusters, selected labels
     #  all labels, selected clusters
-    marker_dict = None
+
     vals_names = {}  # None
     if color_by == 'cluster':
         vals = clusters
@@ -216,6 +216,8 @@ def generate_scatter_data(latent_vectors,
             return scatter_data
 
     selected_indices = None
+    clusters = np.array(clusters)
+    labels = np.array(labels)
     if (cluster_selection == -1) & (label_selection != -2):  # all clusters
         if label_selection != -1:
             label_selection = label_names[label_selection]
@@ -230,6 +232,8 @@ def generate_scatter_data(latent_vectors,
             selected_indices = np.where((clusters == cluster_selection) & (labels == selected_labels))[0]
         else:
             selected_indices = np.where((clusters == cluster_selection))[0]
+
+    vals = np.array(vals)
     if n_components == '2': 
         scatter_data = generate_scattergl_plot(latent_vectors[selected_indices, 0],
                                             latent_vectors[selected_indices, 1],
@@ -244,41 +248,6 @@ def generate_scatter_data(latent_vectors,
                                             vals_names,
                                             custom_indices=selected_indices)
     return scatter_data
-
-
-def generate_cluster_dropdown_options(clusters):
-    """
-    Generates options for a cluster dropdown menu.
-
-    Parameters:
-    clusters (numpy.ndarray): The array of cluster labels.
-
-    Returns:
-    list: A list of dictionaries, each representing an option for the dropdown. Each dictionary has a 'label' key
-    for the display text, and a 'value' key for the corresponding value.
-    """
-    unique_clusters = np.unique(clusters)
-    options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
-    options.insert(0, {'label': 'All', 'value': -1})
-    return options
-
-def generate_label_dropdown_options(label_names, add_all=True):
-    """
-    Generates options for a label dropdown menu.
-
-    Parameters:
-    label_names (dict): The mapping from labels to names.
-    add_all (bool, optional): Whether to add an 'All' option. Default is True.
-
-    Returns:
-    list: A list of dictionaries, each representing an option for the dropdown. Each dictionary has a 'label' key
-    for the display text, and a 'value' key for the corresponding value.
-    """
-    options = [{'label': f'Label {label}', 'value': label} for label in label_names]
-    options.insert(0, {'label': 'Unlabeled', 'value': -1})
-    if add_all:
-        options.insert(0, {'label': 'All', 'value': -2})
-    return options
 
 
 def compute_mean_std_images(selected_indices, images):

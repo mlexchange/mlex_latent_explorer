@@ -4,18 +4,11 @@ from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 import numpy as np
 from sklearn.cluster import DBSCAN
-
-import os
-import io
 import pathlib
-import re
 import json
 
-
-from new_app_layout import app
+from app_layout import app
 from latentxp_utils import hex_to_rgba, generate_scatter_data
-import ids
-from latentxp_utils import generate_cluster_dropdown_options
 from dimension_reduction import computePCA, computeUMAP
 
 #### GLOBAL PARAMS ####
@@ -86,7 +79,8 @@ def update_algo_parameters(selected_algo):
     Output('input_data', 'data'),
     Output('input_labels', 'data'),
     Output('label_schema', 'data'),
-    Input('dataset-selection', 'value')
+    Output('label-dropdown', 'options'),
+    Input('dataset-selection', 'value'),
 )
 def update_label_schema(selected_dataset):
     data = None
@@ -98,13 +92,18 @@ def update_label_schema(selected_dataset):
         labels = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/DemoLabels.npy")  
         f = open("/Users/runbojiang/Desktop/mlex_latent_explorer/data/label_schema.json") #"/app/work/data/label_schema.json"
         label_schema = json.load(f)
+    
+    options = [{'label': f'Label {label}', 'value': label} for label in label_schema]
+    options.insert(0, {'label': 'Unlabeled', 'value': -1})
+    options.insert(0, {'label': 'All', 'value': -2})
 
-    return data, labels, label_schema
+    return data, labels, label_schema, options
 
 @app.callback(
     [
         Output('latent_vectors', 'data'),
         Output('clusters', 'data'),
+        Output('cluster-dropdown', 'options')
     ],
     Input('run-algo', 'n_clicks'),
     [
@@ -131,45 +130,154 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     if latent_vectors is not None:
         obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
         clusters = obj.fit_predict(latent_vectors)
-        print("len clusters", len(clusters))
     
-    return latent_vectors, clusters
+    unique_clusters = np.unique(clusters)
+    options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
+    options.insert(0, {'label': 'All', 'value': -1})
+
+    return latent_vectors, clusters, options
 
 @app.callback(
     Output('scatter', 'figure'),
     [
         Input('latent_vectors', 'data'),
+        Input('cluster-dropdown', 'value'),
+        Input('label-dropdown', 'value'),
+        Input('scatter-color', 'value'),
     ],
     [
+        State('scatter', 'figure'),
+        State('scatter', 'selectedData'),
         State('ncomponents-dropdown', 'value'),
-        State('clusters', 'data')
+        State('clusters', 'data'),
+        State('input_labels', 'data'),
+        State('label_schema', 'data'),
     ]
-    
 )
-def update_scatter_plot(latent_vectors, n_components, clusters):
+def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatter_color,
+                        current_figure, selected_data, n_components, clusters, labels, label_names):
     if latent_vectors is None:
         raise PreventUpdate
-    print('update scatter')
-    
-    latent_vectors = np.array(latent_vectors)    
-    if n_components == '2':
-        print("lv shape", latent_vectors.shape)
-        traces = []
-        trace_x = latent_vectors[:, 0].tolist()
-        trace_y = latent_vectors[:, 1].tolist()
-        traces.append(
-            go.Scattergl(
-                x = trace_x,
-                y = trace_y,
-                mode = 'markers'
-            )
-        )
-        fig = go.Figure(data = traces)
-        return fig
+    latent_vectors = np.array(latent_vectors)
 
+    if selected_data is not None and len(selected_data.get('points', [])) > 0:
+        selected_indices = [point['customdata'][0] for point in selected_data['points']]
     else:
-        return None
+        selected_indices = None
+
+    cluster_names = {a: a for a in np.unique(clusters).astype(int)}
     
+    scatter_data = generate_scatter_data(latent_vectors,
+                                        n_components,
+                                        selected_cluster,
+                                        clusters,
+                                        cluster_names,
+                                        selected_label,
+                                        labels,
+                                        label_names,
+                                        scatter_color)
+
+    fig = go.Figure(scatter_data)
+    fig.update_layout(legend=dict(tracegroupgap=20))
+
+    if current_figure and 'xaxis' in current_figure['layout'] and 'yaxis' in current_figure[
+        'layout'] and 'autorange' in current_figure['layout']['xaxis'] and current_figure['layout']['xaxis'][
+        'autorange'] is False:
+        # Update the axis range with current figure's values if available and if autorange is False
+        fig.update_xaxes(range=current_figure['layout']['xaxis']['range'])
+        fig.update_yaxes(range=current_figure['layout']['yaxis']['range'])
+    else:
+        # If it's the initial figure or autorange is True, set autorange to True to fit all points in view
+        fig.update_xaxes(autorange=True)
+        fig.update_yaxes(autorange=True)
+
+    if selected_indices is not None:
+        # Use the selected indices to highlight the selected points in the updated figure
+        for trace in fig.data:
+            if trace.marker.color is not None:
+                trace.marker.color = [hex_to_rgba('grey', 0.3) if i not in selected_indices else 'red' for i in
+                                      range(len(trace.marker.color))]
+    return fig
+
+@app.callback(
+    Output('heatmap', 'figure'),
+    Input('scatter', 'clickData'),
+    Input('scatter', 'selectedData'),
+    Input('mean-std-toggle', 'value'),
+    State('input_data', 'data'),
+)
+def update_heatmap(click_data, selected_data, display_option, input_data):
+    if input_data is None:
+        raise PreventUpdate
+    
+    images = np.array(input_data)
+    if selected_data is not None and len(selected_data['points']) > 0:
+        selected_indices = [point['customdata'][0] for point in selected_data['points']]  # Access customdata for the original indices
+        selected_images = images[selected_indices]
+        if display_option == 'mean':
+            heatmap_data = go.Heatmap(z=np.mean(selected_images, axis=0))
+        elif display_option == 'sigma':
+            heatmap_data = go.Heatmap(z=np.std(selected_images, axis=0))
+    elif click_data is not None and len(click_data['points']) > 0:
+        selected_index = click_data['points'][0]['customdata'][0]  # click_data['points'][0]['pointIndex']
+        heatmap_data = go.Heatmap(z=images[selected_index])
+    else:
+        heatmap_data = go.Heatmap()
+    
+    # Determine the aspect ratio based on the shape of the heatmap_data's z-values
+    aspect_x = 1
+    aspect_y = 1
+    if heatmap_data['z'] is not None:
+        if heatmap_data['z'].size > 0:
+            aspect_y, aspect_x = np.shape(heatmap_data['z'])
+
+    return go.Figure(
+        data=heatmap_data,
+        layout=dict(
+            autosize=True,
+            yaxis=dict(scaleanchor="x", scaleratio=aspect_y / aspect_x),
+        )
+    )
+
+@app.callback(
+    Output('stats-div', 'children'),
+    Input('scatter', 'selectedData'),
+    [
+        State('clusters', 'data'),
+        State('input_labels', 'data'),
+        State('label_schema', 'data')
+    ]
+)
+def update_statistics(selected_data, clusters, assigned_labels, label_names):
+    clusters = np.array(clusters)
+    assigned_labels = np.array(assigned_labels)
+    if selected_data is not None and len(selected_data['points']) > 0:
+        selected_indices = [point['customdata'][0] for point in
+                            selected_data['points']]  # Access customdata for the original indices
+        selected_clusters = clusters[selected_indices]
+        selected_labels = assigned_labels[selected_indices]
+
+        num_images = len(selected_indices)
+        unique_clusters = np.unique(selected_clusters)
+        unique_labels = np.unique(selected_labels)
+
+        # Format the clusters and labels as comma-separated strings
+        clusters_str = ", ".join(str(cluster) for cluster in unique_clusters)
+        label_int_to_str_map = {val: key for key, val in label_names.items()}
+        labels_str = ", ".join(str(label_int_to_str_map[label]) for label in unique_labels)
+    else:
+        num_images = 0
+        clusters_str = "N/A"
+        labels_str = "N/A"
+
+    return [
+        f"Number of images selected: {num_images}",
+        html.Br(),
+        f"Clusters represented: {clusters_str}",
+        html.Br(),
+        f"Labels represented: {labels_str}",
+    ]
+
 
 if __name__ == '__main__':
     app.run_server(debug=True, host='0.0.0.0', port=8070, )
