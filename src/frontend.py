@@ -108,6 +108,8 @@ def update_label_schema(selected_dataset):
         Output('scatter-color',  'value'),
         Output('cluster-dropdown', 'value'),
         Output('label-dropdown', 'value'),
+        # reset heatmap
+        Output('heatmap', 'figure', allow_duplicate=True),
     ],
     Input('run-algo', 'n_clicks'),
     [
@@ -116,7 +118,8 @@ def update_label_schema(selected_dataset):
         State('ncomponents-dropdown', 'value'),
         State('mindist-dropdown', 'value'),
         State('nneighbors-dropdown', 'value')
-    ]
+    ],
+    prevent_initial_call=True
 )
 def update_latent_vectors_and_clusters(submit_n_clicks, 
                                        input_data, selected_algo, n_components, min_dist, n_neighbors):
@@ -142,7 +145,7 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
     options.insert(0, {'label': 'All', 'value': -1})
 
-    return latent_vectors, clusters, options, 'cluster', -1, -2
+    return latent_vectors, clusters, options, 'cluster', -1, -2 , go.Figure(go.Heatmap())
 
 @app.callback(
     Output('scatter', 'figure'),
@@ -207,11 +210,14 @@ def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatte
     return fig
 
 @app.callback(
-    Output('heatmap', 'figure'),
-    Input('scatter', 'clickData'),
-    Input('scatter', 'selectedData'),
-    Input('mean-std-toggle', 'value'),
+    Output('heatmap', 'figure', allow_duplicate=True),
+    [
+        Input('scatter', 'clickData'),
+        Input('scatter', 'selectedData'),
+        Input('mean-std-toggle', 'value'),
+    ],
     State('input_data', 'data'),
+    prevent_initial_call=True
 )
 def update_heatmap(click_data, selected_data, display_option, input_data):
     if input_data is None:

@@ -239,7 +239,7 @@ meta = [
             dcc.Store(id='input_labels', data=None),
             dcc.Store(id='label_schema', data=None),
             dcc.Store(id='latent_vectors', data=None),
-            dcc.Store(id='clusters', data=[]),
+            dcc.Store(id='clusters', data=None),
         ],
     )
 ]
@@ -251,7 +251,9 @@ app.layout = html.Div(
         header, 
         dbc.Container(
             [
-                dbc.Row([dbc.Col(image_panel, width=7), dbc.Col(control_panel, width=4)]),
+                dbc.Row([ dbc.Col(control_panel, width=4), 
+                         dbc.Col(image_panel, width=7)
+                        ]),
                 dbc.Row(dbc.Col(meta)),
             ]
         )
