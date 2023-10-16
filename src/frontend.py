@@ -103,7 +103,7 @@ def update_label_schema(selected_dataset):
     [
         Output('latent_vectors', 'data'),
         Output('clusters', 'data'),
-        Output('cluster-dropdown', 'options')
+        Output('cluster-dropdown', 'options'),
     ],
     Input('run-algo', 'n_clicks'),
     [
