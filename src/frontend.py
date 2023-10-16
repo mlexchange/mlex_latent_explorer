@@ -104,6 +104,10 @@ def update_label_schema(selected_dataset):
         Output('latent_vectors', 'data'),
         Output('clusters', 'data'),
         Output('cluster-dropdown', 'options'),
+        # reset scatter plot control panel
+        Output('scatter-color',  'value'),
+        Output('cluster-dropdown', 'value'),
+        Output('label-dropdown', 'value'),
     ],
     Input('run-algo', 'n_clicks'),
     [
@@ -116,6 +120,9 @@ def update_label_schema(selected_dataset):
 )
 def update_latent_vectors_and_clusters(submit_n_clicks, 
                                        input_data, selected_algo, n_components, min_dist, n_neighbors):
+    """
+    This callback is triggered every time the Submit button is hit.
+    """
     print(selected_algo)
     input_data = np.array(input_data)
     if (submit_n_clicks is None) or (input_data is None):
@@ -135,7 +142,7 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
     options.insert(0, {'label': 'All', 'value': -1})
 
-    return latent_vectors, clusters, options
+    return latent_vectors, clusters, options, 'cluster', -1, -2
 
 @app.callback(
     Output('scatter', 'figure'),
