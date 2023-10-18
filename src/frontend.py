@@ -75,12 +75,12 @@ def update_label_schema(selected_dataset):
     label_schema = None 
 
     if selected_dataset == "data/Demoshapes.npz":
-        data = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/Demoshapes.npz")['arr_0']
-        labels = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/DemoLabels.npy")  
-        f = open("/Users/runbojiang/Desktop/mlex_latent_explorer/data/label_schema.json")
-        # data = np.load("/app/work/data/Demoshapes.npz")['arr_0']
-        # labels = np.load("/app/worl/data/DemoLabels.npy")  
-        # f = open("/app/worl/data/label_schema.json")
+        # data = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/Demoshapes.npz")['arr_0']
+        # labels = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/DemoLabels.npy")  
+        # f = open("/Users/runbojiang/Desktop/mlex_latent_explorer/data/label_schema.json")
+        data = np.load("/app/work/data/Demoshapes.npz")['arr_0']
+        labels = np.load("/app/work/data/DemoLabels.npy")  
+        f = open("/app/work/data/label_schema.json")
         label_schema = json.load(f)
     
     options = [{'label': f'Label {label}', 'value': label} for label in label_schema]
