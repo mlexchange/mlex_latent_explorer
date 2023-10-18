@@ -124,7 +124,6 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
             key   = child["props"]["children"][1]["props"]["id"]["param_key"]
             value = child["props"]["children"][1]["props"]["value"]
             parameters.append(value)
-            print(type(value))
 
     if selected_algo == 'PCA':
         latent_vectors = computePCA(input_data, parameters[0])
@@ -168,8 +167,7 @@ def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatte
     latent_vectors = np.array(latent_vectors)
 
     n_components = children['props']['children'][0]["props"]["children"][1]["props"]["value"]
-    print("n_com:", n_components)
-
+    
     if selected_data is not None and len(selected_data.get('points', [])) > 0:
         selected_indices = [point['customdata'][0] for point in selected_data['points']]
     else:
