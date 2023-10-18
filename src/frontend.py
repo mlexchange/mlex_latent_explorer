@@ -1,5 +1,4 @@
-from dash import html, dcc , Input, Output, State
-import dash_bootstrap_components as dbc
+from dash import html, Input, Output, State
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 import numpy as np
@@ -7,7 +6,6 @@ from sklearn.cluster import DBSCAN
 import pathlib
 import json
 import uuid
-import requests
 
 from app_layout import app
 from latentxp_utils import hex_to_rgba, generate_scatter_data
@@ -79,7 +77,10 @@ def update_label_schema(selected_dataset):
     if selected_dataset == "data/Demoshapes.npz":
         data = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/Demoshapes.npz")['arr_0']
         labels = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/DemoLabels.npy")  
-        f = open("/Users/runbojiang/Desktop/mlex_latent_explorer/data/label_schema.json") #"/app/work/data/label_schema.json"
+        f = open("/Users/runbojiang/Desktop/mlex_latent_explorer/data/label_schema.json")
+        # data = np.load("/app/work/data/Demoshapes.npz")['arr_0']
+        # labels = np.load("/app/worl/data/DemoLabels.npy")  
+        # f = open("/app/worl/data/label_schema.json")
         label_schema = json.load(f)
     
     options = [{'label': f'Label {label}', 'value': label} for label in label_schema]
@@ -167,7 +168,7 @@ def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatte
     latent_vectors = np.array(latent_vectors)
 
     n_components = children['props']['children'][0]["props"]["children"][1]["props"]["value"]
-    
+
     if selected_data is not None and len(selected_data.get('points', [])) > 0:
         selected_indices = [point['customdata'][0] for point in selected_data['points']]
     else:
