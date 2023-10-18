@@ -201,7 +201,7 @@ def generate_scatter_data(latent_vectors,
         vals = labels
 
     if (cluster_selection == -1) & (label_selection == -2):
-        if n_components == '2':
+        if n_components == 2:
             scatter_data = generate_scattergl_plot(latent_vectors[:, 0],
                                                 latent_vectors[:, 1],
                                                 vals,
@@ -234,13 +234,13 @@ def generate_scatter_data(latent_vectors,
             selected_indices = np.where((clusters == cluster_selection))[0]
 
     vals = np.array(vals)
-    if n_components == '2': 
+    if n_components == 2: 
         scatter_data = generate_scattergl_plot(latent_vectors[selected_indices, 0],
                                             latent_vectors[selected_indices, 1],
                                             vals[selected_indices],
                                             vals_names,
                                             custom_indices=selected_indices)
-    elif n_components == '3':
+    elif n_components == 3:
         scatter_data = generate_scatter3d_plot(latent_vectors[selected_indices, 0],
                                             latent_vectors[selected_indices, 1],
                                             latent_vectors[selected_indices, 2],

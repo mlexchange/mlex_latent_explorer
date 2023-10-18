@@ -6,74 +6,63 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 import pathlib
 import json
+import uuid
+import requests
 
 from app_layout import app
 from latentxp_utils import hex_to_rgba, generate_scatter_data
 from dimension_reduction import computePCA, computeUMAP
+from dash_component_editor import JSONParameterEditor
 
 #### GLOBAL PARAMS ####
 OUTPUT_DIR = pathlib.Path('data/output') # save the latent vectors
 USER = 'mlexchange-team'
 UPLOAD_FOLDER_ROOT = "data/upload"
 
-@app.callback(        
-    Output('additional-algo-params', 'children'),
+pca_kwargs = {"gui_parameters": [ {"type": "dropdown", "name": "ncomp-dropdown-menu", "title": "Number of Components", "param_key": "-1", 
+                                        "options": [{'label': '2 components', 'value': 2}, {'label': '3 components', 'value': 3},], 
+                                        "value": 2},
+                                ]
+            }
+umap_kwargs = {"gui_parameters": [
+                                        {"type": "dropdown", "name": "ncomp-dropdown-menu", "title": "Number of Components", "param_key": "0", 
+                                        "options": [{'label': '2 components', 'value': 2}, {'label': '3 components', 'value': 3},], 
+                                        "value": 2}, 
+                                       {"type": "dropdown", "name": "mindist-dropdown-menu", "title": "Min distance between points", "param_key": "1", 
+                                        "options": [{'label': str(round(0.1*i, 1)), 'value': round(0.1*i, 1)} for i in range(1,10)], "value":0.1},
+                                       {"type": "dropdown", "name": "nneighbor-dropdown-menu", "title": "Number of Nearest Neighbors", "param_key": "2",
+                                        "options": [{'label': str(i), 'value': i} for i in range(5, 51, 5)], "value":15},
+                                       ]
+                    }
+
+@app.callback(
+    Output('additional-model-params', 'children'),
     Input('algo-dropdown', 'value')
 )
-def update_algo_parameters(selected_algo):
-    # if PCA, do nothig
+def show_gui_layouts(selected_algo):
+
+    #data = requests.get('http://content-api:8000/api/v0/models').json()
+   
     if selected_algo == 'PCA':
-        return [
-                dbc.FormGroup([
-                    dbc.Label('Number of Components', className='mr-3'),
-                    dcc.Dropdown(id='ncomponents-dropdown',
-                                    options=[
-                                        {'label': '2 components', 'value': '2'},
-                                        {'label': '3 components', 'value': '3'},
-                                    ],
-                                    value='2',
-                                    style={'min-width': '250px'},
-                                    ),
-                    dbc.Label('Min distance between points', id='invisible1', className='mr-3'),
-                    dcc.Dropdown(id='mindist-dropdown',
-                                    options=[{'label': str(round(0.1*i, 1)), 'value': str(round(0.1*i, 1))} for i in range(1,10)],
-                                    value='0.1',
-                                    style={'min-width': '250px', 'display': 'none'},
-                                    ),
-                    dbc.Label('Number of Nearest Neighbors', id='invisible2', className='mr-3'),
-                    dcc.Dropdown(id='nneighbors-dropdown',
-                                    options=[{'label': str(i), 'value': str(i)} for i in range(5, 51, 5)],
-                                    value='15',
-                                    style={'min-width': '250px', 'display': 'none'},
-                                    ),
-                ])]
-    
+        conditions = {'name': 'PCA'}
+        kwargs = pca_kwargs
+        
     if selected_algo == 'UMAP':
-        return [dbc.FormGroup(
-                    [   
-                        dbc.Label('Number of Components', className='mr-3'),
-                        dcc.Dropdown(id='ncomponents-dropdown',
-                                        options=[
-                                            {'label': '2 components', 'value': '2'},
-                                            {'label': '3 components', 'value': '3'},
-                                        ],
-                                        value='2',
-                                        style={'min-width': '250px'},
-                                        ),
-                        dbc.Label('Min distance between points', className='mr-3'),
-                        dcc.Dropdown(id='mindist-dropdown',
-                                        options=[{'label': str(round(0.1*i, 1)), 'value': str(round(0.1*i, 1))} for i in range(1,10)],
-                                        value='0.1',
-                                        style={'min-width': '250px'},
-                                        ),
-                        dbc.Label('Number of Nearest Neighbors', className='mr-3'),
-                        dcc.Dropdown(id='nneighbors-dropdown',
-                                        options=[{'label': str(i), 'value': str(i)} for i in range(5, 51, 5)],
-                                        value='15',
-                                        style={'min-width': '250px' },
-                                        ),
-                    ],
-                )]
+        conditions = {'name': 'UMAP'}
+        kwargs = umap_kwargs # local version
+    
+    #model = [d for d in data if all((k in d and d[k] == v) for k, v in conditions.items())]
+
+    item_list = JSONParameterEditor(_id={'type': str(uuid.uuid4())},
+                                    json_blob=kwargs["gui_parameters"],
+    )
+
+    # item_list = JSONParameterEditor(_id={'type': str(uuid.uuid4())},
+    #                                 json_blob=model[0]["gui_parameters"],
+    # )
+    item_list.init_callbacks(app)
+        
+    return item_list
         
 @app.callback(
     Output('input_data', 'data'),
@@ -115,14 +104,12 @@ def update_label_schema(selected_dataset):
     [
         State('input_data', 'data'),
         State('algo-dropdown', 'value'),
-        State('ncomponents-dropdown', 'value'),
-        State('mindist-dropdown', 'value'),
-        State('nneighbors-dropdown', 'value')
+        State('additional-model-params', 'children'),
     ],
     prevent_initial_call=True
 )
 def update_latent_vectors_and_clusters(submit_n_clicks, 
-                                       input_data, selected_algo, n_components, min_dist, n_neighbors):
+                                       input_data, selected_algo, children):
     """
     This callback is triggered every time the Submit button is hit.
     """
@@ -131,11 +118,19 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     if (submit_n_clicks is None) or (input_data is None):
         raise PreventUpdate
     
+    parameters = []
+    if children:
+        for child in children['props']['children']:
+            key   = child["props"]["children"][1]["props"]["id"]["param_key"]
+            value = child["props"]["children"][1]["props"]["value"]
+            parameters.append(value)
+            print(type(value))
+
     if selected_algo == 'PCA':
-        latent_vectors = computePCA(input_data, n_components=int(n_components))
+        latent_vectors = computePCA(input_data, parameters[0])
     if selected_algo == 'UMAP':
-        latent_vectors = computeUMAP(input_data, n_components=int(n_components), n_neighbors=int(n_neighbors), min_dist=float(min_dist))
-    
+        latent_vectors = computeUMAP(input_data, *parameters)
+    print("latent vector", latent_vectors.shape)
     clusters = None
     if latent_vectors is not None:
         obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
@@ -147,6 +142,7 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
 
     return latent_vectors, clusters, options, 'cluster', -1, -2 , go.Figure(go.Heatmap())
 
+## TODO: update state 
 @app.callback(
     Output('scatter', 'figure'),
     [
@@ -158,17 +154,21 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     [
         State('scatter', 'figure'),
         State('scatter', 'selectedData'),
-        State('ncomponents-dropdown', 'value'),
+        #State('ncomponents-dropdown', 'value'),
+        State('additional-model-params', 'children'),
         State('clusters', 'data'),
         State('input_labels', 'data'),
         State('label_schema', 'data'),
     ]
 )
 def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatter_color,
-                        current_figure, selected_data, n_components, clusters, labels, label_names):
-    if latent_vectors is None:
+                        current_figure, selected_data, children, clusters, labels, label_names):
+    if latent_vectors is None or children is None:
         raise PreventUpdate
     latent_vectors = np.array(latent_vectors)
+
+    n_components = children['props']['children'][0]["props"]["children"][1]["props"]["value"]
+    print("n_com:", n_components)
 
     if selected_data is not None and len(selected_data.get('points', [])) > 0:
         selected_indices = [point['customdata'][0] for point in selected_data['points']]
