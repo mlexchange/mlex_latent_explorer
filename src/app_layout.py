@@ -77,24 +77,19 @@ algo_panel = html.Div(
                 dbc.CardHeader("Dimension Reduction Algorithms"),
                 dbc.CardBody(
                     [
-                        dbc.Form(
-                            [
-                                dbc.FormGroup(
-                                    [
-                                        dbc.Label("Algorithm", className='mr-2'),
-                                        dcc.Dropdown(id="algo-dropdown",
-                                                     options=[{"label": entry, "value": entry} for entry in ALGORITHM_DATABASE],
-                                                     style={'min-width': '250px'},
-                                                     value='PCA',
-                                                     ),
-                                    ]
-                                ),
+                                dbc.Label("Algorithm", className='mr-2'),
+                                dcc.Dropdown(id="algo-dropdown",
+                                                options=[{"label": entry, "value": entry} for entry in ALGORITHM_DATABASE],
+                                                style={'min-width': '250px'},
+                                                value='PCA',
+                                                ),
                                 html.Div(id='additional-model-params'),
                                 html.Hr(),
                                 html.Div(
                                     [
                                         dbc.Button(
                                             "Submit",
+                                            color="secondary",
                                             id="run-algo",
                                             outline=True,
                                             size="lg",
@@ -105,8 +100,6 @@ algo_panel = html.Div(
                                     className='row',
                                     style={'align-items': 'center', 'justify-content': 'center'}
                                 )
-                            ]
-                        )
                     ]
                 )
             ],
@@ -125,31 +118,25 @@ scatter_control_panel =  html.Div(
         children=[
             dbc.CardHeader("Scatter Plot Control Panel"),
             dbc.CardBody([
-                dbc.Form(
-                    dbc.FormGroup(
-                        [   
-                            dbc.Label('Scatter Colors', className='mr-3'),
-                            dcc.RadioItems(id='scatter-color',
-                                           options=[
-                                               {'label': 'cluster', 'value': 'cluster'},
-                                                {'label': 'label', 'value': 'label'}
-                                                ],
-                                           value = 'cluster',
-                                           style={'min-width': '250px'},
-                                           className='mb-2'),
-                            dbc.Label("Select cluster", className='mr-3'),
-                            dcc.Dropdown(id='cluster-dropdown',
-                                         value=-1,
-                                         style={'min-width': '250px'},
-                                         className='mb-2'),
-                            dbc.Label("Select label", className='mr-3'),
-                            dcc.Dropdown(id='label-dropdown',
-                                         value=-2,
-                                         style={'min-width': '250px'},
-                                         )
-                        ]
-                    )
-                )
+                        dbc.Label('Scatter Colors', className='mr-3'),
+                        dcc.RadioItems(id='scatter-color',
+                                        options=[
+                                            {'label': 'cluster', 'value': 'cluster'},
+                                            {'label': 'label', 'value': 'label'}
+                                            ],
+                                        value = 'cluster',
+                                        style={'min-width': '250px'},
+                                        className='mb-2'),
+                        dbc.Label("Select cluster", className='mr-3'),
+                        dcc.Dropdown(id='cluster-dropdown',
+                                        value=-1,
+                                        style={'min-width': '250px'},
+                                        className='mb-2'),
+                        dbc.Label("Select label", className='mr-3'),
+                        dcc.Dropdown(id='label-dropdown',
+                                        value=-2,
+                                        style={'min-width': '250px'},
+                                        )
             ])
         ]
     )]
@@ -160,10 +147,7 @@ heatmap_control_panel =  html.Div(
         style={"width": "100%"},
         children=[
             dbc.CardHeader("Heatmap Control Panel"),
-            dbc.CardBody([
-                dbc.Form(
-                    dbc.FormGroup(
-                        [   
+            dbc.CardBody([ 
                             dbc.Label([
                                     'Select a Group of Points using ',
                                     html.Span(html.I(DashIconify(icon="lucide:lasso")), className='icon'),
@@ -188,9 +172,6 @@ heatmap_control_panel =  html.Div(
                                    html.Br(),
                                    'Labels represented: N/A',
                                 ]),
-                        ]
-                    )
-                )
             ])
         ]
     )]
