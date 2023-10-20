@@ -6,9 +6,10 @@ from sklearn.cluster import DBSCAN
 import pathlib
 import json
 import uuid
+import requests
 
 from app_layout import app
-from latentxp_utils import hex_to_rgba, generate_scatter_data
+from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list
 from dimension_reduction import computePCA, computeUMAP
 from dash_component_editor import JSONParameterEditor
 
@@ -18,13 +19,13 @@ USER = 'mlexchange-team'
 UPLOAD_FOLDER_ROOT = "data/upload"
 
 pca_kwargs = {"gui_parameters": [ {"type": "dropdown", "name": "ncomp-dropdown-menu", "title": "Number of Components", "param_key": "-1", 
-                                        "options": [{'label': '2 components', 'value': 2}, {'label': '3 components', 'value': 3},], 
+                                        "options": [{'label': '2', 'value': 2}, {'label': '3', 'value': 3},], 
                                         "value": 2},
                                 ]
             }
 umap_kwargs = {"gui_parameters": [
                                         {"type": "dropdown", "name": "ncomp-dropdown-menu", "title": "Number of Components", "param_key": "0", 
-                                        "options": [{'label': '2 components', 'value': 2}, {'label': '3 components', 'value': 3},], 
+                                        "options": [{'label': '2', 'value': 2}, {'label': '3', 'value': 3},], 
                                         "value": 2}, 
                                        {"type": "dropdown", "name": "mindist-dropdown-menu", "title": "Min distance between points", "param_key": "1", 
                                         "options": [{'label': str(round(0.1*i, 1)), 'value': round(0.1*i, 1)} for i in range(1,10)], "value":0.1},
@@ -39,25 +40,26 @@ umap_kwargs = {"gui_parameters": [
 )
 def show_gui_layouts(selected_algo):
 
-    #data = requests.get('http://content-api:8000/api/v0/models').json()
+    data = requests.get('http://content-api:8000/api/v0/models').json() # all model
    
     if selected_algo == 'PCA':
         conditions = {'name': 'PCA'}
-        kwargs = pca_kwargs
+        #kwargs = pca_kwargs
         
     if selected_algo == 'UMAP':
         conditions = {'name': 'UMAP'}
-        kwargs = umap_kwargs # local version
+        #kwargs = umap_kwargs # local version
     
-    #model = [d for d in data if all((k in d and d[k] == v) for k, v in conditions.items())]
-
-    item_list = JSONParameterEditor(_id={'type': str(uuid.uuid4())},
-                                    json_blob=kwargs["gui_parameters"],
-    )
+    model = [d for d in data if all((k in d and d[k] == v) for k, v in conditions.items())] # filter pca or umap
+    new_model = remove_key_from_dict_list(model[0]["gui_parameters"], 'comp_group')
 
     # item_list = JSONParameterEditor(_id={'type': str(uuid.uuid4())},
-    #                                 json_blob=model[0]["gui_parameters"],
+    #                                 json_blob=kwargs["gui_parameters"],
     # )
+
+    item_list = JSONParameterEditor(_id={'type': str(uuid.uuid4())},
+                                    json_blob=new_model,
+    )
     item_list.init_callbacks(app)
         
     return item_list
@@ -75,9 +77,6 @@ def update_label_schema(selected_dataset):
     label_schema = None 
 
     if selected_dataset == "data/Demoshapes.npz":
-        # data = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/Demoshapes.npz")['arr_0']
-        # labels = np.load("/Users/runbojiang/Desktop/mlex_latent_explorer/data/DemoLabels.npy")  
-        # f = open("/Users/runbojiang/Desktop/mlex_latent_explorer/data/label_schema.json")
         data = np.load("/app/work/data/Demoshapes.npz")['arr_0']
         labels = np.load("/app/work/data/DemoLabels.npy")  
         f = open("/app/work/data/label_schema.json")

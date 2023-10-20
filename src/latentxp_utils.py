@@ -1,6 +1,20 @@
 import plotly.graph_objects as go
 import numpy as np
 import colorsys
+from copy import deepcopy
+
+def remove_key_from_dict_list(data, key):
+    new_data = []
+    for item in data:
+        if key in item:
+            print("key in item")
+            new_item = deepcopy(item)
+            new_item.pop(key)
+            new_data.append(new_item)
+        else:
+            new_data.append(item)
+    
+    return new_data
 
 
 def hex_to_rgba(hex_color, alpha=1.0):

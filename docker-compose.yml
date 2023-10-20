@@ -12,4 +12,10 @@ services:
       - ./src:/app/work/src
     ports:
       - "8070:8070"
+    networks:
+      - computing_api_default  
+
+networks:
+  computing_api_default:
+    external: true
 
