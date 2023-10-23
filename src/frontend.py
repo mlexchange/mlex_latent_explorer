@@ -9,7 +9,7 @@ import uuid
 import requests
 
 from app_layout import app
-from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list
+from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, job_content_dict
 from dimension_reduction import computePCA, computeUMAP
 from dash_component_editor import JSONParameterEditor
 
@@ -18,24 +18,9 @@ OUTPUT_DIR = pathlib.Path('data/output') # save the latent vectors
 USER = 'mlexchange-team'
 UPLOAD_FOLDER_ROOT = "data/upload"
 
-pca_kwargs = {"gui_parameters": [ {"type": "dropdown", "name": "ncomp-dropdown-menu", "title": "Number of Components", "param_key": "-1", 
-                                        "options": [{'label': '2', 'value': 2}, {'label': '3', 'value': 3},], 
-                                        "value": 2},
-                                ]
-            }
-umap_kwargs = {"gui_parameters": [
-                                        {"type": "dropdown", "name": "ncomp-dropdown-menu", "title": "Number of Components", "param_key": "0", 
-                                        "options": [{'label': '2', 'value': 2}, {'label': '3', 'value': 3},], 
-                                        "value": 2}, 
-                                       {"type": "dropdown", "name": "mindist-dropdown-menu", "title": "Min distance between points", "param_key": "1", 
-                                        "options": [{'label': str(round(0.1*i, 1)), 'value': round(0.1*i, 1)} for i in range(1,10)], "value":0.1},
-                                       {"type": "dropdown", "name": "nneighbor-dropdown-menu", "title": "Number of Nearest Neighbors", "param_key": "2",
-                                        "options": [{'label': str(i), 'value': i} for i in range(5, 51, 5)], "value":15},
-                                       ]
-                    }
-
 @app.callback(
     Output('additional-model-params', 'children'),
+    Output('model_id', 'data'),
     Input('algo-dropdown', 'value')
 )
 def show_gui_layouts(selected_algo):
@@ -44,25 +29,22 @@ def show_gui_layouts(selected_algo):
    
     if selected_algo == 'PCA':
         conditions = {'name': 'PCA'}
-        #kwargs = pca_kwargs
-        
     if selected_algo == 'UMAP':
         conditions = {'name': 'UMAP'}
-        #kwargs = umap_kwargs # local version
     
     model = [d for d in data if all((k in d and d[k] == v) for k, v in conditions.items())] # filter pca or umap
+    model_uid = model[0]["content_id"]
     new_model = remove_key_from_dict_list(model[0]["gui_parameters"], 'comp_group')
-
-    # item_list = JSONParameterEditor(_id={'type': str(uuid.uuid4())},
-    #                                 json_blob=kwargs["gui_parameters"],
-    # )
+    # print("---")
+    # print(new_model)
+    # print("---")
 
     item_list = JSONParameterEditor(_id={'type': str(uuid.uuid4())},
                                     json_blob=new_model,
     )
     item_list.init_callbacks(app)
         
-    return item_list
+    return item_list, model_uid
         
 @app.callback(
     Output('input_data', 'data'),
@@ -103,37 +85,63 @@ def update_label_schema(selected_dataset):
     Input('run-algo', 'n_clicks'),
     [
         State('input_data', 'data'),
+        State('model_id', 'data'),
         State('algo-dropdown', 'value'),
         State('additional-model-params', 'children'),
     ],
     prevent_initial_call=True
 )
-def update_latent_vectors_and_clusters(submit_n_clicks, 
+def update_latent_vectors_and_clusters(submit_n_clicks, model_id,
                                        input_data, selected_algo, children):
     """
     This callback is triggered every time the Submit button is hit.
     """
     print(selected_algo)
+    #print("model id", model_id)
     input_data = np.array(input_data)
     if (submit_n_clicks is None) or (input_data is None):
         raise PreventUpdate
     
-    parameters = []
+    input_params = {}
     if children:
         for child in children['props']['children']:
             key   = child["props"]["children"][1]["props"]["id"]["param_key"]
             value = child["props"]["children"][1]["props"]["value"]
-            parameters.append(value)
+            input_params[key] = value
+    print(input_params)
+
+    model_content = get_content(model_id)
+    job_content = job_content_dict(model_content)
+    job_content['job_kwargs']['kwargs']['parameters'] = input_params
+
+    compute_dict = {'user_uid': USER,
+                    'host_list': ['mlsandbox.als.lbl.gov', 'local.als.lbl.gov', 'vaughan.als.lbl.gov'],
+                    'requirements': {'num_processors': 2,
+                                     'num_gpus': 0,
+                                     'num_nodes': 2},
+                    }
+    compute_dict['job_list'] = [job_content]
+    compute_dict['dependencies'] = {'0':[]}
+    compute_dict['requirements']['num_nodes'] = 1
+
 
     if selected_algo == 'PCA':
-        latent_vectors = computePCA(input_data, parameters[0])
+        cmd_list = ["python pca_run.py", "data/Demoshapes.npz", "output"]
     if selected_algo == 'UMAP':
-        latent_vectors = computeUMAP(input_data, *parameters)
-    print("latent vector", latent_vectors.shape)
+        cmd_list = ["python umap_run.py", "data/Demoshapes.npz", "output"]
+        #latent_vectors = computeUMAP(input_data, input_params)
+    docker_cmd = " ".join(cmd_list)
+    docker_cmd = docker_cmd + ' \'' + json.dumps(input_params) + '\''
+    job_content['job_kwargs']['cmd'] = docker_cmd
+    print("job cont")
+    #print(job_content)
+    response = requests.post('http://job-service:8080/api/v0/workflows', json=compute_dict)
+    print("respnse: ", response)
+    # print("latent vector", latent_vectors.shape)
     clusters = None
-    if latent_vectors is not None:
-        obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
-        clusters = obj.fit_predict(latent_vectors)
+    # if latent_vectors is not None:
+    #     obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
+    #     clusters = obj.fit_predict(latent_vectors)
     
     unique_clusters = np.unique(clusters)
     options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]

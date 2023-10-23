@@ -2,6 +2,27 @@ import plotly.graph_objects as go
 import numpy as np
 import colorsys
 from copy import deepcopy
+import requests
+
+DATA_DIR = "/app/work/data/"
+
+def get_content(uid: str):
+    url = 'http://content-api:8000/api/v0/contents/{}/content'.format(uid)  # current host, could be inside the docker
+    response = requests.get(url).json()
+    return response
+
+def job_content_dict(content):
+    job_content = {# 'mlex_app': content['name'],
+                   'mlex_app': 'dimension reduction demo',
+                   'service_type': content['service_type'],
+                   'working_directory': DATA_DIR,
+                   'job_kwargs': {'uri': content['uri'], 
+                                  'cmd': content['cmd'][0]}
+    }
+    if 'map' in content:
+        job_content['job_kwargs']['map'] = content['map']
+    
+    return job_content
 
 def remove_key_from_dict_list(data, key):
     new_data = []

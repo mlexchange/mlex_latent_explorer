@@ -193,6 +193,7 @@ meta = [
             dcc.Store(id='input_data', data=None),
             dcc.Store(id='input_labels', data=None),
             dcc.Store(id='label_schema', data=None),
+            dcc.Store(id='model_id', data=None),
             dcc.Store(id='latent_vectors', data=None),
             dcc.Store(id='clusters', data=None),
         ],
