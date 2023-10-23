@@ -8,6 +8,7 @@ DATA_DIR = "/app/work/data/"
 
 def get_content(uid: str):
     url = 'http://content-api:8000/api/v0/contents/{}/content'.format(uid)  # current host, could be inside the docker
+    #print(url)
     response = requests.get(url).json()
     return response
 
@@ -28,7 +29,7 @@ def remove_key_from_dict_list(data, key):
     new_data = []
     for item in data:
         if key in item:
-            print("key in item")
+            # print("key in item")
             new_item = deepcopy(item)
             new_item.pop(key)
             new_data.append(new_item)

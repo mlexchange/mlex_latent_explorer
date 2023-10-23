@@ -33,11 +33,9 @@ def show_gui_layouts(selected_algo):
         conditions = {'name': 'UMAP'}
     
     model = [d for d in data if all((k in d and d[k] == v) for k, v in conditions.items())] # filter pca or umap
-    model_uid = model[0]["content_id"]
+    model_uid = model[0]['content_id']
+    print(model_uid)
     new_model = remove_key_from_dict_list(model[0]["gui_parameters"], 'comp_group')
-    # print("---")
-    # print(new_model)
-    # print("---")
 
     item_list = JSONParameterEditor(_id={'type': str(uuid.uuid4())},
                                     json_blob=new_model,
@@ -91,13 +89,12 @@ def update_label_schema(selected_dataset):
     ],
     prevent_initial_call=True
 )
-def update_latent_vectors_and_clusters(submit_n_clicks, model_id,
-                                       input_data, selected_algo, children):
+def update_latent_vectors_and_clusters(submit_n_clicks, 
+                                       input_data, model_id, selected_algo, children):
     """
     This callback is triggered every time the Submit button is hit.
     """
     print(selected_algo)
-    #print("model id", model_id)
     input_data = np.array(input_data)
     if (submit_n_clicks is None) or (input_data is None):
         raise PreventUpdate
@@ -108,11 +105,13 @@ def update_latent_vectors_and_clusters(submit_n_clicks, model_id,
             key   = child["props"]["children"][1]["props"]["id"]["param_key"]
             value = child["props"]["children"][1]["props"]["value"]
             input_params[key] = value
-    print(input_params)
-
     model_content = get_content(model_id)
     job_content = job_content_dict(model_content)
-    job_content['job_kwargs']['kwargs']['parameters'] = input_params
+    print('----')
+    print("job content")
+    print(job_content)
+    print('----')
+    #job_content['job_kwargs']['kwargs']['parameters'] = input_params
 
     compute_dict = {'user_uid': USER,
                     'host_list': ['mlsandbox.als.lbl.gov', 'local.als.lbl.gov', 'vaughan.als.lbl.gov'],
@@ -124,7 +123,6 @@ def update_latent_vectors_and_clusters(submit_n_clicks, model_id,
     compute_dict['dependencies'] = {'0':[]}
     compute_dict['requirements']['num_nodes'] = 1
 
-
     if selected_algo == 'PCA':
         cmd_list = ["python pca_run.py", "data/Demoshapes.npz", "output"]
     if selected_algo == 'UMAP':
@@ -132,9 +130,11 @@ def update_latent_vectors_and_clusters(submit_n_clicks, model_id,
         #latent_vectors = computeUMAP(input_data, input_params)
     docker_cmd = " ".join(cmd_list)
     docker_cmd = docker_cmd + ' \'' + json.dumps(input_params) + '\''
+    print('----')
+    print('docker cmd')
+    print(docker_cmd)
+    print('----')
     job_content['job_kwargs']['cmd'] = docker_cmd
-    print("job cont")
-    #print(job_content)
     response = requests.post('http://job-service:8080/api/v0/workflows', json=compute_dict)
     print("respnse: ", response)
     # print("latent vector", latent_vectors.shape)

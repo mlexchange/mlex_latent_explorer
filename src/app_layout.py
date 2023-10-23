@@ -15,8 +15,6 @@ DATA_OPTION = [
     {"label": "Synthetic Shapes", "value": "data/Demoshapes.npz"}
 ]
 
-
-
 #### SETUP DASH APP ####
 external_stylesheets = [dbc.themes.BOOTSTRAP, "../assets/segmentation-style.css"]
 app = Dash(__name__, external_stylesheets=external_stylesheets, suppress_callback_exceptions=True)
