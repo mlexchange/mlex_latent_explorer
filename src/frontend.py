@@ -8,15 +8,14 @@ import json
 import uuid
 import requests
 import os
+import time
 
 from app_layout import app
 from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, job_content_dict, get_job
-from dimension_reduction import computePCA, computeUMAP
 from dash_component_editor import JSONParameterEditor
 
 #### GLOBAL PARAMS ####
 DATA_DIR = str(os.environ['DATA_DIR'])
-print(DATA_DIR)
 OUTPUT_DIR = pathlib.Path('data/output') # save the latent vectors
 USER = 'mlexchange-team'
 UPLOAD_FOLDER_ROOT = "data/upload"
@@ -107,14 +106,15 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
             key   = child["props"]["children"][1]["props"]["id"]["param_key"]
             value = child["props"]["children"][1]["props"]["value"]
             input_params[key] = value
+    print(input_params)
     model_content = get_content(model_id)
     job_content = job_content_dict(model_content)
-    job_content['working_directory'] = "/Users/runbojiang/Desktop/mlex_latent_explorer/data" ## update
-    print('----')
-    print("job content")
-    print(job_content)
-    print('----')
-    #job_content['job_kwargs']['kwargs']['parameters'] = input_params
+    job_content['working_directory'] = DATA_DIR #"/Users/runbojiang/Desktop/mlex_latent_explorer/data" ## update
+    # print('----')
+    # print("job content")
+    # print(job_content)
+    # print('----')
+    # #job_content['job_kwargs']['kwargs']['parameters'] = input_params
 
     compute_dict = {'user_uid': USER,
                     'host_list': ['mlsandbox.als.lbl.gov', 'local.als.lbl.gov', 'vaughan.als.lbl.gov'],
@@ -133,21 +133,29 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
         
     docker_cmd = " ".join(cmd_list)
     docker_cmd = docker_cmd + ' \'' + json.dumps(input_params) + '\''
-    print('----')
-    print('docker cmd')
-    print(docker_cmd)
-    print('----')
     job_content['job_kwargs']['cmd'] = docker_cmd
+
     response = requests.post('http://job-service:8080/api/v0/workflows', json=compute_dict)
     print("respnse: ", response)
 
-    job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
-    print('job response')
-    print(job_response)
+    # job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
 
-    
+    time.sleep(20)
+    #read the latent vectors from the output dir
+    latent_vectors = None
+    lv_filepath = "/app/work/data/output/" + selected_algo.lower() + "_" + str(input_params['n_components']) + "d"
+    if (selected_algo == 'PCA'):
+        lv_filepath += '.npy'
+    else:
+        lv_filepath += "_{0}_{1}.npy".format(input_params['n_neighbors'], input_params['min_dist'])
+    print(lv_filepath)
+    # Check if the path exists
+    if os.path.exists(lv_filepath):
+        print(f"The path '{lv_filepath}' exists.")
+    else:
+        print(f"The path '{lv_filepath}' does not exist.")
 
-    latent_vectors = None #read the latent vectors from the output dir # TODO: retrieve the latent vectors
+    latent_vectors = np.load(lv_filepath)
     print("latent vector", latent_vectors.shape)
     clusters = None
     if latent_vectors is not None:
