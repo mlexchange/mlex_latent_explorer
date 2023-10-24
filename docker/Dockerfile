@@ -1,5 +1,5 @@
 FROM python:3.9
-MAINTAINER THE MLEXCHANGE TEAM
+LABEL maintainer="THE MLEXCHANGE TEAM"
 
 RUN ls
 COPY docker/requirements.txt requirements.txt
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
     libxext6 
 
 RUN pip3 install --upgrade pip &&\
-    pip3 install --timeout=2000 -r requirements.txt 
+    pip3 install --timeout=2000 -r requirements.txt
 
 EXPOSE 8000
 

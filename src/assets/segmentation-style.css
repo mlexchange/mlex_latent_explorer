@@ -32,3 +32,11 @@ label {
     margin: 0;
     border-style: solid;
 }
+
+#invisible1 {
+    display: none;
+}
+
+#invisible2 {
+    display: none;
+}
