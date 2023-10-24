@@ -6,9 +6,18 @@ import requests
 
 DATA_DIR = "/app/work/data/"
 
+def get_job(user, mlex_app):
+    url = 'http://job-service:8080/api/v0/jobs?'
+    if user:
+        url += ('&user=' + user)
+    if mlex_app:
+        url += ('&mlex_app=' + mlex_app)
+    
+    response = requests.get(url).json()
+    return response
+
 def get_content(uid: str):
     url = 'http://content-api:8000/api/v0/contents/{}/content'.format(uid)  # current host, could be inside the docker
-    #print(url)
     response = requests.get(url).json()
     return response
 

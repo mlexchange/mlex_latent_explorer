@@ -7,13 +7,16 @@ import pathlib
 import json
 import uuid
 import requests
+import os
 
 from app_layout import app
-from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, job_content_dict
+from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, job_content_dict, get_job
 from dimension_reduction import computePCA, computeUMAP
 from dash_component_editor import JSONParameterEditor
 
 #### GLOBAL PARAMS ####
+DATA_DIR = str(os.environ['DATA_DIR'])
+print(DATA_DIR)
 OUTPUT_DIR = pathlib.Path('data/output') # save the latent vectors
 USER = 'mlexchange-team'
 UPLOAD_FOLDER_ROOT = "data/upload"
@@ -34,7 +37,6 @@ def show_gui_layouts(selected_algo):
     
     model = [d for d in data if all((k in d and d[k] == v) for k, v in conditions.items())] # filter pca or umap
     model_uid = model[0]['content_id']
-    print(model_uid)
     new_model = remove_key_from_dict_list(model[0]["gui_parameters"], 'comp_group')
 
     item_list = JSONParameterEditor(_id={'type': str(uuid.uuid4())},
@@ -107,6 +109,7 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
             input_params[key] = value
     model_content = get_content(model_id)
     job_content = job_content_dict(model_content)
+    job_content['working_directory'] = "/Users/runbojiang/Desktop/mlex_latent_explorer/data" ## update
     print('----')
     print("job content")
     print(job_content)
@@ -124,10 +127,10 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     compute_dict['requirements']['num_nodes'] = 1
 
     if selected_algo == 'PCA':
-        cmd_list = ["python pca_run.py", "data/Demoshapes.npz", "output"]
+        cmd_list = ["python pca_run.py", "data/Demoshapes.npz", "data/output"]
     if selected_algo == 'UMAP':
-        cmd_list = ["python umap_run.py", "data/Demoshapes.npz", "output"]
-        #latent_vectors = computeUMAP(input_data, input_params)
+        cmd_list = ["python umap_run.py", "data/Demoshapes.npz", "data/output"]
+        
     docker_cmd = " ".join(cmd_list)
     docker_cmd = docker_cmd + ' \'' + json.dumps(input_params) + '\''
     print('----')
@@ -137,11 +140,19 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     job_content['job_kwargs']['cmd'] = docker_cmd
     response = requests.post('http://job-service:8080/api/v0/workflows', json=compute_dict)
     print("respnse: ", response)
-    # print("latent vector", latent_vectors.shape)
+
+    job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
+    print('job response')
+    print(job_response)
+
+    
+
+    latent_vectors = None #read the latent vectors from the output dir # TODO: retrieve the latent vectors
+    print("latent vector", latent_vectors.shape)
     clusters = None
-    # if latent_vectors is not None:
-    #     obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
-    #     clusters = obj.fit_predict(latent_vectors)
+    if latent_vectors is not None:
+        obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
+        clusters = obj.fit_predict(latent_vectors)
     
     unique_clusters = np.unique(clusters)
     options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
