@@ -2,9 +2,15 @@ from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
 from dash import dcc
 from dash_iconify import DashIconify
+from dash.long_callback import DiskcacheLongCallbackManager
 import plotly.graph_objects as go
 import dash_uploader as du
+import diskcache
+import pathlib
+import os
+
 import templates
+from file_manager.main import FileManager
 
 ### GLOBAL VARIABLES
 ALGORITHM_DATABASE = {"PCA": "PCA",
@@ -14,14 +20,23 @@ ALGORITHM_DATABASE = {"PCA": "PCA",
 DATA_OPTION = [
     {"label": "Synthetic Shapes", "value": "data/Demoshapes.npz"}
 ]
+DOCKER_DATA = pathlib.Path.home() / 'data'  #/app/work/data
+UPLOAD_FOLDER_ROOT = DOCKER_DATA / 'upload' #/app/work/data/upload
 
 #### SETUP DASH APP ####
+cache = diskcache.Cache("./cache")
+long_callback_manager = DiskcacheLongCallbackManager(cache)
 external_stylesheets = [dbc.themes.BOOTSTRAP, "../assets/segmentation-style.css"]
-app = Dash(__name__, external_stylesheets=external_stylesheets, suppress_callback_exceptions=True)
+app = Dash(__name__, 
+           external_stylesheets=external_stylesheets, 
+           suppress_callback_exceptions=True,
+           long_callback_manager=long_callback_manager)
 
 server = app.server
 
-UPLOAD_FOLDER_ROOT = "data/upload"
+dash_file_explorer = FileManager(DOCKER_DATA, 
+                                 UPLOAD_FOLDER_ROOT)
+dash_file_explorer.init_callbacks(app)
 du.configure_upload(app, UPLOAD_FOLDER_ROOT, use_upload_id=False)
 
 #### BEGIN DASH CODE ####
@@ -33,13 +48,14 @@ image_panel = [
         children=[
             dbc.CardHeader(
                 [
-                    du.Upload(
-                        id='dash-uploader',
-                        max_file_size=1800,
-                        cancel_button=True,
-                        pause_button=True
-                    ),
-                    dbc.Label('Choose Dataset', className='mr-2'),
+                    dash_file_explorer.file_explorer,
+                    dcc.Loading(
+                        id="loading-display",
+                        parent_className='transparent-loader-wrapper',
+                        children=[html.Div(id='output-image-upload')],
+                        type="circle"
+                        ),
+                    dbc.Label('Try Example Dataset', className='mr-2'),
                     dcc.Dropdown(
                         id='dataset-selection',
                         options=DATA_OPTION,

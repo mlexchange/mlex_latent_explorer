@@ -13,7 +13,8 @@ RUN apt-get update && apt-get install -y \
     libxext6 
 
 RUN pip3 install --upgrade pip &&\
-    pip3 install --timeout=2000 -r requirements.txt
+    pip3 install --timeout=2000 -r requirements.txt\
+    pip install git+https://github.com/taxe10/mlex_file_manager
 
 EXPOSE 8000
 
