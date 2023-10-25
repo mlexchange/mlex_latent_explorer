@@ -49,12 +49,6 @@ image_panel = [
             dbc.CardHeader(
                 [
                     dash_file_explorer.file_explorer,
-                    dcc.Loading(
-                        id="loading-display",
-                        parent_className='transparent-loader-wrapper',
-                        children=[html.Div(id='output-image-upload')],
-                        type="circle"
-                        ),
                     dbc.Label('Try Example Dataset', className='mr-2'),
                     dcc.Dropdown(
                         id='dataset-selection',
