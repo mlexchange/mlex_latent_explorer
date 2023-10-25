@@ -21,5 +21,3 @@ networks:
   computing_api_default:
     external: true
 
-# env file: set up pwd
-

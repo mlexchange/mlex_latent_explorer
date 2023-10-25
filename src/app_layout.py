@@ -59,7 +59,7 @@ image_panel = [
                     dcc.Dropdown(
                         id='dataset-selection',
                         options=DATA_OPTION,
-                        value = DATA_OPTION[0]['value'],
+                        #value = DATA_OPTION[0]['value'],
                         clearable=False,
                         style={'margin-bottom': '1rem'}
                     ),

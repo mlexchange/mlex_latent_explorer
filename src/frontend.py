@@ -10,10 +10,9 @@ import requests
 import os
 import time
 
-from app_layout import app
+from app_layout import app, DOCKER_DATA, UPLOAD_FOLDER_ROOT
 from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, job_content_dict, get_job
 from dash_component_editor import JSONParameterEditor
-
 #### GLOBAL PARAMS ####
 DATA_DIR = str(os.environ['DATA_DIR'])
 OUTPUT_DIR = pathlib.Path('data/output') # save the latent vectors
@@ -55,15 +54,16 @@ def show_gui_layouts(selected_algo):
 def update_label_schema(selected_dataset):
     data = None
     labels = None
-    label_schema = None 
+    label_schema = None
+    options = []
 
     if selected_dataset == "data/Demoshapes.npz":
         data = np.load("/app/work/data/Demoshapes.npz")['arr_0']
         labels = np.load("/app/work/data/DemoLabels.npy")  
         f = open("/app/work/data/label_schema.json")
         label_schema = json.load(f)
-    
-    options = [{'label': f'Label {label}', 'value': label} for label in label_schema]
+    if label_schema: 
+        options = [{'label': f'Label {label}', 'value': label} for label in label_schema]
     options.insert(0, {'label': 'Unlabeled', 'value': -1})
     options.insert(0, {'label': 'All', 'value': -2})
 
