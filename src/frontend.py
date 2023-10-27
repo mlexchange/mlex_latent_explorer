@@ -1,6 +1,7 @@
 from dash import html, Input, Output, State
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
+import pandas as pd
 import numpy as np
 from sklearn.cluster import DBSCAN
 import pathlib
@@ -9,12 +10,14 @@ import uuid
 import requests
 import os
 import time
+import pyarrow.parquet as pq
+
 
 from app_layout import app, DOCKER_DATA, UPLOAD_FOLDER_ROOT
-from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, job_content_dict, get_job
+from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, get_job, check_if_path_exist
 from dash_component_editor import JSONParameterEditor
 #### GLOBAL PARAMS ####
-DATA_DIR = str(os.environ['DATA_DIR'])
+DATA_DIR = str(os.environ['DATA_DIR']) #"/Users/runbojiang/Desktop/mlex_latent_explorer/data/"
 OUTPUT_DIR = pathlib.Path('data/output') # save the latent vectors
 USER = 'mlexchange-team'
 UPLOAD_FOLDER_ROOT = "data/upload"
@@ -74,17 +77,39 @@ def update_data_n_label_schema(selected_dataset):
     label_schema = None
     options = []
 
-    if selected_dataset == "data/Demoshapes.npz":
-        data = np.load("/app/work/data/Demoshapes.npz")['arr_0']
-        labels = np.load("/app/work/data/DemoLabels.npy")  
-        f = open("/app/work/data/label_schema.json")
+    if selected_dataset == "data/example_shapes/Demoshapes.npz":
+        data = np.load("/app/work/" + selected_dataset)['arr_0']
+        labels = np.load("/app/work/data/example_shapes/DemoLabels.npy")  
+        f = open("/app/work/data/example_shapes/label_schema.json")
         label_schema = json.load(f)
+    if selected_dataset == "data/example_latentrepresentation/f_vectors.parquet":
+        print('a')
+        table = pd.read_table("/app/work/" + selected_dataset)
+        print('b')
+        df = table.to_pandas()
+        print(df.shape)
+        data = df.values
+        labels = np.full((df.shapes[0],), -2) # all data unlabeled, therefore no label schema
+
     if label_schema: 
         options = [{'label': f'Label {label}', 'value': label} for label in label_schema]
     options.insert(0, {'label': 'Unlabeled', 'value': -1})
     options.insert(0, {'label': 'All', 'value': -2})
 
     return data, labels, label_schema, options
+
+def job_content_dict(content):
+    job_content = {# 'mlex_app': content['name'],
+                   'mlex_app': 'dimension reduction demo',
+                   'service_type': content['service_type'],
+                   'working_directory': DATA_DIR,
+                   'job_kwargs': {'uri': content['uri'], 
+                                  'cmd': content['cmd'][0]}
+    }
+    if 'map' in content:
+        job_content['job_kwargs']['map'] = content['map']
+    
+    return job_content
 
 @app.callback(
     [
@@ -100,7 +125,7 @@ def update_data_n_label_schema(selected_dataset):
     ],
     Input('run-algo', 'n_clicks'),
     [
-        State('input_data', 'data'),
+        State('dataset-selection', 'value'),
         State('model_id', 'data'),
         State('algo-dropdown', 'value'),
         State('additional-model-params', 'children'),
@@ -108,7 +133,7 @@ def update_data_n_label_schema(selected_dataset):
     prevent_initial_call=True
 )
 def update_latent_vectors_and_clusters(submit_n_clicks, 
-                                       input_data, model_id, selected_algo, children):
+                                       selected_dataset, model_id, selected_algo, children):
     
     """
     This callback is triggered every time the Submit button is hit:
@@ -119,7 +144,7 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     TODO: This callback needs to be split into two
     Args:
         submit_n_clicks:        num of clicks for the submit button
-        input_data:             data from selected example dataset
+        selected_dataset:       selected example dataset
         model_id:               uid of selected dimension reduciton algo
         selected_algo:          selected dimension reduction algo
         children:               div for algo's parameters
@@ -132,8 +157,7 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
         heatmap:                empty heatmap figure
     """
     print(selected_algo)
-    input_data = np.array(input_data)
-    if (submit_n_clicks is None) or (input_data is None):
+    if submit_n_clicks is None or selected_dataset is None:
         raise PreventUpdate
     
     input_params = {}
@@ -144,13 +168,11 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
             input_params[key] = value
     print(input_params)
     model_content = get_content(model_id)
+    print(model_content)
     job_content = job_content_dict(model_content)
-    job_content['working_directory'] = DATA_DIR #"/Users/runbojiang/Desktop/mlex_latent_explorer/data" ## update
-    # print('----')
-    # print("job content")
-    # print(job_content)
-    # print('----')
-    # #job_content['job_kwargs']['kwargs']['parameters'] = input_params
+    job_content['job_kwargs']['kwargs'] = {}
+    job_content['job_kwargs']['kwargs']['parameters'] = input_params
+    #TODO: other kwargs
 
     compute_dict = {'user_uid': USER,
                     'host_list': ['mlsandbox.als.lbl.gov', 'local.als.lbl.gov', 'vaughan.als.lbl.gov'],
@@ -163,11 +185,12 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     compute_dict['requirements']['num_nodes'] = 1
 
     if selected_algo == 'PCA':
-        cmd_list = ["python pca_run.py", "data/Demoshapes.npz", "data/output"]
+        cmd_list = ["python pca_run.py", selected_dataset, "data/output"]
     if selected_algo == 'UMAP':
-        cmd_list = ["python umap_run.py", "data/Demoshapes.npz", "data/output"]
+        cmd_list = ["python umap_run.py", selected_dataset, "data/output"]
         
     docker_cmd = " ".join(cmd_list)
+    print(docker_cmd)
     docker_cmd = docker_cmd + ' \'' + json.dumps(input_params) + '\''
     job_content['job_kwargs']['cmd'] = docker_cmd
 
@@ -186,10 +209,7 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
         lv_filepath += "_{0}_{1}.npy".format(input_params['n_neighbors'], input_params['min_dist'])
     print(lv_filepath)
     # Check if the path exists
-    if os.path.exists(lv_filepath):
-        print(f"The path '{lv_filepath}' exists.")
-    else:
-        print(f"The path '{lv_filepath}' does not exist.")
+    check_if_path_exist(lv_filepath)
 
     latent_vectors = np.load(lv_filepath)
     print("latent vector", latent_vectors.shape)
