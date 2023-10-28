@@ -70,26 +70,22 @@ def update_data_n_label_schema(selected_dataset):
         input_data:             input image data
         input_labels:           labels of input image data, which is of int values
         label_schema:           the text of each unique label
-        label-dropdown:         dropdown options for each label
+        label-dropdown:         label dropdown options
     '''
     data = None
     labels = None
-    label_schema = None
+    label_schema = {}
     options = []
 
     if selected_dataset == "data/example_shapes/Demoshapes.npz":
         data = np.load("/app/work/" + selected_dataset)['arr_0']
-        labels = np.load("/app/work/data/example_shapes/DemoLabels.npy")  
+        labels = np.load("/app/work/data/example_shapes/DemoLabels.npy")
         f = open("/app/work/data/example_shapes/label_schema.json")
         label_schema = json.load(f)
     if selected_dataset == "data/example_latentrepresentation/f_vectors.parquet":
-        print('a')
-        table = pd.read_table("/app/work/" + selected_dataset)
-        print('b')
-        df = table.to_pandas()
-        print(df.shape)
+        df = pd.read_parquet("/app/work/" + selected_dataset)
         data = df.values
-        labels = np.full((df.shapes[0],), -2) # all data unlabeled, therefore no label schema
+        labels = np.full((df.shape[0],), -1)
 
     if label_schema: 
         options = [{'label': f'Label {label}', 'value': label} for label in label_schema]
@@ -207,7 +203,6 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
         lv_filepath += '.npy'
     else:
         lv_filepath += "_{0}_{1}.npy".format(input_params['n_neighbors'], input_params['min_dist'])
-    print(lv_filepath)
     # Check if the path exists
     check_if_path_exist(lv_filepath)
 
@@ -222,7 +217,7 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
     options.insert(0, {'label': 'All', 'value': -1})
 
-    return latent_vectors, clusters, options, 'cluster', -1, -2 , go.Figure(go.Heatmap())
+    return latent_vectors, clusters, options, 'cluster', -1, -2, go.Figure(go.Heatmap())
 
 @app.callback(
     Output('scatter', 'figure'),

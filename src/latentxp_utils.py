@@ -228,15 +228,16 @@ def generate_scatter_data(latent_vectors,
     #  all clusters, selected labels
     #  all labels, selected clusters
 
-    vals_names = {}  # None
+    vals_names = {}
     if color_by == 'cluster':
         vals = clusters
         vals_names = cluster_names
     if color_by == 'label':
-        vals_names = {value: key for key, value in label_names.items()}
-        vals_names[-1] = "N/A"
         vals = labels
-
+        if label_names is not None:
+            vals_names = {value: key for key, value in label_names.items()}
+        vals_names[-1] = "Unlabeled"
+        
     if (cluster_selection == -1) & (label_selection == -2):
         if n_components == 2:
             scatter_data = generate_scattergl_plot(latent_vectors[:, 0],
