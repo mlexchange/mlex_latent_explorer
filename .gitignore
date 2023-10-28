@@ -2,12 +2,13 @@
 __pycache__/
 *.py[cod]
 *$py.class
+test.py
 
 # output dir
-output/
+data/output/
+data/upload/
+data/.file_manager_vars.pkl
 .DS_Store
-dimension_reduction_precompute/
-src/dimension_reduction.py
 
 # C extensions
 *.so

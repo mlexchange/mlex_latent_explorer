@@ -1,6 +1,7 @@
 from dash import html, Input, Output, State
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
+import pandas as pd
 import numpy as np
 from sklearn.cluster import DBSCAN
 import pathlib
@@ -9,14 +10,15 @@ import uuid
 import requests
 import os
 import time
+import pyarrow.parquet as pq
 
-from app_layout import app
-from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, job_content_dict, get_job
+
+from app_layout import app, DOCKER_DATA, UPLOAD_FOLDER_ROOT
+from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, get_job, check_if_path_exist
 from dash_component_editor import JSONParameterEditor
-
 #### GLOBAL PARAMS ####
 DATA_DIR = str(os.environ['DATA_DIR'])
-OUTPUT_DIR = pathlib.Path('data/output') # save the latent vectors
+OUTPUT_DIR = pathlib.Path('data/output')
 USER = 'mlexchange-team'
 UPLOAD_FOLDER_ROOT = "data/upload"
 
@@ -26,7 +28,14 @@ UPLOAD_FOLDER_ROOT = "data/upload"
     Input('algo-dropdown', 'value')
 )
 def show_gui_layouts(selected_algo):
-
+    '''
+    This callback display dropdown menu in the frontend for different dimension reduction algos
+    Args:
+        selected_algo:      Selected dimension reduction algorithm
+    Returns:
+        item_list:          dropdown menu html code
+        model_uid:          selected algo's uid
+    '''
     data = requests.get('http://content-api:8000/api/v0/models').json() # all model
    
     if selected_algo == 'PCA':
@@ -52,22 +61,51 @@ def show_gui_layouts(selected_algo):
     Output('label-dropdown', 'options'),
     Input('dataset-selection', 'value'),
 )
-def update_label_schema(selected_dataset):
+def update_data_n_label_schema(selected_dataset):
+    '''
+    This callback updates the selected dataset from the provided example datasets, as well as labels, and label schema
+    Args:
+        dataset-selection:      selected dataset from the provided example datasets
+    Returns:
+        input_data:             input image data
+        input_labels:           labels of input image data, which is of int values
+        label_schema:           the text of each unique label
+        label-dropdown:         label dropdown options
+    '''
     data = None
     labels = None
-    label_schema = None 
+    label_schema = {}
+    options = []
 
-    if selected_dataset == "data/Demoshapes.npz":
-        data = np.load("/app/work/data/Demoshapes.npz")['arr_0']
-        labels = np.load("/app/work/data/DemoLabels.npy")  
-        f = open("/app/work/data/label_schema.json")
+    if selected_dataset == "data/example_shapes/Demoshapes.npz":
+        data = np.load("/app/work/" + selected_dataset)['arr_0']
+        labels = np.load("/app/work/data/example_shapes/DemoLabels.npy")
+        f = open("/app/work/data/example_shapes/label_schema.json")
         label_schema = json.load(f)
-    
-    options = [{'label': f'Label {label}', 'value': label} for label in label_schema]
+    if selected_dataset == "data/example_latentrepresentation/f_vectors.parquet":
+        df = pd.read_parquet("/app/work/" + selected_dataset)
+        data = df.values
+        labels = np.full((df.shape[0],), -1)
+
+    if label_schema: 
+        options = [{'label': f'Label {label}', 'value': label} for label in label_schema]
     options.insert(0, {'label': 'Unlabeled', 'value': -1})
     options.insert(0, {'label': 'All', 'value': -2})
 
     return data, labels, label_schema, options
+
+def job_content_dict(content):
+    job_content = {# 'mlex_app': content['name'],
+                   'mlex_app': 'dimension reduction demo',
+                   'service_type': content['service_type'],
+                   'working_directory': DATA_DIR,
+                   'job_kwargs': {'uri': content['uri'], 
+                                  'cmd': content['cmd'][0]}
+    }
+    if 'map' in content:
+        job_content['job_kwargs']['map'] = content['map']
+    
+    return job_content
 
 @app.callback(
     [
@@ -83,7 +121,7 @@ def update_label_schema(selected_dataset):
     ],
     Input('run-algo', 'n_clicks'),
     [
-        State('input_data', 'data'),
+        State('dataset-selection', 'value'),
         State('model_id', 'data'),
         State('algo-dropdown', 'value'),
         State('additional-model-params', 'children'),
@@ -91,13 +129,31 @@ def update_label_schema(selected_dataset):
     prevent_initial_call=True
 )
 def update_latent_vectors_and_clusters(submit_n_clicks, 
-                                       input_data, model_id, selected_algo, children):
+                                       selected_dataset, model_id, selected_algo, children):
+    
     """
-    This callback is triggered every time the Submit button is hit.
+    This callback is triggered every time the Submit button is hit:
+        - compute latent vectors, which is saved in data/output
+        - reset scatter plot control panel to default
+        - reset heatmap to no image
+        - read latent vectors to calculate clusters
+    TODO: This callback needs to be split into two
+    Args:
+        submit_n_clicks:        num of clicks for the submit button
+        selected_dataset:       selected example dataset
+        model_id:               uid of selected dimension reduciton algo
+        selected_algo:          selected dimension reduction algo
+        children:               div for algo's parameters
+    Returns:
+        latent_vectors:         data from dimension reduction algos
+        clusters:               clusters for latent vectors
+        cluster-dropdown:       options for cluster dropdown
+        scatter-color:          default scatter-color value
+        cluster-dropdown:       default cluster-dropdown value
+        heatmap:                empty heatmap figure
     """
     print(selected_algo)
-    input_data = np.array(input_data)
-    if (submit_n_clicks is None) or (input_data is None):
+    if submit_n_clicks is None or selected_dataset is None:
         raise PreventUpdate
     
     input_params = {}
@@ -108,13 +164,11 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
             input_params[key] = value
     print(input_params)
     model_content = get_content(model_id)
+    print(model_content)
     job_content = job_content_dict(model_content)
-    job_content['working_directory'] = DATA_DIR #"/Users/runbojiang/Desktop/mlex_latent_explorer/data" ## update
-    # print('----')
-    # print("job content")
-    # print(job_content)
-    # print('----')
-    # #job_content['job_kwargs']['kwargs']['parameters'] = input_params
+    job_content['job_kwargs']['kwargs'] = {}
+    job_content['job_kwargs']['kwargs']['parameters'] = input_params
+    #TODO: other kwargs
 
     compute_dict = {'user_uid': USER,
                     'host_list': ['mlsandbox.als.lbl.gov', 'local.als.lbl.gov', 'vaughan.als.lbl.gov'],
@@ -127,11 +181,12 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     compute_dict['requirements']['num_nodes'] = 1
 
     if selected_algo == 'PCA':
-        cmd_list = ["python pca_run.py", "data/Demoshapes.npz", "data/output"]
+        cmd_list = ["python pca_run.py", selected_dataset, "data/output"]
     if selected_algo == 'UMAP':
-        cmd_list = ["python umap_run.py", "data/Demoshapes.npz", "data/output"]
+        cmd_list = ["python umap_run.py", selected_dataset, "data/output"]
         
     docker_cmd = " ".join(cmd_list)
+    print(docker_cmd)
     docker_cmd = docker_cmd + ' \'' + json.dumps(input_params) + '\''
     job_content['job_kwargs']['cmd'] = docker_cmd
 
@@ -148,12 +203,8 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
         lv_filepath += '.npy'
     else:
         lv_filepath += "_{0}_{1}.npy".format(input_params['n_neighbors'], input_params['min_dist'])
-    print(lv_filepath)
     # Check if the path exists
-    if os.path.exists(lv_filepath):
-        print(f"The path '{lv_filepath}' exists.")
-    else:
-        print(f"The path '{lv_filepath}' does not exist.")
+    check_if_path_exist(lv_filepath)
 
     latent_vectors = np.load(lv_filepath)
     print("latent vector", latent_vectors.shape)
@@ -166,9 +217,8 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
     options.insert(0, {'label': 'All', 'value': -1})
 
-    return latent_vectors, clusters, options, 'cluster', -1, -2 , go.Figure(go.Heatmap())
+    return latent_vectors, clusters, options, 'cluster', -1, -2, go.Figure(go.Heatmap())
 
-## TODO: update state 
 @app.callback(
     Output('scatter', 'figure'),
     [
@@ -180,7 +230,6 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     [
         State('scatter', 'figure'),
         State('scatter', 'selectedData'),
-        #State('ncomponents-dropdown', 'value'),
         State('additional-model-params', 'children'),
         State('clusters', 'data'),
         State('input_labels', 'data'),
@@ -189,6 +238,22 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
 )
 def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatter_color,
                         current_figure, selected_data, children, clusters, labels, label_names):
+    '''
+    This callback update the scater plot
+    Args:
+        latent_vectors:     data from dimension reduction algos
+        selected_cluster:   selected cluster option from dropdown
+        selected_label:     selected label option from dropdown
+        scatter_color:      selected scatter-color option, either cluster or label
+        current_figure:     current scatter figure
+        selected_data:      lasso or rect selected data points on scatter figure
+        children:           div for algo's parameters
+        clusters:           clusters for latent vectors
+        labels:             labels of input image data, which is of int values
+        label_names:        same as label_schema defined earlier
+    Returns:
+        fig:                updated scatter figure
+    '''
     if latent_vectors is None or children is None:
         raise PreventUpdate
     latent_vectors = np.array(latent_vectors)
@@ -245,6 +310,16 @@ def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatte
     prevent_initial_call=True
 )
 def update_heatmap(click_data, selected_data, display_option, input_data):
+    '''
+    This callback update the heatmap
+    Args:
+        click_data:         clicked data on scatter figure
+        selected_data:      lasso or rect selected data points on scatter figure
+        display_option:     option to display mean or std
+        input_data:         input image data
+    Returns:
+        fig:                updated heatmap
+    '''
     if input_data is None:
         raise PreventUpdate
     
@@ -287,6 +362,16 @@ def update_heatmap(click_data, selected_data, display_option, input_data):
     ]
 )
 def update_statistics(selected_data, clusters, assigned_labels, label_names):
+    '''
+    This callback update the statistics panel
+    Args:
+        selected_data:      lasso or rect selected data points on scatter figure
+        clusters:           clusters for latent vectors
+        assigned_labels:    labels for each latent vector
+        label_names:        same as label schema  
+    Returns:
+        [num_images, clusters, labels]:     statistics
+    '''
     clusters = np.array(clusters)
     assigned_labels = np.array(assigned_labels)
     if selected_data is not None and len(selected_data['points']) > 0:
