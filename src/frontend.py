@@ -17,8 +17,8 @@ from app_layout import app, DOCKER_DATA, UPLOAD_FOLDER_ROOT
 from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, get_job, check_if_path_exist
 from dash_component_editor import JSONParameterEditor
 #### GLOBAL PARAMS ####
-DATA_DIR = str(os.environ['DATA_DIR']) #"/Users/runbojiang/Desktop/mlex_latent_explorer/data/"
-OUTPUT_DIR = pathlib.Path('data/output') # save the latent vectors
+DATA_DIR = str(os.environ['DATA_DIR'])
+OUTPUT_DIR = pathlib.Path('data/output')
 USER = 'mlexchange-team'
 UPLOAD_FOLDER_ROOT = "data/upload"
 
