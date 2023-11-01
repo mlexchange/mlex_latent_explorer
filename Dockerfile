@@ -2,7 +2,7 @@ FROM python:3.9
 LABEL maintainer="THE MLEXCHANGE TEAM"
 
 RUN ls
-COPY docker/requirements.txt requirements.txt
+COPY requirements.txt requirements.txt
 
 RUN apt-get update && apt-get install -y \
     build-essential \
