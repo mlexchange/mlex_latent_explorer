@@ -6,7 +6,7 @@ services:
     container_name: "latentxp"
     build:
       context: "."
-      dockerfile: "docker/Dockerfile"
+      dockerfile: "Dockerfile"
     environment:
       DATA_DIR: "${PWD}/data/"
     volumes:
