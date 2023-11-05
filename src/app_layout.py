@@ -49,7 +49,7 @@ image_panel = [
         children=[
             dbc.CardHeader(
                 [
-                    # dash_file_explorer.file_explorer,
+                    dash_file_explorer.file_explorer,
                     dbc.Label('Try Example Dataset', className='mr-2'),
                     dcc.Dropdown(
                         id='dataset-selection',
