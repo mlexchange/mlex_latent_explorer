@@ -12,6 +12,7 @@ import os
 import time
 import pyarrow.parquet as pq
 
+from file_manager.data_project import DataProject
 
 from app_layout import app, DOCKER_DATA, UPLOAD_FOLDER_ROOT
 from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, get_job, check_if_path_exist
@@ -62,28 +63,44 @@ def show_gui_layouts(selected_algo):
     Input('dataset-selection', 'value'),
     Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'),
 )
-def update_data_n_label_schema(selected_dataset, file_paths):
+def update_data_n_label_schema(selected_dataset, upload_file_paths):
     '''
     This callback updates the selected dataset from the provided example datasets, as well as labels, and label schema
     Args:
-        dataset-selection:      selected dataset from the provided example datasets
+        dataset-selection:      selected dataset from the provided example datasets, not the one that user uploaded
+        upload_file_pahts:      Data project info, the user uploaded zip file using FileManager, list
     Returns:
-        input_data:             input image data
+        input_data:             input image data, numpy.ndarray
         input_labels:           labels of input image data, which is of int values
         label_schema:           the text of each unique label
         label-dropdown:         label dropdown options
     '''
+    
+    data_project = DataProject()
+    data_project.init_from_dict(upload_file_paths)
+    data_set = data_project.data # list of len 1920, each element is a local_dataset.LocalDataset object
+
     data = None
     labels = None
     label_schema = {}
     options = []
 
-    if selected_dataset == "data/example_shapes/Demoshapes.npz":
+    if len(data_set) > 0:
+        data = []
+        #for i in range(len(data_set)): #exited with code 247, 137
+        for i in range(20):
+            image, uri = data_project.data[i].read_data(export='pillow')
+            data.append(np.array(image))
+        data = np.array(data)
+        print(data.shape)
+        labels = np.full((data.shape[0],), -1)
+
+    elif selected_dataset == "data/example_shapes/Demoshapes.npz":
         data = np.load("/app/work/" + selected_dataset)['arr_0']
         labels = np.load("/app/work/data/example_shapes/DemoLabels.npy")
         f = open("/app/work/data/example_shapes/label_schema.json")
         label_schema = json.load(f)
-    if selected_dataset == "data/example_latentrepresentation/f_vectors.parquet":
+    elif selected_dataset == "data/example_latentrepresentation/f_vectors.parquet":
         df = pd.read_parquet("/app/work/" + selected_dataset)
         data = df.values
         labels = np.full((df.shape[0],), -1)
@@ -123,6 +140,7 @@ def job_content_dict(content):
     Input('run-algo', 'n_clicks'),
     [
         State('dataset-selection', 'value'),
+        State({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'),
         State('model_id', 'data'),
         State('algo-dropdown', 'value'),
         State('additional-model-params', 'children'),
@@ -130,7 +148,7 @@ def job_content_dict(content):
     prevent_initial_call=True
 )
 def update_latent_vectors_and_clusters(submit_n_clicks, 
-                                       selected_dataset, model_id, selected_algo, children):
+                                       selected_dataset, upload_file_paths, model_id, selected_algo, children):
     
     """
     This callback is triggered every time the Submit button is hit:
@@ -154,7 +172,7 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
         heatmap:                empty heatmap figure
     """
     print(selected_algo)
-    if submit_n_clicks is None or selected_dataset is None:
+    if submit_n_clicks is None:
         raise PreventUpdate
     
     input_params = {}
@@ -181,9 +199,18 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     compute_dict['dependencies'] = {'0':[]}
     compute_dict['requirements']['num_nodes'] = 1
 
+    data_project = DataProject()
+    data_project.init_from_dict(upload_file_paths)
+    data_set = data_project.data
+    print(len(data_set))
+    if len(data_set) > 0:
+        selected_dataset = "data/upload/archive-20231025T173412Z-001/archive"
+    print("selected_dataset")
+    print(selected_dataset)
+    
     if selected_algo == 'PCA':
         cmd_list = ["python pca_run.py", selected_dataset, "data/output"]
-    if selected_algo == 'UMAP':
+    elif selected_algo == 'UMAP':
         cmd_list = ["python umap_run.py", selected_dataset, "data/output"]
         
     docker_cmd = " ".join(cmd_list)
@@ -196,7 +223,7 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
 
     # job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
 
-    time.sleep(20)
+    time.sleep(30)
     #read the latent vectors from the output dir
     latent_vectors = None
     lv_filepath = "/app/work/data/output/" + selected_algo.lower() + "_" + str(input_params['n_components']) + "d"
