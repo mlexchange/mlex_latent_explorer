@@ -60,8 +60,9 @@ def show_gui_layouts(selected_algo):
     Output('label_schema', 'data'),
     Output('label-dropdown', 'options'),
     Input('dataset-selection', 'value'),
+    Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'),
 )
-def update_data_n_label_schema(selected_dataset):
+def update_data_n_label_schema(selected_dataset, file_paths):
     '''
     This callback updates the selected dataset from the provided example datasets, as well as labels, and label schema
     Args:
@@ -210,9 +211,13 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     print("latent vector", latent_vectors.shape)
     clusters = None
     if latent_vectors is not None:
-        obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
-        clusters = obj.fit_predict(latent_vectors)
-    
+        obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5) # check the effect of thess params. -> use the archiv file.
+                                                            # other clustering algo? -> 2 step
+        clusters = obj.fit_predict(latent_vectors) ### time complexity - O(n) for low dimensional data
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        np.save(OUTPUT_DIR/'clusters.npy', clusters)
+
+
     unique_clusters = np.unique(clusters)
     options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
     options.insert(0, {'label': 'All', 'value': -1})
