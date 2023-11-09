@@ -88,7 +88,7 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
     if len(data_set) > 0:
         data = []
         #for i in range(len(data_set)): #exited with code 247, 137
-        for i in range(20):
+        for i in range(3):
             image, uri = data_project.data[i].read_data(export='pillow')
             data.append(np.array(image))
         data = np.array(data)
