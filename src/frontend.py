@@ -199,19 +199,26 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     compute_dict['dependencies'] = {'0':[]}
     compute_dict['requirements']['num_nodes'] = 1
 
+    # create user directory to store users data/experiments
+    experiment_id = str(uuid.uuid4())  # create unique id for experiment
+    output_path = OUTPUT_DIR / experiment_id
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # check if user is using user uploaded zip file or example dataset
     data_project = DataProject()
     data_project.init_from_dict(upload_file_paths)
     data_set = data_project.data
     print(len(data_set))
     if len(data_set) > 0:
         selected_dataset = "data/upload/archive-20231025T173412Z-001/archive"
-    print("selected_dataset")
-    print(selected_dataset)
     
+    # check which dimension reduction algo, then compose command
     if selected_algo == 'PCA':
-        cmd_list = ["python pca_run.py", selected_dataset, "data/output"]
+        #cmd_list = ["python pca_run.py", selected_dataset, "data/output"]
+        cmd_list = ["python pca_run.py", selected_dataset, str(output_path)]
     elif selected_algo == 'UMAP':
-        cmd_list = ["python umap_run.py", selected_dataset, "data/output"]
+        #cmd_list = ["python umap_run.py", selected_dataset, "data/output"]
+        cmd_list = ["python umap_run.py", selected_dataset, str(output_path)]
         
     docker_cmd = " ".join(cmd_list)
     print(docker_cmd)
@@ -226,12 +233,8 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     time.sleep(30)
     #read the latent vectors from the output dir
     latent_vectors = None
-    lv_filepath = "/app/work/data/output/" + selected_algo.lower() + "_" + str(input_params['n_components']) + "d"
-    if (selected_algo == 'PCA'):
-        lv_filepath += '.npy'
-    else:
-        lv_filepath += "_{0}_{1}.npy".format(input_params['n_neighbors'], input_params['min_dist'])
-    # Check if the path exists
+    npz_files = list(output_path.glob('*.npy'))
+    lv_filepath = npz_files[0] if len(npz_files) == 1 else None
     check_if_path_exist(lv_filepath)
 
     latent_vectors = np.load(lv_filepath)
@@ -241,8 +244,7 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
         obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5) # check the effect of thess params. -> use the archiv file.
                                                             # other clustering algo? -> 2 step
         clusters = obj.fit_predict(latent_vectors) ### time complexity - O(n) for low dimensional data
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        np.save(OUTPUT_DIR/'clusters.npy', clusters)
+        np.save(output_path/'clusters.npy', clusters)
 
 
     unique_clusters = np.unique(clusters)
