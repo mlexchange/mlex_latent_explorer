@@ -5,7 +5,9 @@ An app to visulize latent vectors in 2D or 3D. It supports PCA and UMAP for dime
 To run this demo:
 - install Docker.
 - clone and run the MLExchange [Compute API](https://github.com/mlexchange/mlex_computing_api) and [Content Registry](https://github.com/mlexchange/mlex_content_registry) in their corresponding folders.
-- clone the PCA and UMAP repo (not published yet) and run both containers in their corresponding folders.
+- clone the [PCA](https://github.com/runboj/mlex_dimension_reduction_pca) and [UMAP](https://github.com/runboj/mlex_dimension_reduction_umap) repo.
+    - Register these two models in Content Registry using the json file in the description folder
+    - Run these two models in Docker
 - clone this repo and then run `docker-compose up` in the main folder.  
 - Go to `http://0.0.0.0:8070/` in a brower.
 
