@@ -60,6 +60,7 @@ def show_gui_layouts(selected_algo):
     Output('input_labels', 'data'),
     Output('label_schema', 'data'),
     Output('label-dropdown', 'options'),
+    Output('user-upload-data-dir', 'data'),
     Input('dataset-selection', 'value'),
     Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'),
 )
@@ -84,16 +85,17 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
     labels = None
     label_schema = {}
     options = []
+    user_upload_data_dir = None
 
     if len(data_set) > 0:
         data = []
-        #for i in range(len(data_set)): #exited with code 247, 137
-        for i in range(3):
+        for i in range(len(data_set)): #if dataset too large, dash will exit with code 247, 137
             image, uri = data_project.data[i].read_data(export='pillow')
             data.append(np.array(image))
         data = np.array(data)
         print(data.shape)
         labels = np.full((data.shape[0],), -1)
+        user_upload_data_dir =  os.path.dirname(upload_file_paths[0]['uri'])
 
     elif selected_dataset == "data/example_shapes/Demoshapes.npz":
         data = np.load("/app/work/" + selected_dataset)['arr_0']
@@ -110,7 +112,7 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
     options.insert(0, {'label': 'Unlabeled', 'value': -1})
     options.insert(0, {'label': 'All', 'value': -2})
 
-    return data, labels, label_schema, options
+    return data, labels, label_schema, options, user_upload_data_dir
 
 def job_content_dict(content):
     job_content = {# 'mlex_app': content['name'],
@@ -140,7 +142,7 @@ def job_content_dict(content):
     Input('run-algo', 'n_clicks'),
     [
         State('dataset-selection', 'value'),
-        State({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'),
+        State('user-upload-data-dir', 'data'),
         State('model_id', 'data'),
         State('algo-dropdown', 'value'),
         State('additional-model-params', 'children'),
@@ -148,7 +150,7 @@ def job_content_dict(content):
     prevent_initial_call=True
 )
 def update_latent_vectors_and_clusters(submit_n_clicks, 
-                                       selected_dataset, upload_file_paths, model_id, selected_algo, children):
+                                       selected_dataset, user_upload_data_dir, model_id, selected_algo, children):
     
     """
     This callback is triggered every time the Submit button is hit:
@@ -205,19 +207,13 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     output_path.mkdir(parents=True, exist_ok=True)
 
     # check if user is using user uploaded zip file or example dataset
-    data_project = DataProject()
-    data_project.init_from_dict(upload_file_paths)
-    data_set = data_project.data
-    print(len(data_set))
-    if len(data_set) > 0:
-        selected_dataset = "data/upload/archive-20231025T173412Z-001/archive"
+    if user_upload_data_dir is not None:
+        selected_dataset = user_upload_data_dir
     
     # check which dimension reduction algo, then compose command
     if selected_algo == 'PCA':
-        #cmd_list = ["python pca_run.py", selected_dataset, "data/output"]
         cmd_list = ["python pca_run.py", selected_dataset, str(output_path)]
     elif selected_algo == 'UMAP':
-        #cmd_list = ["python umap_run.py", selected_dataset, "data/output"]
         cmd_list = ["python umap_run.py", selected_dataset, str(output_path)]
         
     docker_cmd = " ".join(cmd_list)
@@ -230,14 +226,15 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
 
     # job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
 
-    time.sleep(30)
+    time.sleep(60)
     #read the latent vectors from the output dir
     latent_vectors = None
     npz_files = list(output_path.glob('*.npy'))
     lv_filepath = npz_files[0] if len(npz_files) == 1 else None
-    check_if_path_exist(lv_filepath)
+    print(lv_filepath)
+    check_if_path_exist(str(lv_filepath))
 
-    latent_vectors = np.load(lv_filepath)
+    latent_vectors = np.load(str(lv_filepath))
     print("latent vector", latent_vectors.shape)
     clusters = None
     if latent_vectors is not None:

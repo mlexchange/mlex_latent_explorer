@@ -195,7 +195,7 @@ meta = [
         children=[
             # Store for user created contents
             dcc.Store(id='image-length', data=0),
-            dcc.Store(id='uploader-filename', data=[]),
+            dcc.Store(id='user-upload-data-dir', data=None),
             dcc.Store(id='dataset-options', data=DATA_OPTION),
             dcc.Store(id='run-counter', data=0),
             # data_label_schema, latent vectors, clusters
