@@ -223,45 +223,37 @@ def submit_dimension_reduction_job(submit_n_clicks,
 
 @app.callback(
     [   
-        #Output('start-interval', 'data'),
         Output('latent_vectors', 'data'),
         Output('clusters', 'data'),
         Output('cluster-dropdown', 'options'),
     ],
-    Input('experiment-id', 'data'),
+    Input('interval-component', 'n_intervals')
+    State('experiment-id', 'data'),
     prevent_initial_call=True
 )
-def update_latent_vectors_and_clusters(experiment-id):
+def update_latent_vectors_and_clusters(n_intervals, experiment-id):
     
     """
     This callback is triggered every time ???:
         - read latent vectors
         - calculate clusters and save to data/output/experiment-id
     Args:
-        selected_dataset:       selected example dataset
-        model_id:               uid of selected dimension reduciton algo
-        selected_algo:          selected dimension reduction algo
-        children:               div for algo's parameters
+        n_intervals:       
+        experiment-id:
     Returns:
         latent_vectors:         data from dimension reduction algos
         clusters:               clusters for latent vectors
         cluster-dropdown:       options for cluster dropdown
-        scatter-color:          default scatter-color value
-        cluster-dropdown:       default cluster-dropdown value
-        heatmap:                empty heatmap figure
     """
-    if experiment-od is None:
+    if experiment-id is None:
         raise PreventUpdate
-    
-    
 
-    time.sleep(60)
+    output_path = OUTPUT_DIR / experiment-id
     #read the latent vectors from the output dir
     latent_vectors = None
     npz_files = list(output_path.glob('*.npy'))
     lv_filepath = npz_files[0] if len(npz_files) == 1 else None
     print(lv_filepath)
-    check_if_path_exist(str(lv_filepath))
 
     latent_vectors = np.load(str(lv_filepath))
     print("latent vector", latent_vectors.shape)
@@ -271,7 +263,6 @@ def update_latent_vectors_and_clusters(experiment-id):
                                                             # other clustering algo? -> 2 step
         clusters = obj.fit_predict(latent_vectors) ### time complexity - O(n) for low dimensional data
         np.save(output_path/'clusters.npy', clusters)
-
 
     unique_clusters = np.unique(clusters)
     options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
