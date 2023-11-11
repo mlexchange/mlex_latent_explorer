@@ -108,7 +108,8 @@ algo_panel = html.Div(
                                     ],
                                     className='row',
                                     style={'align-items': 'center', 'justify-content': 'center'}
-                                )
+                                ),
+                                html.Div(id='invisible-submit-div')
                     ]
                 )
             ],
@@ -148,6 +149,11 @@ scatter_control_panel =  html.Div(
                                         )
             ])
         ]
+    ),
+    dcc.Interval(
+        id='interval-component',
+        interval=1000,
+        n_intervals=0
     )]
 )
 
@@ -198,6 +204,7 @@ meta = [
             dcc.Store(id='user-upload-data-dir', data=None),
             dcc.Store(id='dataset-options', data=DATA_OPTION),
             dcc.Store(id='run-counter', data=0),
+            dcc.Store(id='experiment-id', data=False),
             # data_label_schema, latent vectors, clusters
             dcc.Store(id='input_data', data=None),
             dcc.Store(id='input_labels', data=None),

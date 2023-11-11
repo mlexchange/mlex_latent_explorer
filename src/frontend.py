@@ -126,12 +126,10 @@ def job_content_dict(content):
         job_content['job_kwargs']['map'] = content['map']
     
     return job_content
-
 @app.callback(
     [
-        Output('latent_vectors', 'data'),
-        Output('clusters', 'data'),
-        Output('cluster-dropdown', 'options'),
+        # flag the read variable
+        Output('experiment-id', 'data'),
         # reset scatter plot control panel
         Output('scatter-color',  'value'),
         Output('cluster-dropdown', 'value'),
@@ -147,36 +145,31 @@ def job_content_dict(content):
         State('algo-dropdown', 'value'),
         State('additional-model-params', 'children'),
     ],
-    prevent_initial_call=True
 )
-def update_latent_vectors_and_clusters(submit_n_clicks, 
-                                       selected_dataset, user_upload_data_dir, model_id, selected_algo, children):
-    
+def submit_dimension_reduction_job(submit_n_clicks,
+                                   selected_dataset, user_upload_data_dir, model_id, selected_algo, children):
     """
     This callback is triggered every time the Submit button is hit:
-        - compute latent vectors, which is saved in data/output
+        - compute latent vectors, which will be saved in data/output/experiment_id
         - reset scatter plot control panel to default
         - reset heatmap to no image
-        - read latent vectors to calculate clusters
-    TODO: This callback needs to be split into two
     Args:
         submit_n_clicks:        num of clicks for the submit button
         selected_dataset:       selected example dataset
+        user_upload_data_dir:   user uploaded dataset
         model_id:               uid of selected dimension reduciton algo
         selected_algo:          selected dimension reduction algo
         children:               div for algo's parameters
     Returns:
-        latent_vectors:         data from dimension reduction algos
-        clusters:               clusters for latent vectors
+        experiment-id:          uuid for current run
         cluster-dropdown:       options for cluster dropdown
         scatter-color:          default scatter-color value
         cluster-dropdown:       default cluster-dropdown value
         heatmap:                empty heatmap figure
     """
-    print(selected_algo)
     if submit_n_clicks is None:
         raise PreventUpdate
-    
+
     input_params = {}
     if children:
         for child in children['props']['children']:
@@ -225,6 +218,42 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     print("respnse: ", response)
 
     # job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
+    
+    return experiment_id, 'cluster', -1, -2, go.Figure(go.Heatmap())
+
+@app.callback(
+    [   
+        #Output('start-interval', 'data'),
+        Output('latent_vectors', 'data'),
+        Output('clusters', 'data'),
+        Output('cluster-dropdown', 'options'),
+    ],
+    Input('experiment-id', 'data'),
+    prevent_initial_call=True
+)
+def update_latent_vectors_and_clusters(experiment-id):
+    
+    """
+    This callback is triggered every time ???:
+        - read latent vectors
+        - calculate clusters and save to data/output/experiment-id
+    Args:
+        selected_dataset:       selected example dataset
+        model_id:               uid of selected dimension reduciton algo
+        selected_algo:          selected dimension reduction algo
+        children:               div for algo's parameters
+    Returns:
+        latent_vectors:         data from dimension reduction algos
+        clusters:               clusters for latent vectors
+        cluster-dropdown:       options for cluster dropdown
+        scatter-color:          default scatter-color value
+        cluster-dropdown:       default cluster-dropdown value
+        heatmap:                empty heatmap figure
+    """
+    if experiment-od is None:
+        raise PreventUpdate
+    
+    
 
     time.sleep(60)
     #read the latent vectors from the output dir
