@@ -227,34 +227,31 @@ def submit_dimension_reduction_job(submit_n_clicks,
         Output('clusters', 'data'),
         Output('cluster-dropdown', 'options'),
     ],
-    Input('interval-component', 'n_intervals')
+    Input('interval-component', 'n_intervals'),
     State('experiment-id', 'data'),
     prevent_initial_call=True
 )
-def update_latent_vectors_and_clusters(n_intervals, experiment-id):
-    
+def update_latent_vectors_and_clusters(n_intervals, experiment_id):
     """
     This callback is triggered every time ???:
         - read latent vectors
         - calculate clusters and save to data/output/experiment-id
     Args:
         n_intervals:       
-        experiment-id:
+        experiment-id:          each run/submit has a unique experiment id
     Returns:
         latent_vectors:         data from dimension reduction algos
         clusters:               clusters for latent vectors
         cluster-dropdown:       options for cluster dropdown
     """
-    if experiment-id is None:
+    if experiment_id is None:
         raise PreventUpdate
-
-    output_path = OUTPUT_DIR / experiment-id
+     
     #read the latent vectors from the output dir
+    output_path = OUTPUT_DIR / experiment_id
     latent_vectors = None
     npz_files = list(output_path.glob('*.npy'))
     lv_filepath = npz_files[0] if len(npz_files) == 1 else None
-    print(lv_filepath)
-
     latent_vectors = np.load(str(lv_filepath))
     print("latent vector", latent_vectors.shape)
     clusters = None
@@ -268,7 +265,7 @@ def update_latent_vectors_and_clusters(n_intervals, experiment-id):
     options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
     options.insert(0, {'label': 'All', 'value': -1})
 
-    return latent_vectors, clusters, options, 'cluster', -1, -2, go.Figure(go.Heatmap())
+    return latent_vectors, clusters, options
 
 @app.callback(
     Output('scatter', 'figure'),
