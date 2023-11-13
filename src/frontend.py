@@ -136,6 +136,8 @@ def job_content_dict(content):
         Output('label-dropdown', 'value'),
         # reset heatmap
         Output('heatmap', 'figure', allow_duplicate=True),
+        # reset max_intervals to -1
+        Output('interval-component', 'max_intervals'),
     ],
     Input('run-algo', 'n_clicks'),
     [
@@ -220,53 +222,54 @@ def submit_dimension_reduction_job(submit_n_clicks,
 
     # job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
     
-    return experiment_id, 'cluster', -1, -2, go.Figure(go.Heatmap())
+    return experiment_id, 'cluster', -1, -2, go.Figure(go.Heatmap()), -1
 
-# @app.callback(
-#     [   
-#         Output('latent_vectors', 'data'),
-#         Output('clusters', 'data'),
-#         Output('cluster-dropdown', 'options'),
-#         Output('interval-component', 'max_intervals'),
-#     ],
-#     Input('interval-component', 'n_intervals'),
-#     State('experiment-id', 'data')
-# )
-# def update_latent_vectors_and_clusters(n_intervals, experiment_id):
-#     """
-#     This callback is triggered every time ???:
-#         - read latent vectors
-#         - calculate clusters and save to data/output/experiment-id
-#     Args:
-#         n_intervals:       
-#         experiment-id:          each run/submit has a unique experiment id
-#     Returns:
-#         latent_vectors:         data from dimension reduction algos
-#         clusters:               clusters for latent vectors
-#         cluster-dropdown:       options for cluster dropdown
-#         max_intervals:          max_intervals in the
-#     """
-#     if experiment_id is None:
-#         raise PreventUpdate
+@app.callback(
+    [   
+        Output('latent_vectors', 'data'),
+        Output('clusters', 'data'),
+        Output('cluster-dropdown', 'options'),
+        Output('interval-component', 'max_intervals', allow_duplicate=True),
+    ],
+    Input('interval-component', 'n_intervals'),
+    State('experiment-id', 'data'),
+    prevent_initial_call=True
+)
+def update_latent_vectors_and_clusters(n_intervals, experiment_id):
+    """
+    This callback is triggered every time ???:
+        - read latent vectors
+        - calculate clusters and save to data/output/experiment-id
+    Args:
+        n_intervals:       
+        experiment-id:          each run/submit has a unique experiment id
+    Returns:
+        latent_vectors:         data from dimension reduction algos
+        clusters:               clusters for latent vectors
+        cluster-dropdown:       options for cluster dropdown
+        max_intervals:          max_intervals in the
+    """
+    if experiment_id is None:
+        raise PreventUpdate
      
-#     #read the latent vectors from the output dir
-#     output_path = OUTPUT_DIR / experiment_id
-#     npz_files = list(output_path.glob('*.npy'))
-#     if len(npz_files) == 1:
-#         lv_filepath = npz_files[0]
-#         latent_vectors = np.load(str(lv_filepath))
-#         print("latent vector", latent_vectors.shape)
-#         # clustering
-#         obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5) # check the effect of thess params. -> use the archiv file.
-#                                                             # other clustering algo? -> 2 step
-#         clusters = obj.fit_predict(latent_vectors) ### time complexity - O(n) for low dimensional data
-#         np.save(output_path/'clusters.npy', clusters)
-#         unique_clusters = np.unique(clusters)
-#         options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
-#         options.insert(0, {'label': 'All', 'value': -1})
-#         return latent_vectors, clusters, options, 0
-#     else:
-#         return None, [], {'label': 'All', 'value':-1}, -1
+    #read the latent vectors from the output dir
+    output_path = OUTPUT_DIR / experiment_id
+    npz_files = list(output_path.glob('*.npy'))
+    if len(npz_files) == 1:
+        lv_filepath = npz_files[0]
+        latent_vectors = np.load(str(lv_filepath))
+        print("latent vector", latent_vectors.shape)
+        # clustering
+        obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5) # check the effect of thess params. -> use the archiv file.
+                                                            # other clustering algo? -> 2 step
+        clusters = obj.fit_predict(latent_vectors) ### time complexity - O(n) for low dimensional data
+        np.save(output_path/'clusters.npy', clusters)
+        unique_clusters = np.unique(clusters)
+        options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
+        options.insert(0, {'label': 'All', 'value': -1})
+        return latent_vectors, clusters, options, 0
+    else:
+        return None, [], {'label': 'All', 'value':-1}, -1
 
 @app.callback(
     Output('scatter', 'figure'),
