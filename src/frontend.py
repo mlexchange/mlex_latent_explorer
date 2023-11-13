@@ -60,6 +60,7 @@ def show_gui_layouts(selected_algo):
     Output('input_labels', 'data'),
     Output('label_schema', 'data'),
     Output('label-dropdown', 'options'),
+    Output('user-upload-data-dir', 'data'),
     Input('dataset-selection', 'value'),
     Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'),
 )
@@ -84,16 +85,17 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
     labels = None
     label_schema = {}
     options = []
+    user_upload_data_dir = None
 
     if len(data_set) > 0:
         data = []
-        #for i in range(len(data_set)): #exited with code 247, 137
-        for i in range(20):
+        for i in range(len(data_set)): #if dataset too large, dash will exit with code 247, 137
             image, uri = data_project.data[i].read_data(export='pillow')
             data.append(np.array(image))
         data = np.array(data)
         print(data.shape)
         labels = np.full((data.shape[0],), -1)
+        user_upload_data_dir =  os.path.dirname(upload_file_paths[0]['uri'])
 
     elif selected_dataset == "data/example_shapes/Demoshapes.npz":
         data = np.load("/app/work/" + selected_dataset)['arr_0']
@@ -110,7 +112,7 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
     options.insert(0, {'label': 'Unlabeled', 'value': -1})
     options.insert(0, {'label': 'All', 'value': -2})
 
-    return data, labels, label_schema, options
+    return data, labels, label_schema, options, user_upload_data_dir
 
 def job_content_dict(content):
     job_content = {# 'mlex_app': content['name'],
@@ -124,57 +126,53 @@ def job_content_dict(content):
         job_content['job_kwargs']['map'] = content['map']
     
     return job_content
-
 @app.callback(
     [
-        Output('latent_vectors', 'data'),
-        Output('clusters', 'data'),
-        Output('cluster-dropdown', 'options'),
+        # flag the read variable
+        Output('experiment-id', 'data'),
         # reset scatter plot control panel
         Output('scatter-color',  'value'),
         Output('cluster-dropdown', 'value'),
         Output('label-dropdown', 'value'),
         # reset heatmap
         Output('heatmap', 'figure', allow_duplicate=True),
+        # reset max_intervals to -1
+        Output('interval-component', 'max_intervals'),
     ],
     Input('run-algo', 'n_clicks'),
     [
         State('dataset-selection', 'value'),
-        State({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'),
+        State('user-upload-data-dir', 'data'),
         State('model_id', 'data'),
         State('algo-dropdown', 'value'),
         State('additional-model-params', 'children'),
     ],
     prevent_initial_call=True
 )
-def update_latent_vectors_and_clusters(submit_n_clicks, 
-                                       selected_dataset, upload_file_paths, model_id, selected_algo, children):
-    
+def submit_dimension_reduction_job(submit_n_clicks,
+                                   selected_dataset, user_upload_data_dir, model_id, selected_algo, children):
     """
     This callback is triggered every time the Submit button is hit:
-        - compute latent vectors, which is saved in data/output
+        - compute latent vectors, which will be saved in data/output/experiment_id
         - reset scatter plot control panel to default
         - reset heatmap to no image
-        - read latent vectors to calculate clusters
-    TODO: This callback needs to be split into two
     Args:
         submit_n_clicks:        num of clicks for the submit button
         selected_dataset:       selected example dataset
+        user_upload_data_dir:   user uploaded dataset
         model_id:               uid of selected dimension reduciton algo
         selected_algo:          selected dimension reduction algo
         children:               div for algo's parameters
     Returns:
-        latent_vectors:         data from dimension reduction algos
-        clusters:               clusters for latent vectors
+        experiment-id:          uuid for current run
         cluster-dropdown:       options for cluster dropdown
         scatter-color:          default scatter-color value
         cluster-dropdown:       default cluster-dropdown value
         heatmap:                empty heatmap figure
     """
-    print(selected_algo)
     if submit_n_clicks is None:
         raise PreventUpdate
-    
+
     input_params = {}
     if children:
         for child in children['props']['children']:
@@ -199,19 +197,20 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     compute_dict['dependencies'] = {'0':[]}
     compute_dict['requirements']['num_nodes'] = 1
 
-    data_project = DataProject()
-    data_project.init_from_dict(upload_file_paths)
-    data_set = data_project.data
-    print(len(data_set))
-    if len(data_set) > 0:
-        selected_dataset = "data/upload/archive-20231025T173412Z-001/archive"
-    print("selected_dataset")
-    print(selected_dataset)
+    # create user directory to store users data/experiments
+    experiment_id = str(uuid.uuid4())  # create unique id for experiment
+    output_path = OUTPUT_DIR / experiment_id
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # check if user is using user uploaded zip file or example dataset
+    if user_upload_data_dir is not None:
+        selected_dataset = user_upload_data_dir
     
+    # check which dimension reduction algo, then compose command
     if selected_algo == 'PCA':
-        cmd_list = ["python pca_run.py", selected_dataset, "data/output"]
+        cmd_list = ["python pca_run.py", selected_dataset, str(output_path)]
     elif selected_algo == 'UMAP':
-        cmd_list = ["python umap_run.py", selected_dataset, "data/output"]
+        cmd_list = ["python umap_run.py", selected_dataset, str(output_path)]
         
     docker_cmd = " ".join(cmd_list)
     print(docker_cmd)
@@ -222,34 +221,55 @@ def update_latent_vectors_and_clusters(submit_n_clicks,
     print("respnse: ", response)
 
     # job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
+    
+    return experiment_id, 'cluster', -1, -2, go.Figure(go.Heatmap()), -1
 
-    time.sleep(30)
+@app.callback(
+    [   
+        Output('latent_vectors', 'data'),
+        Output('clusters', 'data'),
+        Output('cluster-dropdown', 'options'),
+        Output('interval-component', 'max_intervals', allow_duplicate=True),
+    ],
+    Input('interval-component', 'n_intervals'),
+    State('experiment-id', 'data'),
+    prevent_initial_call=True
+)
+def update_latent_vectors_and_clusters(n_intervals, experiment_id):
+    """
+    This callback is triggered every time ???:
+        - read latent vectors
+        - calculate clusters and save to data/output/experiment-id
+    Args:
+        n_intervals:       
+        experiment-id:          each run/submit has a unique experiment id
+    Returns:
+        latent_vectors:         data from dimension reduction algos
+        clusters:               clusters for latent vectors
+        cluster-dropdown:       options for cluster dropdown
+        max_intervals:          max_intervals in the
+    """
+    if experiment_id is None:
+        raise PreventUpdate
+     
     #read the latent vectors from the output dir
-    latent_vectors = None
-    lv_filepath = "/app/work/data/output/" + selected_algo.lower() + "_" + str(input_params['n_components']) + "d"
-    if (selected_algo == 'PCA'):
-        lv_filepath += '.npy'
-    else:
-        lv_filepath += "_{0}_{1}.npy".format(input_params['n_neighbors'], input_params['min_dist'])
-    # Check if the path exists
-    check_if_path_exist(lv_filepath)
-
-    latent_vectors = np.load(lv_filepath)
-    print("latent vector", latent_vectors.shape)
-    clusters = None
-    if latent_vectors is not None:
+    output_path = OUTPUT_DIR / experiment_id
+    npz_files = list(output_path.glob('*.npy'))
+    if len(npz_files) == 1:
+        lv_filepath = npz_files[0]
+        latent_vectors = np.load(str(lv_filepath))
+        print("latent vector", latent_vectors.shape)
+        # clustering
         obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5) # check the effect of thess params. -> use the archiv file.
                                                             # other clustering algo? -> 2 step
         clusters = obj.fit_predict(latent_vectors) ### time complexity - O(n) for low dimensional data
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        np.save(OUTPUT_DIR/'clusters.npy', clusters)
-
-
-    unique_clusters = np.unique(clusters)
-    options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
-    options.insert(0, {'label': 'All', 'value': -1})
-
-    return latent_vectors, clusters, options, 'cluster', -1, -2, go.Figure(go.Heatmap())
+        np.save(output_path/'clusters.npy', clusters)
+        unique_clusters = np.unique(clusters)
+        options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
+        options.insert(0, {'label': 'All', 'value': -1})
+        return latent_vectors, clusters, options, 0
+    else:
+        return None, [], {'label': 'All', 'value':-1}, -1
 
 @app.callback(
     Output('scatter', 'figure'),

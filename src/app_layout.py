@@ -108,7 +108,8 @@ algo_panel = html.Div(
                                     ],
                                     className='row',
                                     style={'align-items': 'center', 'justify-content': 'center'}
-                                )
+                                ),
+                                html.Div(id='invisible-submit-div')
                     ]
                 )
             ],
@@ -148,7 +149,14 @@ scatter_control_panel =  html.Div(
                                         )
             ])
         ]
-    )]
+    ),
+    dcc.Interval(
+        id='interval-component',
+        interval=3000, # in milliseconds
+        max_intervals=-1,  # keep triggering indefinitely
+        n_intervals=0
+    )
+    ]
 )
 
 heatmap_control_panel =  html.Div(
@@ -195,9 +203,10 @@ meta = [
         children=[
             # Store for user created contents
             dcc.Store(id='image-length', data=0),
-            dcc.Store(id='uploader-filename', data=[]),
+            dcc.Store(id='user-upload-data-dir', data=None),
             dcc.Store(id='dataset-options', data=DATA_OPTION),
             dcc.Store(id='run-counter', data=0),
+            dcc.Store(id='experiment-id', data=None),
             # data_label_schema, latent vectors, clusters
             dcc.Store(id='input_data', data=None),
             dcc.Store(id='input_labels', data=None),
