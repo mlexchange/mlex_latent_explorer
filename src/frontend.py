@@ -74,7 +74,8 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
         input_data:             input image data, numpy.ndarray
         input_labels:           labels of input image data, which is of int values
         label_schema:           the text of each unique label
-        label-dropdown:         label dropdown options
+        label_dropdown:         label dropdown options
+        user_upload_data_dir:   dir name for the user uploaded zip file
     '''
     
     data_project = DataProject()
@@ -95,7 +96,7 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
         data = np.array(data)
         print(data.shape)
         labels = np.full((data.shape[0],), -1)
-        user_upload_data_dir =  os.path.dirname(upload_file_paths[0]['uri'])
+        user_upload_data_dir = os.path.dirname(upload_file_paths[0]['uri'])
 
     elif selected_dataset == "data/example_shapes/Demoshapes.npz":
         data = np.load("/app/work/" + selected_dataset)['arr_0']
@@ -126,6 +127,7 @@ def job_content_dict(content):
         job_content['job_kwargs']['map'] = content['map']
     
     return job_content
+
 @app.callback(
     [
         # flag the read variable
@@ -169,6 +171,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
         scatter-color:          default scatter-color value
         cluster-dropdown:       default cluster-dropdown value
         heatmap:                empty heatmap figure
+        max-interval:           interval component that controls if trigger the interval indefintely
     """
     if submit_n_clicks is None:
         raise PreventUpdate
@@ -237,17 +240,17 @@ def submit_dimension_reduction_job(submit_n_clicks,
 )
 def update_latent_vectors_and_clusters(n_intervals, experiment_id):
     """
-    This callback is triggered every time ???:
+    This callback is triggered by the interval:
         - read latent vectors
         - calculate clusters and save to data/output/experiment-id
     Args:
-        n_intervals:       
+        n_intervals:            interval component
         experiment-id:          each run/submit has a unique experiment id
     Returns:
         latent_vectors:         data from dimension reduction algos
         clusters:               clusters for latent vectors
         cluster-dropdown:       options for cluster dropdown
-        max_intervals:          max_intervals in the
+        max_intervals:          interval component that controls if trigger the interval indefintely
     """
     if experiment_id is None:
         raise PreventUpdate
