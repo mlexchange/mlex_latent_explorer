@@ -189,6 +189,7 @@ heatmap_control_panel =  html.Div(
                                            value = 'mean',
                                            style={'min-width': '250px'},
                                            className='mb-2'),
+                                           
 
             ])
         ]
