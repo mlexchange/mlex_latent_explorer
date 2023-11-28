@@ -173,6 +173,13 @@ heatmap_control_panel =  html.Div(
                                     ' Tools :'
                                     ], 
                                     className='mb-3'),
+                            dbc.Label(id='stats-div', children=[
+                                   'Number of images selected: 0',
+                                   html.Br(),
+                                   'Clusters represented: N/A',
+                                   html.Br(),
+                                   'Labels represented: N/A',
+                                ]),
                             dbc.Label('Display Image Options', className='mr-3'),
                             dcc.RadioItems(id='mean-std-toggle',
                                            options=[
@@ -182,13 +189,7 @@ heatmap_control_panel =  html.Div(
                                            value = 'mean',
                                            style={'min-width': '250px'},
                                            className='mb-2'),
-                            dbc.Label(id='stats-div', children=[
-                                   'Number of images selected: 0',
-                                   html.Br(),
-                                   'Clusters represented: N/A',
-                                   html.Br(),
-                                   'Labels represented: N/A',
-                                ]),
+
             ])
         ]
     )]
