@@ -391,6 +391,10 @@ def update_heatmap(click_data, selected_data, display_option, input_data):
         heatmap_data = go.Heatmap(z=images[selected_index])
     else:
         heatmap_data = go.Heatmap()
+
+    # only update heat map when the input data is 2d images, do not update for input latent vectors
+    if heatmap_data['z'] is None or len(np.shape(heatmap_data['z'])) < 2:
+        raise PreventUpdate
     
     # Determine the aspect ratio based on the shape of the heatmap_data's z-values
     aspect_x = 1
