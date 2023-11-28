@@ -442,7 +442,7 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
         # Format the clusters and labels as comma-separated strings
         clusters_str = ", ".join(str(cluster) for cluster in unique_clusters)
         label_int_to_str_map = {val: key for key, val in label_names.items()}
-        labels_str = ", ".join(str(label_int_to_str_map[label]) for label in unique_labels)
+        labels_str = ", ".join(str(label_int_to_str_map[label]) for label in unique_labels if label >= 0)
     else:
         num_images = 0
         clusters_str = "N/A"
