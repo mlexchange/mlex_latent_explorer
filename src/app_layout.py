@@ -92,7 +92,23 @@ algo_panel = html.Div(
                                                 value='PCA',
                                                 ),
                                 html.Div(id='additional-model-params'),
-
+                                html.Hr(),
+                                html.Div(
+                                    [
+                                        dbc.Button(
+                                            "Submit",
+                                            color="secondary",
+                                            id="run-algo",
+                                            outline=True,
+                                            size="lg",
+                                            className="m-1",
+                                            style={'width':'50%'}
+                                        ),
+                                    ],
+                                    className='row',
+                                    style={'align-items': 'center', 'justify-content': 'center'}
+                                ),
+                                html.Div(id='invisible-submit-div')
                     ]
                 )
             ],
@@ -121,23 +137,6 @@ cluster_algo_panel = html.Div(
                                             value='DBSCAN',
                                             ),
                             html.Div(id='additional-cluster-params'),
-                            html.Hr(),
-                            html.Div(
-                                [
-                                    dbc.Button(
-                                        "Submit",
-                                        color="secondary",
-                                        id="run-algo",
-                                        outline=True,
-                                        size="lg",
-                                        className="m-1",
-                                        style={'width':'50%'}
-                                    ),
-                                ],
-                                className='row',
-                                style={'align-items': 'center', 'justify-content': 'center'}
-                            ),
-                            html.Div(id='invisible-submit-div')
                         ]
 
                         )
