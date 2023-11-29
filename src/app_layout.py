@@ -13,9 +13,8 @@ import templates
 from file_manager.main import FileManager
 
 ### GLOBAL VARIABLES
-ALGORITHM_DATABASE = {"PCA": "PCA",
-                      "UMAP": "UMAP",
-                      }
+ALGORITHM_DATABASE = {"PCA": "PCA", "UMAP": "UMAP",}
+CLUSTER_ALGORITHM_DATABASE = {"KMeans": "KMeans", "DBCAN": "DBSCAN", "HDBSCAN": "HDBSCAN"}
 
 DATA_OPTION = [
     {"label": "Synthetic Shapes", "value": "data/example_shapes/Demoshapes.npz"},
@@ -42,7 +41,7 @@ du.configure_upload(app, UPLOAD_FOLDER_ROOT, use_upload_id=False)
 
 #### BEGIN DASH CODE ####
 header = templates.header()
-# left panel: uploader, scatter plot, individual image  plot
+# right panel: uploader, scatter plot, individual image  plot
 image_panel = [
     dbc.Card(
         id="image-card",
@@ -76,14 +75,14 @@ image_panel = [
     )
 ]
 
-# right panel: choose algorithm, submit job, choose scatter plot attributes, and statistics...
+# left panel: choose algorithms, submit job, choose scatter plot attributes, and statistics...
 algo_panel = html.Div(
     [dbc.Card(
         id="algo-card",
         style={"width": "100%"},
         children=[
             dbc.Collapse(children=[
-                dbc.CardHeader("Dimension Reduction Algorithms"),
+                dbc.CardHeader("Select Dimension Reduction Algorithms"),
                 dbc.CardBody(
                     [
                                 dbc.Label("Algorithm", className='mr-2'),
@@ -119,6 +118,35 @@ algo_panel = html.Div(
             )
         ]
     )
+    ]
+)
+
+cluster_algo_panel = html.Div(
+    [
+        dbc.Card(
+            id="cluster-algo-card",
+            style={"width": "100%"},
+            children=[
+                dbc.Collapse(children=[
+                        dbc.CardHeader("Select Clustering Algorithms"),
+                        dbc.CardBody([
+                            dbc.Label("Algorithm", className='mr-2'),
+                            dcc.Dropdown(id="cluster-algo-dropdown",
+                                            options=[{"label": entry, "value": entry} for entry in CLUSTER_ALGORITHM_DATABASE],
+                                            style={'min-width': '250px'},
+                                            value='DBSCAN',
+                                            ),
+                            html.Div(id='additional-cluster-params'),
+                        ]
+
+                        )
+                    ],
+                id="cluster-model-collapse",
+                is_open=True,
+                style = {'margin-bottom': '0rem'}
+                )
+            ]
+        )
     ]
 )
 
@@ -194,7 +222,7 @@ heatmap_control_panel =  html.Div(
     )]
 )
 
-control_panel = [algo_panel, scatter_control_panel, heatmap_control_panel] #TODO: add controls for scatter plot and statistics
+control_panel = [algo_panel, cluster_algo_panel, scatter_control_panel, heatmap_control_panel] #TODO: add controls for scatter plot and statistics
 
 # metadata
 meta = [
