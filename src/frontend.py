@@ -9,14 +9,14 @@ import json
 import uuid
 import requests
 import os
-import time
-import pyarrow.parquet as pq
 
 from file_manager.data_project import DataProject
 
 from app_layout import app, DOCKER_DATA, UPLOAD_FOLDER_ROOT
-from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, get_job, check_if_path_exist
+from latentxp_utils import kmeans_kwargs, dbscan_kwargs, hdbscan_kwargs, hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content
 from dash_component_editor import JSONParameterEditor
+
+
 #### GLOBAL PARAMS ####
 DATA_DIR = str(os.environ['DATA_DIR'])
 OUTPUT_DIR = pathlib.Path('data/output')
@@ -28,7 +28,7 @@ UPLOAD_FOLDER_ROOT = "data/upload"
     Output('model_id', 'data'),
     Input('algo-dropdown', 'value')
 )
-def show_gui_layouts(selected_algo):
+def show_dimension_reduction_gui_layouts(selected_algo):
     '''
     This callback display dropdown menu in the frontend for different dimension reduction algos
     Args:
@@ -41,7 +41,7 @@ def show_gui_layouts(selected_algo):
    
     if selected_algo == 'PCA':
         conditions = {'name': 'PCA'}
-    if selected_algo == 'UMAP':
+    elif selected_algo == 'UMAP':
         conditions = {'name': 'UMAP'}
     
     model = [d for d in data if all((k in d and d[k] == v) for k, v in conditions.items())] # filter pca or umap
@@ -54,7 +54,31 @@ def show_gui_layouts(selected_algo):
     item_list.init_callbacks(app)
         
     return item_list, model_uid
-        
+
+@app.callback(
+    Output('additional-cluster-params', 'children'),
+    Input('cluster-algo-dropdown', 'value'),
+)
+def show_clustering_gui_layouts(selected_algo):
+    '''
+    This callback display drop down menu in the fronend  for different clustering algos
+    Args:
+        selected_algo:      selected clustering algorithm
+    Returns:
+        item_list:          dropdown menu html code
+    '''
+    if selected_algo == 'KMeans':
+        kwargs = kmeans_kwargs
+    elif selected_algo == 'DBSCAN':
+        kwargs = dbscan_kwargs
+    elif selected_algo == 'HDBSCAN':
+        kwargs = hdbscan_kwargs
+    
+    item_list = JSONParameterEditor(_id={'type': str(uuid.uuid4())},
+                                    json_blob=kwargs["gui_parameters"])
+    item_list.init_callbacks(app)
+    return item_list
+
 @app.callback(
     Output('input_data', 'data'),
     Output('input_labels', 'data'),

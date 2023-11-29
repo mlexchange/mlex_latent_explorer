@@ -14,7 +14,7 @@ from file_manager.main import FileManager
 
 ### GLOBAL VARIABLES
 ALGORITHM_DATABASE = {"PCA": "PCA", "UMAP": "UMAP",}
-CLUSTER_ALGORITHM_DATABASE = {"KMeans": "KMeans", "DBCAN": "DBSCAN", "HDBSCAN": "HDBSCAN"}
+CLUSTER_ALGORITHM_DATABASE = {"KMeans": "KMeans", "DBSCAN": "DBSCAN", "HDBSCAN": "HDBSCAN"}
 
 DATA_OPTION = [
     {"label": "Synthetic Shapes", "value": "data/example_shapes/Demoshapes.npz"},
