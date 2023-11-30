@@ -197,6 +197,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
         heatmap:                empty heatmap figure
         interval:               set interval component to trigger to find the latent_vectors.npy file (-1)
     """
+    #TODO: when user does not select a dataset, pop up a window
     if submit_n_clicks is None:
         raise PreventUpdate
 
@@ -340,6 +341,7 @@ def read_latent_vectors(n_intervals, experiment_id, max_intervals):
         Input('cluster-dropdown', 'value'),
         Input('label-dropdown', 'value'),
         Input('scatter-color', 'value'),
+        # input cluster, data
     ],
     [
         State('scatter', 'figure'),
@@ -378,7 +380,9 @@ def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatte
         selected_indices = [point['customdata'][0] for point in selected_data['points']]
     else:
         selected_indices = None
-
+    
+    if not clusters: # when clusters is None, i.e., after submit dimension reduction but before apply clustering
+        clusters = [-1 for i in range(latent_vectors.shape[0])]
     cluster_names = {a: a for a in np.unique(clusters).astype(int)}
     
     scatter_data = generate_scatter_data(latent_vectors,
