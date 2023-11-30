@@ -255,7 +255,6 @@ def submit_dimension_reduction_job(submit_n_clicks,
 @app.callback(
     [   
         Output('latent_vectors', 'data'),
-        # Output('scatter', 'figure'),
         Output('interval-component', 'max_intervals', allow_duplicate=True),
     ],
     Input('interval-component', 'n_intervals'),
@@ -267,7 +266,6 @@ def read_latent_vectors(n_intervals, experiment_id, max_intervals):
     """
     This callback is trigged by the interval:
         - read latent vectors
-        - show scatter plot
         - set interval to not trigger (0)
     Args:
         n_intervals:            interval component
@@ -277,8 +275,6 @@ def read_latent_vectors(n_intervals, experiment_id, max_intervals):
         scatter_fig:            scatter plot the latent vectors (no cluster info yet)
         max_intervals:          interval component that controls if trigger the interval indefintely
     """
-    print("max_intervals: ", max_intervals)
-    print('experiment-id:', experiment_id)
     if experiment_id is None or n_intervals == 0 or max_intervals == 0:
         raise PreventUpdate
 
@@ -292,6 +288,48 @@ def read_latent_vectors(n_intervals, experiment_id, max_intervals):
         return latent_vectors, 0
     else:
         return None, -1
+    
+@app.callback(
+    [
+        Output('clusters', 'data')
+    ],
+    Input('run-cluster-algo', 'n_clicks'),
+    [
+        State('latent_vectors', 'data'),
+        State('additional-cluster-params', 'children'),
+        State('experiment-id', 'data'),
+    ]
+)
+def apply_clustering(apply_n_clicks, latent_vectors, children, experiment_id):
+    """
+    This callback is triggered by click the 'Apply' button at the clustering panel:
+        - apply cluster
+        - save cluster array to npy file
+    Args:
+        apply_n_clicks:         num of clicks for the apply button
+        latent_vectors:         latent vectors from the dimension reduction algo
+        children:               div for clustering algo's parameters
+        experiment_id:          current experiment id, keep track to save the clustering.npy
+    Returns:
+        clusters:               clustering result for each data point
+    """
+    ## TODO: pop up a widow to ask user to first run diemnsion reduction then apply
+    if apply_n_clicks == 0 or experiment_id is None:
+        raise PreventUpdate
+    latent_vectors = np.array(latent_vectors)
+
+    input_params = []
+    if children:
+        for child in children['props']['children']:
+            # key   = child["props"]["children"][1]["props"]["id"]["param_key"]
+            # value = child["props"]["children"][1]["props"]["value"]
+            # input_params[key] = value
+            print(child)
+            print("###")
+    print(input_params)
+
+
+    return None
 
 # @app.callback(
 #     [   
