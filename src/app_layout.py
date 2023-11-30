@@ -137,6 +137,23 @@ cluster_algo_panel = html.Div(
                                             value='DBSCAN',
                                             ),
                             html.Div(id='additional-cluster-params'),
+                            html.Hr(),
+                            html.Div(
+                                [
+                                    dbc.Button(
+                                        "Apply",
+                                        color="secondary",
+                                        id="run-cluster-algo",
+                                        outline=True,
+                                        size="lg",
+                                        className="m-1",
+                                        style={'width':'50%'}
+                                    ),
+                                ],
+                                className='row',
+                                style={'align-items': 'center', 'justify-content': 'center'}
+                            ),
+                            html.Div(id='invisible-submit-div')
                         ]
 
                         )
