@@ -3,7 +3,7 @@ from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import MiniBatchKMeans, DBSCAN, HDBSCAN
 import pathlib
 import json
 import uuid
@@ -291,16 +291,19 @@ def read_latent_vectors(n_intervals, experiment_id, max_intervals):
     
 @app.callback(
     [
-        Output('clusters', 'data')
+        Output('clusters', 'data'),
+        Output('cluster-dropdown', 'options'),
     ],
     Input('run-cluster-algo', 'n_clicks'),
     [
         State('latent_vectors', 'data'),
+        State('cluster-algo-dropdown', 'value'),
         State('additional-cluster-params', 'children'),
         State('experiment-id', 'data'),
     ]
 )
-def apply_clustering(apply_n_clicks, latent_vectors, children, experiment_id):
+def apply_clustering(apply_n_clicks, 
+                     latent_vectors, selected_algo, children, experiment_id):
     """
     This callback is triggered by click the 'Apply' button at the clustering panel:
         - apply cluster
@@ -308,6 +311,7 @@ def apply_clustering(apply_n_clicks, latent_vectors, children, experiment_id):
     Args:
         apply_n_clicks:         num of clicks for the apply button
         latent_vectors:         latent vectors from the dimension reduction algo
+        selected_algo:          selected clustering algo
         children:               div for clustering algo's parameters
         experiment_id:          current experiment id, keep track to save the clustering.npy
     Returns:
@@ -318,18 +322,30 @@ def apply_clustering(apply_n_clicks, latent_vectors, children, experiment_id):
         raise PreventUpdate
     latent_vectors = np.array(latent_vectors)
 
-    input_params = []
+    input_params = {}
     if children:
         for child in children['props']['children']:
-            # key   = child["props"]["children"][1]["props"]["id"]["param_key"]
-            # value = child["props"]["children"][1]["props"]["value"]
-            # input_params[key] = value
-            print(child)
-            print("###")
+            key   = child["props"]["children"][1]["props"]["id"]["param_key"]
+            value = child["props"]["children"][1]["props"]["value"]
+            input_params[key] = value
     print(input_params)
 
+    if selected_algo == "KMeans":
+        obj = MiniBatchKMeans()
+    elif selected_algo == "DBSCAN":
+        obj = DBSCAN()
+    elif selected_algo == "HDBSCAN":
+        obj = HDBSCAN()
 
-    return None
+    cluster, options = None, None
+    if obj:
+        clusters = obj.fit_predict(latent_vectors)
+        np.save(output_path/'clusters.npy', clusters)
+        unique_clusters = np.unique(clusters)
+        options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
+        options.insert(0, {'label': 'All', 'value': -1})
+
+    return clusters, options
 
 # @app.callback(
 #     [   
