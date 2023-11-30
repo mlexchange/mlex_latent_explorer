@@ -162,7 +162,7 @@ def job_content_dict(content):
         Output('label-dropdown', 'value'),
         # reset heatmap
         Output('heatmap', 'figure', allow_duplicate=True),
-        # reset max_intervals to -1
+        # reset interval value to
         Output('interval-component', 'max_intervals'),
     ],
     Input('run-algo', 'n_clicks'),
@@ -195,7 +195,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
         scatter-color:          default scatter-color value
         cluster-dropdown:       default cluster-dropdown value
         heatmap:                empty heatmap figure
-        max-interval:           interval component that controls if trigger the interval indefintely
+        interval:               set interval component to trigger to find the latent_vectors.npy file (-1)
     """
     if submit_n_clicks is None:
         raise PreventUpdate
@@ -246,57 +246,92 @@ def submit_dimension_reduction_job(submit_n_clicks,
 
     response = requests.post('http://job-service:8080/api/v0/workflows', json=compute_dict)
     print("respnse: ", response)
-
     # job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
+    
     
     return experiment_id, 'cluster', -1, -2, go.Figure(go.Heatmap()), -1
 
 @app.callback(
     [   
         Output('latent_vectors', 'data'),
-        Output('clusters', 'data'),
-        Output('cluster-dropdown', 'options'),
+        # Output('scatter', 'figure'),
         Output('interval-component', 'max_intervals', allow_duplicate=True),
     ],
     Input('interval-component', 'n_intervals'),
     State('experiment-id', 'data'),
+    State('interval-component', 'max_intervals'),
     prevent_initial_call=True
 )
-def update_latent_vectors_and_clusters(n_intervals, experiment_id):
+def read_latent_vectors(n_intervals, experiment_id, max_intervals):
     """
-    This callback is triggered by the interval:
+    This callback is trigged by the interval:
         - read latent vectors
-        - calculate clusters and save to data/output/experiment-id
+        - show scatter plot
+        - set interval to not trigger (0)
     Args:
         n_intervals:            interval component
         experiment-id:          each run/submit has a unique experiment id
     Returns:
         latent_vectors:         data from dimension reduction algos
-        clusters:               clusters for latent vectors
-        cluster-dropdown:       options for cluster dropdown
+        scatter_fig:            scatter plot the latent vectors (no cluster info yet)
         max_intervals:          interval component that controls if trigger the interval indefintely
     """
-    if experiment_id is None:
+    print("max_intervals: ", max_intervals)
+    print('experiment-id:', experiment_id)
+    if experiment_id is None or n_intervals == 0 or max_intervals == 0:
         raise PreventUpdate
-     
+
     #read the latent vectors from the output dir
     output_path = OUTPUT_DIR / experiment_id
     npz_files = list(output_path.glob('*.npy'))
-    if len(npz_files) == 1:
-        lv_filepath = npz_files[0]
+    if len(npz_files) > 0 :
+        lv_filepath = npz_files[0] # latent vector file path
         latent_vectors = np.load(str(lv_filepath))
         print("latent vector", latent_vectors.shape)
-        # clustering
-        obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5) # check the effect of thess params. -> use the archiv file.
-                                                            # other clustering algo? -> 2 step
-        clusters = obj.fit_predict(latent_vectors) ### time complexity - O(n) for low dimensional data
-        np.save(output_path/'clusters.npy', clusters)
-        unique_clusters = np.unique(clusters)
-        options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
-        options.insert(0, {'label': 'All', 'value': -1})
-        return latent_vectors, clusters, options, 0
+        return latent_vectors, 0
     else:
-        return None, [], {'label': 'All', 'value':-1}, -1
+        return None, -1
+
+# @app.callback(
+#     [   
+#         Output('latent_vectors', 'data'),
+#         Output('clusters', 'data'),
+#         Output('cluster-dropdown', 'options'),
+#         Output('interval-component', 'max_intervals', allow_duplicate=True),
+#     ],
+#     Input('interval-component', 'n_intervals'),
+#     State('experiment-id', 'data'),
+#     prevent_initial_call=True
+# )
+# def update_latent_vectors_and_clusters(n_intervals, experiment_id):
+#     """
+#     This callback is triggered by the interval:
+#         - read latent vectors
+#         - calculate clusters and save to data/output/experiment-id
+#     Args:
+#         n_intervals:            interval component
+#         experiment-id:          each run/submit has a unique experiment id
+#     Returns:
+#         latent_vectors:         data from dimension reduction algos
+#         clusters:               clusters for latent vectors
+#         cluster-dropdown:       options for cluster dropdown
+#         max_intervals:          interval component that controls if trigger the interval indefintely
+#     """
+#     if experiment_id is None:
+#         raise PreventUpdate
+     
+
+#         # clustering
+#         obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
+#                                                             # other clustering algo? -> 2 step
+#         clusters = obj.fit_predict(latent_vectors) ### time complexity - O(n) for low dimensional data
+#         np.save(output_path/'clusters.npy', clusters)
+#         unique_clusters = np.unique(clusters)
+#         options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
+#         options.insert(0, {'label': 'All', 'value': -1})
+#         return latent_vectors, clusters, options, 0
+#     else:
+#         return None, [], {'label': 'All', 'value':-1}, -1
 
 @app.callback(
     Output('scatter', 'figure'),

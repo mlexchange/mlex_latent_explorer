@@ -108,7 +108,7 @@ algo_panel = html.Div(
                                     className='row',
                                     style={'align-items': 'center', 'justify-content': 'center'}
                                 ),
-                                html.Div(id='invisible-submit-div')
+                                html.Div(id='invisible-apply-div')
                     ]
                 )
             ],
@@ -198,8 +198,8 @@ scatter_control_panel =  html.Div(
     dcc.Interval(
         id='interval-component',
         interval=3000, # in milliseconds
-        max_intervals=-1,  # keep triggering indefinitely
-        n_intervals=0
+        max_intervals=-1,  # keep triggering indefinitely, None
+        n_intervals=0,
     )
     ]
 )
