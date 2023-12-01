@@ -239,7 +239,28 @@ heatmap_control_panel =  html.Div(
     )]
 )
 
-control_panel = [algo_panel, cluster_algo_panel, scatter_control_panel, heatmap_control_panel] #TODO: add controls for scatter plot and statistics
+control_panel = [algo_panel, cluster_algo_panel, scatter_control_panel, heatmap_control_panel]
+
+# add alert pop up window
+modal = html.Div(
+    [
+        dbc.Button("Open modal", id="open", n_clicks=0),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("Header")),
+                dbc.ModalBody("This is the content of the modal"),
+                dbc.ModalFooter(
+                    dbc.Button(
+                        "Close", id="close", className="ms-auto", n_clicks=0
+                    )
+                ),
+            ],
+            id="modal",
+            is_open=False,
+        ),
+    ]
+)
+
 
 # metadata
 meta = [
@@ -274,7 +295,9 @@ app.layout = html.Div(
                          dbc.Col(image_panel, width=7)
                         ]),
                 dbc.Row(dbc.Col(meta)),
+                # dbc.Row(dbc.Col(modal))
             ]
-        )
+        ),
+        modal
     ]
 )
