@@ -207,7 +207,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
             key   = child["props"]["children"][1]["props"]["id"]["param_key"]
             value = child["props"]["children"][1]["props"]["value"]
             input_params[key] = value
-    print(input_params)
+    print("Dimension reduction algo params: ", input_params)
     model_content = get_content(model_id)
     print(model_content)
     job_content = job_content_dict(model_content)
@@ -241,8 +241,9 @@ def submit_dimension_reduction_job(submit_n_clicks,
         cmd_list = ["python umap_run.py", selected_dataset, str(output_path)]
         
     docker_cmd = " ".join(cmd_list)
-    print(docker_cmd)
+    #print(docker_cmd)
     docker_cmd = docker_cmd + ' \'' + json.dumps(input_params) + '\''
+    #print(docker_cmd)
     job_content['job_kwargs']['cmd'] = docker_cmd
 
     response = requests.post('http://job-service:8080/api/v0/workflows', json=compute_dict)
@@ -328,18 +329,19 @@ def apply_clustering(apply_n_clicks,
             key   = child["props"]["children"][1]["props"]["id"]["param_key"]
             value = child["props"]["children"][1]["props"]["value"]
             input_params[key] = value
-    print(input_params)
-
+    print("Clustering params:", input_params)
+ 
     if selected_algo == "KMeans":
-        obj = MiniBatchKMeans()
+        obj = MiniBatchKMeans(n_clusters=input_params['n_clusters'])
     elif selected_algo == "DBSCAN":
-        obj = DBSCAN()
+        obj = DBSCAN(eps=input_params['eps'], min_samples=input_params['min_samples'])
     elif selected_algo == "HDBSCAN":
-        obj = HDBSCAN()
+        obj = HDBSCAN(min_cluster_size=input_params['min_cluster_size'])
 
-    cluster, options = None, None
+    clusters, options = None, None
     if obj:
         clusters = obj.fit_predict(latent_vectors)
+        output_path = OUTPUT_DIR / experiment_id
         np.save(output_path/'clusters.npy', clusters)
         unique_clusters = np.unique(clusters)
         options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
@@ -395,19 +397,19 @@ def apply_clustering(apply_n_clicks,
         Input('cluster-dropdown', 'value'),
         Input('label-dropdown', 'value'),
         Input('scatter-color', 'value'),
-        # input cluster, data
+        Input('clusters', 'data'), #move clusters to the input
     ],
     [
         State('scatter', 'figure'),
         State('scatter', 'selectedData'),
         State('additional-model-params', 'children'),
-        State('clusters', 'data'),
+
         State('input_labels', 'data'),
         State('label_schema', 'data'),
     ]
 )
-def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatter_color,
-                        current_figure, selected_data, children, clusters, labels, label_names):
+def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatter_color, clusters,
+                        current_figure, selected_data, children, labels, label_names):
     '''
     This callback update the scater plot
     Args:
