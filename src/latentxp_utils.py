@@ -5,22 +5,22 @@ from copy import deepcopy
 import requests
 import os
 
-kmeans_kwargs = {"gui_parameters": [{"type": "dropdown", "name": "ncluster-dropdown-menu", "title": "Number of clusters", "param_key": "-1",
+kmeans_kwargs = {"gui_parameters": [{"type": "dropdown", "name": "ncluster-dropdown-menu", "title": "Number of clusters", "param_key": "n_clusters",
                                      "options": [{"label": i, "value": i} for i in range(1, 21)], 
                                      "value":8},
                                      ]
                 }
 dbscan_kwargs = {"gui_parameters": [
-                                    {"type": "dropdown", "name": "eps-dropdown", "title": "The maximum distance between two samples for one to be considered as in the neighborhood of the other", "param_key": "1",
-                                     "options": [{"label": i*0.1, "value": i*0.1} for i in range(1, 31)], 
+                                    {"type": "dropdown", "name": "eps-dropdown", "title": "The maximum distance between two samples for one to be considered as in the neighborhood of the other", "param_key": "eps",
+                                     "options": [{"label": i/10, "value": i/10} for i in range(1, 31)], 
                                      "value":0.5},
-                                    {"type": "dropdown", "name": "minsample-dropdown", "title": "The number of samples in a neighborhood for a point to be considered as a core point", "param_key": "2",
+                                    {"type": "dropdown", "name": "minsample-dropdown", "title": "The number of samples in a neighborhood for a point to be considered as a core point", "param_key": "min_samples",
                                      "options": [{"label": i, "value": i} for i in range(1, 31)], 
                                      "value":5},
                                     ]
                 }
 hdbscan_kwargs = {"gui_parameters": [
-                                    {"type": "dropdown", "name": "mincluster-size", "title": "The minimum number of samples in a group for that group to be considered a cluster", "param_key": "3",
+                                    {"type": "dropdown", "name": "mincluster-size", "title": "The minimum number of samples in a group for that group to be considered a cluster", "param_key": "min_cluster_size",
                                      "options": [{"label": i, "value": i} for i in range(2, 31)], 
                                      "value":5},
                                     ]
