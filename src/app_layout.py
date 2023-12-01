@@ -239,8 +239,6 @@ heatmap_control_panel =  html.Div(
     )]
 )
 
-control_panel = [algo_panel, cluster_algo_panel, scatter_control_panel, heatmap_control_panel]
-
 # add alert pop up window
 modal = html.Div(
     [
@@ -260,6 +258,9 @@ modal = html.Div(
         ),
     ]
 )
+
+
+control_panel = [algo_panel, cluster_algo_panel, scatter_control_panel, heatmap_control_panel, modal]
 
 
 # metadata
@@ -295,7 +296,6 @@ app.layout = html.Div(
                          dbc.Col(image_panel, width=7)
                         ]),
                 dbc.Row(dbc.Col(meta)),
-                # dbc.Row(dbc.Col(modal))
             ]
         ),
         modal

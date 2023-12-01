@@ -349,47 +349,6 @@ def apply_clustering(apply_n_clicks,
 
     return clusters, options
 
-# @app.callback(
-#     [   
-#         Output('latent_vectors', 'data'),
-#         Output('clusters', 'data'),
-#         Output('cluster-dropdown', 'options'),
-#         Output('interval-component', 'max_intervals', allow_duplicate=True),
-#     ],
-#     Input('interval-component', 'n_intervals'),
-#     State('experiment-id', 'data'),
-#     prevent_initial_call=True
-# )
-# def update_latent_vectors_and_clusters(n_intervals, experiment_id):
-#     """
-#     This callback is triggered by the interval:
-#         - read latent vectors
-#         - calculate clusters and save to data/output/experiment-id
-#     Args:
-#         n_intervals:            interval component
-#         experiment-id:          each run/submit has a unique experiment id
-#     Returns:
-#         latent_vectors:         data from dimension reduction algos
-#         clusters:               clusters for latent vectors
-#         cluster-dropdown:       options for cluster dropdown
-#         max_intervals:          interval component that controls if trigger the interval indefintely
-#     """
-#     if experiment_id is None:
-#         raise PreventUpdate
-     
-
-#         # clustering
-#         obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5)
-#                                                             # other clustering algo? -> 2 step
-#         clusters = obj.fit_predict(latent_vectors) ### time complexity - O(n) for low dimensional data
-#         np.save(output_path/'clusters.npy', clusters)
-#         unique_clusters = np.unique(clusters)
-#         options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
-#         options.insert(0, {'label': 'All', 'value': -1})
-#         return latent_vectors, clusters, options, 0
-#     else:
-#         return None, [], {'label': 'All', 'value':-1}, -1
-
 @app.callback(
     Output('scatter', 'figure'),
     [
@@ -578,6 +537,54 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
         html.Br(),
         f"Labels represented: {labels_str}",
     ]
+
+# @app.callback(
+#     [
+#         Output('modal', 'is_open'),
+#         # Output('modal-body', 'children')
+#     ],
+#     [
+#         Input('run-algo', 'n_clicks'),
+#         Input('run-cluster-algo', 'n_clicks'),
+#     ],
+#     [
+#         State('input_data', 'data'),
+#         State('modal', 'is_open'),
+#     ]
+# )
+# def toggle_modal(submit_n_clicks, apply_n_clicks, input_data, is_open):
+#     """
+#     Order: select a dataset -> submit for dimension reduction -> apply clustering
+
+#     This alert window is triggered in the following instance:
+#     1. user clicks on "submit" button, but does not select any data
+#     2. user clicks on "apply" button, but either does not click "submit" or data yet
+#     """
+#     # if submit_n_clicks == 0 or apply_n_clicks == 0:
+#     #     PreventUpdate
+    
+#     # if submit_n_clicks:
+#     #     if input_data is None:
+#     #         return True#, "Please select an example dataset or upload your own zipped dataset."
+    
+#     # if apply_n_clicks:
+#     #     if not submit_n_clicks: 
+#     #         return True#, "Please select a dimension reduction algorithm and click Submit button."
+
+#     #return True
+#     print(is_open)
+#     return True
+
+
+@app.callback(
+    Output("modal", "is_open"),
+    [Input("open", "n_clicks"), Input("close", "n_clicks")],
+    [State("modal", "is_open")],
+)
+def toggle_modal(n1, n2, is_open):
+    if n1 or n2:
+        return not is_open
+    return is_open
 
 
 if __name__ == '__main__':
