@@ -242,16 +242,10 @@ heatmap_control_panel =  html.Div(
 # add alert pop up window
 modal = html.Div(
     [
-        dbc.Button("Open modal", id="open", n_clicks=0),
         dbc.Modal(
             [
                 dbc.ModalHeader(dbc.ModalTitle("Header")),
-                dbc.ModalBody("This is the content of the modal"),
-                dbc.ModalFooter(
-                    dbc.Button(
-                        "Close", id="close", className="ms-auto", n_clicks=0
-                    )
-                ),
+                dbc.ModalBody("This is the content of the modal", id="modal-body"),
             ],
             id="modal",
             is_open=False,

@@ -169,6 +169,7 @@ def job_content_dict(content):
     [
         State('dataset-selection', 'value'),
         State('user-upload-data-dir', 'data'),
+        State('input_data', 'data'),
         State('model_id', 'data'),
         State('algo-dropdown', 'value'),
         State('additional-model-params', 'children'),
@@ -176,7 +177,7 @@ def job_content_dict(content):
     prevent_initial_call=True
 )
 def submit_dimension_reduction_job(submit_n_clicks,
-                                   selected_dataset, user_upload_data_dir, model_id, selected_algo, children):
+                                   selected_dataset, user_upload_data_dir, input_data, model_id, selected_algo, children):
     """
     This callback is triggered every time the Submit button is hit:
         - compute latent vectors, which will be saved in data/output/experiment_id
@@ -197,8 +198,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
         heatmap:                empty heatmap figure
         interval:               set interval component to trigger to find the latent_vectors.npy file (-1)
     """
-    #TODO: when user does not select a dataset, pop up a window
-    if submit_n_clicks is None:
+    if not submit_n_clicks or not input_data:
         raise PreventUpdate
 
     input_params = {}
@@ -577,14 +577,28 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
 
 
 @app.callback(
-    Output("modal", "is_open"),
-    [Input("open", "n_clicks"), Input("close", "n_clicks")],
-    [State("modal", "is_open")],
+    [Output("modal", "is_open"), Output("modal-body", "children")],
+    [
+        Input('run-algo', 'n_clicks'), 
+        Input('run-cluster-algo', 'n_clicks'),
+    ],
+    [
+        State("modal", "is_open"), 
+        State('input_data', 'data'),
+    ]
 )
-def toggle_modal(n1, n2, is_open):
-    if n1 or n2:
-        return not is_open
-    return is_open
+def toggle_modal(n_submit, n_apply,
+                 is_open, input_data):
+    
+    print("!!run algo n click:", n_submit)
+    if n_submit and input_data is None:
+        return True, "Please select an example dataset or upload your own zipped dataset."
+    elif n_apply and input_data is None:
+        return True, "Please select an example dataset or upload your own zipped dataset."
+    elif n_apply and n_submit is None:
+        return True, "Please select a dimension reduction algorithm and click 'Submit' button before clustering."
+            
+    return is_open, "yes"
 
 
 if __name__ == '__main__':
