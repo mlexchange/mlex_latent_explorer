@@ -35,7 +35,8 @@ app = Dash(__name__,
 server = app.server
 
 dash_file_explorer = FileManager(DOCKER_DATA, 
-                                 UPLOAD_FOLDER_ROOT)
+                                 UPLOAD_FOLDER_ROOT,
+                                 open_explorer=False)
 dash_file_explorer.init_callbacks(app)
 du.configure_upload(app, UPLOAD_FOLDER_ROOT, use_upload_id=False)
 
@@ -49,6 +50,14 @@ image_panel = [
             dbc.CardHeader(
                 [
                     dash_file_explorer.file_explorer,
+                    dbc.Label('Select Data Clinic modal', className='mr-2'),
+                    dcc.Dropdown(
+                        id='feature_vector-model-list',
+                        #options=DATA_OPTION,
+                        #value = DATA_OPTION[0]['value'],
+                        clearable=False,
+                        style={'margin-bottom': '1rem'}
+                    ),
                     dbc.Label('Try Example Dataset', className='mr-2'),
                     dcc.Dropdown(
                         id='dataset-selection',
@@ -285,7 +294,7 @@ app.layout = html.Div(
     [
         header, 
         dbc.Container(
-            [
+            children = [
                 dbc.Row([ dbc.Col(control_panel, width=4), 
                          dbc.Col(image_panel, width=7)
                         ]),
