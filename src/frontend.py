@@ -1,3 +1,4 @@
+import dash
 from dash import html, Input, Output, State
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
@@ -9,11 +10,12 @@ import json
 import uuid
 import requests
 import os
+import requests
 
 from file_manager.data_project import DataProject
 
 from app_layout import app, DOCKER_DATA, UPLOAD_FOLDER_ROOT
-from latentxp_utils import kmeans_kwargs, dbscan_kwargs, hdbscan_kwargs, hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content
+from latentxp_utils import kmeans_kwargs, dbscan_kwargs, hdbscan_kwargs, hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, get_trained_models_list
 from dash_component_editor import JSONParameterEditor
 
 
@@ -538,44 +540,6 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
         f"Labels represented: {labels_str}",
     ]
 
-# @app.callback(
-#     [
-#         Output('modal', 'is_open'),
-#         # Output('modal-body', 'children')
-#     ],
-#     [
-#         Input('run-algo', 'n_clicks'),
-#         Input('run-cluster-algo', 'n_clicks'),
-#     ],
-#     [
-#         State('input_data', 'data'),
-#         State('modal', 'is_open'),
-#     ]
-# )
-# def toggle_modal(submit_n_clicks, apply_n_clicks, input_data, is_open):
-#     """
-#     Order: select a dataset -> submit for dimension reduction -> apply clustering
-
-#     This alert window is triggered in the following instance:
-#     1. user clicks on "submit" button, but does not select any data
-#     2. user clicks on "apply" button, but either does not click "submit" or data yet
-#     """
-#     # if submit_n_clicks == 0 or apply_n_clicks == 0:
-#     #     PreventUpdate
-    
-#     # if submit_n_clicks:
-#     #     if input_data is None:
-#     #         return True#, "Please select an example dataset or upload your own zipped dataset."
-    
-#     # if apply_n_clicks:
-#     #     if not submit_n_clicks: 
-#     #         return True#, "Please select a dimension reduction algorithm and click Submit button."
-
-#     #return True
-#     print(is_open)
-#     return True
-
-
 @app.callback(
     [Output("modal", "is_open"), Output("modal-body", "children")],
     [
@@ -589,8 +553,19 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
 )
 def toggle_modal(n_submit, n_apply,
                  is_open, input_data):
+    '''
+    This callback pop up a winder to remind user to follow this flow: 
+        select dataset -> Submit dimension reduction job -> Apply clustering
+    Args:
+        n_submit (int):     Number of clicks on the 'Submit' button.
+        n_apply (int):      Number of clicks on the 'Apply' button.
+        is_open (bool):     Current state of the modal window (open/closed).
+        input_data (list):         User selected data
+    Returns:
+        is_open (bool):     New state of the modal window.
+        modal_body_text (str): Text to be displayed in the modal body.
+    '''
     
-    print("!!run algo n click:", n_submit)
     if n_submit and input_data is None:
         return True, "Please select an example dataset or upload your own zipped dataset."
     elif n_apply and input_data is None:
@@ -598,7 +573,31 @@ def toggle_modal(n_submit, n_apply,
     elif n_apply and n_submit is None:
         return True, "Please select a dimension reduction algorithm and click 'Submit' button before clustering."
             
-    return is_open, "yes"
+    return False, "No alert."
+
+
+# @app.callback(
+#     Output('feature_vector-model-list', 'options'),
+#     Input('interval-component', 'n_intervals'),
+#     prevent_initial_call=True
+# )
+# def update_trained_model_list(interval):
+#     '''
+#     This callback updates the list of trained models
+#     Args:
+#         tab_value:                      Tab option
+#         prob_refresh_n_clicks:          Button to refresh the list of probability-based trained models
+#         similarity_refresh_n_clicks:    Button to refresh the list of similarity-based trained models
+#     Returns:
+#         prob_model_list:                List of trained models in mlcoach
+#         similarity_model_list:          List of trained models in data clinic and mlcoach
+#     '''
+
+#     data_clinic_models = get_trained_models_list(USER, 'data_clinic')
+#     ml_coach_models = get_trained_models_list(USER, 'mlcoach')
+#     feature_vector_models = data_clinic_models + ml_coach_models
+
+#     return feature_vector_models
 
 
 if __name__ == '__main__':
