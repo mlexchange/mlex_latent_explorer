@@ -10,6 +10,8 @@ data/upload/
 data/.file_manager_vars.pkl
 .DS_Store
 
+src/dash_component_editor.py
+
 # C extensions
 *.so
 
