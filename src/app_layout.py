@@ -48,7 +48,8 @@ image_panel = [
         id="image-card",
         children=[
             dbc.CardHeader(
-                [
+                [   
+                    dbc.Label('Upload your own zipped dataset', className='mr-2'),
                     dash_file_explorer.file_explorer,
                     dbc.Label('Select Data Clinic modal', className='mr-2'),
                     dcc.Dropdown(
