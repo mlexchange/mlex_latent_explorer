@@ -51,15 +51,15 @@ image_panel = [
                 [   
                     dbc.Label('Upload your own zipped dataset', className='mr-2'),
                     dash_file_explorer.file_explorer,
-                    dbc.Label('Select Data Clinic modal', className='mr-2'),
+                    dbc.Label('Or select Data Clinic modal', className='mr-2'),
                     dcc.Dropdown(
-                        id='feature_vector-model-list',
+                        id='feature-vector-model-list',
                         #options=DATA_OPTION,
                         #value = DATA_OPTION[0]['value'],
                         clearable=False,
                         style={'margin-bottom': '1rem'}
                     ),
-                    dbc.Label('Try Example Dataset', className='mr-2'),
+                    dbc.Label('Or try Example Dataset', className='mr-2'),
                     dcc.Dropdown(
                         id='dataset-selection',
                         options=DATA_OPTION,
@@ -210,7 +210,13 @@ scatter_control_panel =  html.Div(
         interval=3000, # in milliseconds
         max_intervals=-1,  # keep triggering indefinitely, None
         n_intervals=0,
-    )
+    ),
+    dcc.Interval(
+        id='interval-for-dc',
+        interval=1000, # in milliseconds
+        max_intervals=-1,  # keep triggering indefinitely, None
+        n_intervals=0,
+    ),
     ]
 )
 

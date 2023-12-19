@@ -22,7 +22,7 @@ from dash_component_editor import JSONParameterEditor
 #### GLOBAL PARAMS ####
 DATA_DIR = str(os.environ['DATA_DIR'])
 OUTPUT_DIR = pathlib.Path('data/output')
-USER = 'mlexchange-team'
+USER = 'admin' #'mlexchange-team' # move to env file
 UPLOAD_FOLDER_ROOT = "data/upload"
 
 @app.callback(
@@ -87,10 +87,11 @@ def show_clustering_gui_layouts(selected_algo):
     Output('label_schema', 'data'),
     Output('label-dropdown', 'options'),
     Output('user-upload-data-dir', 'data'),
-    Input('dataset-selection', 'value'),
-    Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'),
+    Input('dataset-selection', 'value'), # Example dataset
+    Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'), # FM
+    Input('feature-vector-model-list', 'value'), # data clinic
 )
-def update_data_n_label_schema(selected_dataset, upload_file_paths):
+def update_data_n_label_schema(selected_dataset, upload_file_paths, data_clinic_file_path):
     '''
     This callback updates the selected dataset from the provided example datasets, as well as labels, and label schema
     Args:
@@ -103,7 +104,7 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
         label_dropdown:         label dropdown options
         user_upload_data_dir:   dir name for the user uploaded zip file
     '''
-    
+    # FM
     data_project = DataProject()
     data_project.init_from_dict(upload_file_paths)
     data_set = data_project.data # list of len 1920, each element is a local_dataset.LocalDataset object
@@ -114,6 +115,7 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
     options = []
     user_upload_data_dir = None
 
+    # FM options
     if len(data_set) > 0:
         data = []
         for i in range(len(data_set)): #if dataset too large, dash will exit with code 247, 137
@@ -123,14 +125,20 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
         print(data.shape)
         labels = np.full((data.shape[0],), -1)
         user_upload_data_dir = os.path.dirname(upload_file_paths[0]['uri'])
-
+    # Example dataset option 1
     elif selected_dataset == "data/example_shapes/Demoshapes.npz":
         data = np.load("/app/work/" + selected_dataset)['arr_0']
         labels = np.load("/app/work/data/example_shapes/DemoLabels.npy")
         f = open("/app/work/data/example_shapes/label_schema.json")
         label_schema = json.load(f)
+    # Example dataset option 2
     elif selected_dataset == "data/example_latentrepresentation/f_vectors.parquet":
         df = pd.read_parquet("/app/work/" + selected_dataset)
+        data = df.values
+        labels = np.full((df.shape[0],), -1)
+    # DataClinic options
+    elif data_clinic_file_path is not None:
+        df = pd.read_parquet(data_clinic_file_path)
         data = df.values
         labels = np.full((df.shape[0],), -1)
 
@@ -171,6 +179,7 @@ def job_content_dict(content):
     [
         State('dataset-selection', 'value'),
         State('user-upload-data-dir', 'data'),
+        State('feature-vector-model-list', 'value'),
         State('input_data', 'data'),
         State('model_id', 'data'),
         State('algo-dropdown', 'value'),
@@ -179,7 +188,8 @@ def job_content_dict(content):
     prevent_initial_call=True
 )
 def submit_dimension_reduction_job(submit_n_clicks,
-                                   selected_dataset, user_upload_data_dir, input_data, model_id, selected_algo, children):
+                                   selected_dataset, user_upload_data_dir, data_clinic_file_path,
+                                   input_data, model_id, selected_algo, children):
     """
     This callback is triggered every time the Submit button is hit:
         - compute latent vectors, which will be saved in data/output/experiment_id
@@ -232,9 +242,11 @@ def submit_dimension_reduction_job(submit_n_clicks,
     output_path = OUTPUT_DIR / experiment_id
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # check if user is using user uploaded zip file or example dataset
+    # check if user is using user uploaded zip file or example dataset or data clinic file
     if user_upload_data_dir is not None:
         selected_dataset = user_upload_data_dir
+    elif data_clinic_file_path is not None:
+        selected_dataset = data_clinic_file_path
     
     # check which dimension reduction algo, then compose command
     if selected_algo == 'PCA':
@@ -576,28 +588,28 @@ def toggle_modal(n_submit, n_apply,
     return False, "No alert."
 
 
-# @app.callback(
-#     Output('feature_vector-model-list', 'options'),
-#     Input('interval-component', 'n_intervals'),
-#     prevent_initial_call=True
-# )
-# def update_trained_model_list(interval):
-#     '''
-#     This callback updates the list of trained models
-#     Args:
-#         tab_value:                      Tab option
-#         prob_refresh_n_clicks:          Button to refresh the list of probability-based trained models
-#         similarity_refresh_n_clicks:    Button to refresh the list of similarity-based trained models
-#     Returns:
-#         prob_model_list:                List of trained models in mlcoach
-#         similarity_model_list:          List of trained models in data clinic and mlcoach
-#     '''
+@app.callback(
+    Output('feature-vector-model-list', 'options'),
+    Input('interval-for-dc', 'n_intervals'),
+    # prevent_initial_call=True
+)
+def update_trained_model_list(interval):
+    '''
+    This callback updates the list of trained models
+    Args:
+        tab_value:                      Tab option
+        prob_refresh_n_clicks:          Button to refresh the list of probability-based trained models
+        similarity_refresh_n_clicks:    Button to refresh the list of similarity-based trained models
+    Returns:
+        prob_model_list:                List of trained models in mlcoach
+        similarity_model_list:          List of trained models in data clinic and mlcoach
+    '''
+    data_clinic_models = get_trained_models_list(USER, 'data_clinic')
+    ml_coach_models = get_trained_models_list(USER, 'mlcoach')
+    feature_vector_models = data_clinic_models + ml_coach_models
+    print(feature_vector_models)
 
-#     data_clinic_models = get_trained_models_list(USER, 'data_clinic')
-#     ml_coach_models = get_trained_models_list(USER, 'mlcoach')
-#     feature_vector_models = data_clinic_models + ml_coach_models
-
-#     return feature_vector_models
+    return feature_vector_models
 
 
 if __name__ == '__main__':

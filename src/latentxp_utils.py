@@ -336,8 +336,9 @@ def get_trained_models_list(user, app):
         trained_models:     List of options
     '''
     MLEX_COMPUTE_URL = "http://job-service:8080/api/v0"
-    filename = '/results.parquet'
+    filename = '/f_vectors.parquet'
     model_list = requests.get(f'{MLEX_COMPUTE_URL}/jobs?&user={user}&mlex_app={app}').json()
+    # print(model_list, flush=True)
     trained_models = []
     for model in model_list:
         if model['job_kwargs']['kwargs']['job_type']=='prediction_model':
