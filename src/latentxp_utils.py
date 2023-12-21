@@ -5,6 +5,27 @@ from copy import deepcopy
 import requests
 import os
 
+kmeans_kwargs = {"gui_parameters": [{"type": "dropdown", "name": "ncluster-dropdown-menu", "title": "Number of clusters", "param_key": "n_clusters",
+                                     "options": [{"label": i, "value": i} for i in range(1, 21)], 
+                                     "value":8},
+                                     ]
+                }
+dbscan_kwargs = {"gui_parameters": [
+                                    {"type": "dropdown", "name": "eps-dropdown", "title": "The maximum distance between two samples for one to be considered as in the neighborhood of the other", "param_key": "eps",
+                                     "options": [{"label": i/10, "value": i/10} for i in range(1, 31)], 
+                                     "value":0.5},
+                                    {"type": "dropdown", "name": "minsample-dropdown", "title": "The number of samples in a neighborhood for a point to be considered as a core point", "param_key": "min_samples",
+                                     "options": [{"label": i, "value": i} for i in range(1, 31)], 
+                                     "value":5},
+                                    ]
+                }
+hdbscan_kwargs = {"gui_parameters": [
+                                    {"type": "dropdown", "name": "mincluster-size", "title": "The minimum number of samples in a group for that group to be considered a cluster", "param_key": "min_cluster_size",
+                                     "options": [{"label": i, "value": i} for i in range(2, 31)], 
+                                     "value":5},
+                                    ]
+                }
+
 def check_if_path_exist(path):
     if os.path.exists(path):
         print(f"The path '{path}' exists.")
@@ -303,3 +324,33 @@ def compute_mean_std_images(selected_indices, images):
     mean_image = np.mean(selected_images, axis=0)
     std_image = np.std(selected_images, axis=0)
     return mean_image, std_image
+
+def get_trained_models_list(user, app):
+    '''
+    This function queries the MLCoach or DataClinic results
+    Args:
+        user:               Username
+        app:                Tab option (MLCoach vs Data Clinic)
+        similarity:         [Bool] Retrieve f_vec vs probabilities
+    Returns:
+        trained_models:     List of options
+    '''
+    MLEX_COMPUTE_URL = "http://job-service:8080/api/v0"
+    filename = '/f_vectors.parquet'
+    model_list = requests.get(f'{MLEX_COMPUTE_URL}/jobs?&user={user}&mlex_app={app}').json()
+    # print(model_list, flush=True)
+    trained_models = []
+    for model in model_list:
+        if model['job_kwargs']['kwargs']['job_type']=='prediction_model':
+            cmd = model['job_kwargs']['cmd'].split(' ')
+            indx = cmd.index('-o')
+            out_path = cmd[indx+1]
+            if os.path.exists(out_path+filename):  # check if the file exists
+                if model['description']:
+                    trained_models.append({'label': app+': '+model['description'],
+                                           'value': out_path+filename})
+                else:
+                    trained_models.append({'label': app+': '+model['job_kwargs']['kwargs']['job_type'],
+                                           'value': out_path+filename})
+    trained_models.reverse()
+    return trained_models

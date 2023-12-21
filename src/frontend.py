@@ -1,26 +1,28 @@
+import dash
 from dash import html, Input, Output, State
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import MiniBatchKMeans, DBSCAN, HDBSCAN
 import pathlib
 import json
 import uuid
 import requests
 import os
-import time
-import pyarrow.parquet as pq
+import requests
 
 from file_manager.data_project import DataProject
 
 from app_layout import app, DOCKER_DATA, UPLOAD_FOLDER_ROOT
-from latentxp_utils import hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, get_job, check_if_path_exist
+from latentxp_utils import kmeans_kwargs, dbscan_kwargs, hdbscan_kwargs, hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, get_trained_models_list
 from dash_component_editor import JSONParameterEditor
+
+
 #### GLOBAL PARAMS ####
 DATA_DIR = str(os.environ['DATA_DIR'])
 OUTPUT_DIR = pathlib.Path('data/output')
-USER = 'mlexchange-team'
+USER = 'admin' #'mlexchange-team' # move to env file
 UPLOAD_FOLDER_ROOT = "data/upload"
 
 @app.callback(
@@ -28,7 +30,7 @@ UPLOAD_FOLDER_ROOT = "data/upload"
     Output('model_id', 'data'),
     Input('algo-dropdown', 'value')
 )
-def show_gui_layouts(selected_algo):
+def show_dimension_reduction_gui_layouts(selected_algo):
     '''
     This callback display dropdown menu in the frontend for different dimension reduction algos
     Args:
@@ -41,7 +43,7 @@ def show_gui_layouts(selected_algo):
    
     if selected_algo == 'PCA':
         conditions = {'name': 'PCA'}
-    if selected_algo == 'UMAP':
+    elif selected_algo == 'UMAP':
         conditions = {'name': 'UMAP'}
     
     model = [d for d in data if all((k in d and d[k] == v) for k, v in conditions.items())] # filter pca or umap
@@ -54,17 +56,42 @@ def show_gui_layouts(selected_algo):
     item_list.init_callbacks(app)
         
     return item_list, model_uid
-        
+
+@app.callback(
+    Output('additional-cluster-params', 'children'),
+    Input('cluster-algo-dropdown', 'value'),
+)
+def show_clustering_gui_layouts(selected_algo):
+    '''
+    This callback display drop down menu in the fronend  for different clustering algos
+    Args:
+        selected_algo:      selected clustering algorithm
+    Returns:
+        item_list:          dropdown menu html code
+    '''
+    if selected_algo == 'KMeans':
+        kwargs = kmeans_kwargs
+    elif selected_algo == 'DBSCAN':
+        kwargs = dbscan_kwargs
+    elif selected_algo == 'HDBSCAN':
+        kwargs = hdbscan_kwargs
+    
+    item_list = JSONParameterEditor(_id={'type': str(uuid.uuid4())},
+                                    json_blob=kwargs["gui_parameters"])
+    item_list.init_callbacks(app)
+    return item_list
+
 @app.callback(
     Output('input_data', 'data'),
     Output('input_labels', 'data'),
     Output('label_schema', 'data'),
     Output('label-dropdown', 'options'),
     Output('user-upload-data-dir', 'data'),
-    Input('dataset-selection', 'value'),
-    Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'),
+    Input('dataset-selection', 'value'), # Example dataset
+    Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'), # FM
+    Input('feature-vector-model-list', 'value'), # data clinic
 )
-def update_data_n_label_schema(selected_dataset, upload_file_paths):
+def update_data_n_label_schema(selected_dataset, upload_file_paths, data_clinic_file_path):
     '''
     This callback updates the selected dataset from the provided example datasets, as well as labels, and label schema
     Args:
@@ -77,7 +104,7 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
         label_dropdown:         label dropdown options
         user_upload_data_dir:   dir name for the user uploaded zip file
     '''
-    
+    # FM
     data_project = DataProject()
     data_project.init_from_dict(upload_file_paths)
     data_set = data_project.data # list of len 1920, each element is a local_dataset.LocalDataset object
@@ -88,6 +115,7 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
     options = []
     user_upload_data_dir = None
 
+    # FM options
     if len(data_set) > 0:
         data = []
         for i in range(len(data_set)): #if dataset too large, dash will exit with code 247, 137
@@ -97,14 +125,20 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths):
         print(data.shape)
         labels = np.full((data.shape[0],), -1)
         user_upload_data_dir = os.path.dirname(upload_file_paths[0]['uri'])
-
+    # Example dataset option 1
     elif selected_dataset == "data/example_shapes/Demoshapes.npz":
         data = np.load("/app/work/" + selected_dataset)['arr_0']
         labels = np.load("/app/work/data/example_shapes/DemoLabels.npy")
         f = open("/app/work/data/example_shapes/label_schema.json")
         label_schema = json.load(f)
+    # Example dataset option 2
     elif selected_dataset == "data/example_latentrepresentation/f_vectors.parquet":
         df = pd.read_parquet("/app/work/" + selected_dataset)
+        data = df.values
+        labels = np.full((df.shape[0],), -1)
+    # DataClinic options
+    elif data_clinic_file_path is not None:
+        df = pd.read_parquet(data_clinic_file_path)
         data = df.values
         labels = np.full((df.shape[0],), -1)
 
@@ -138,13 +172,15 @@ def job_content_dict(content):
         Output('label-dropdown', 'value'),
         # reset heatmap
         Output('heatmap', 'figure', allow_duplicate=True),
-        # reset max_intervals to -1
+        # reset interval value to
         Output('interval-component', 'max_intervals'),
     ],
     Input('run-algo', 'n_clicks'),
     [
         State('dataset-selection', 'value'),
         State('user-upload-data-dir', 'data'),
+        State('feature-vector-model-list', 'value'),
+        State('input_data', 'data'),
         State('model_id', 'data'),
         State('algo-dropdown', 'value'),
         State('additional-model-params', 'children'),
@@ -152,7 +188,8 @@ def job_content_dict(content):
     prevent_initial_call=True
 )
 def submit_dimension_reduction_job(submit_n_clicks,
-                                   selected_dataset, user_upload_data_dir, model_id, selected_algo, children):
+                                   selected_dataset, user_upload_data_dir, data_clinic_file_path,
+                                   input_data, model_id, selected_algo, children):
     """
     This callback is triggered every time the Submit button is hit:
         - compute latent vectors, which will be saved in data/output/experiment_id
@@ -171,9 +208,9 @@ def submit_dimension_reduction_job(submit_n_clicks,
         scatter-color:          default scatter-color value
         cluster-dropdown:       default cluster-dropdown value
         heatmap:                empty heatmap figure
-        max-interval:           interval component that controls if trigger the interval indefintely
+        interval:               set interval component to trigger to find the latent_vectors.npy file (-1)
     """
-    if submit_n_clicks is None:
+    if not submit_n_clicks or not input_data:
         raise PreventUpdate
 
     input_params = {}
@@ -182,7 +219,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
             key   = child["props"]["children"][1]["props"]["id"]["param_key"]
             value = child["props"]["children"][1]["props"]["value"]
             input_params[key] = value
-    print(input_params)
+    print("Dimension reduction algo params: ", input_params)
     model_content = get_content(model_id)
     print(model_content)
     job_content = job_content_dict(model_content)
@@ -205,9 +242,11 @@ def submit_dimension_reduction_job(submit_n_clicks,
     output_path = OUTPUT_DIR / experiment_id
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # check if user is using user uploaded zip file or example dataset
+    # check if user is using user uploaded zip file or example dataset or data clinic file
     if user_upload_data_dir is not None:
         selected_dataset = user_upload_data_dir
+    elif data_clinic_file_path is not None:
+        selected_dataset = data_clinic_file_path
     
     # check which dimension reduction algo, then compose command
     if selected_algo == 'PCA':
@@ -216,63 +255,113 @@ def submit_dimension_reduction_job(submit_n_clicks,
         cmd_list = ["python umap_run.py", selected_dataset, str(output_path)]
         
     docker_cmd = " ".join(cmd_list)
-    print(docker_cmd)
+    #print(docker_cmd)
     docker_cmd = docker_cmd + ' \'' + json.dumps(input_params) + '\''
+    #print(docker_cmd)
     job_content['job_kwargs']['cmd'] = docker_cmd
 
     response = requests.post('http://job-service:8080/api/v0/workflows', json=compute_dict)
     print("respnse: ", response)
-
     # job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
+    
     
     return experiment_id, 'cluster', -1, -2, go.Figure(go.Heatmap()), -1
 
 @app.callback(
     [   
         Output('latent_vectors', 'data'),
-        Output('clusters', 'data'),
-        Output('cluster-dropdown', 'options'),
         Output('interval-component', 'max_intervals', allow_duplicate=True),
     ],
     Input('interval-component', 'n_intervals'),
     State('experiment-id', 'data'),
+    State('interval-component', 'max_intervals'),
     prevent_initial_call=True
 )
-def update_latent_vectors_and_clusters(n_intervals, experiment_id):
+def read_latent_vectors(n_intervals, experiment_id, max_intervals):
     """
-    This callback is triggered by the interval:
+    This callback is trigged by the interval:
         - read latent vectors
-        - calculate clusters and save to data/output/experiment-id
+        - set interval to not trigger (0)
     Args:
         n_intervals:            interval component
         experiment-id:          each run/submit has a unique experiment id
     Returns:
         latent_vectors:         data from dimension reduction algos
-        clusters:               clusters for latent vectors
-        cluster-dropdown:       options for cluster dropdown
+        scatter_fig:            scatter plot the latent vectors (no cluster info yet)
         max_intervals:          interval component that controls if trigger the interval indefintely
     """
-    if experiment_id is None:
+    if experiment_id is None or n_intervals == 0 or max_intervals == 0:
         raise PreventUpdate
-     
+
     #read the latent vectors from the output dir
     output_path = OUTPUT_DIR / experiment_id
     npz_files = list(output_path.glob('*.npy'))
-    if len(npz_files) == 1:
-        lv_filepath = npz_files[0]
+    if len(npz_files) > 0 :
+        lv_filepath = npz_files[0] # latent vector file path
         latent_vectors = np.load(str(lv_filepath))
         print("latent vector", latent_vectors.shape)
-        # clustering
-        obj = DBSCAN(eps=1.70, min_samples=1, leaf_size=5) # check the effect of thess params. -> use the archiv file.
-                                                            # other clustering algo? -> 2 step
-        clusters = obj.fit_predict(latent_vectors) ### time complexity - O(n) for low dimensional data
+        return latent_vectors, 0
+    else:
+        return None, -1
+    
+@app.callback(
+    [
+        Output('clusters', 'data'),
+        Output('cluster-dropdown', 'options'),
+    ],
+    Input('run-cluster-algo', 'n_clicks'),
+    [
+        State('latent_vectors', 'data'),
+        State('cluster-algo-dropdown', 'value'),
+        State('additional-cluster-params', 'children'),
+        State('experiment-id', 'data'),
+    ]
+)
+def apply_clustering(apply_n_clicks, 
+                     latent_vectors, selected_algo, children, experiment_id):
+    """
+    This callback is triggered by click the 'Apply' button at the clustering panel:
+        - apply cluster
+        - save cluster array to npy file
+    Args:
+        apply_n_clicks:         num of clicks for the apply button
+        latent_vectors:         latent vectors from the dimension reduction algo
+        selected_algo:          selected clustering algo
+        children:               div for clustering algo's parameters
+        experiment_id:          current experiment id, keep track to save the clustering.npy
+    Returns:
+        clusters:               clustering result for each data point
+    """
+    ## TODO: pop up a widow to ask user to first run diemnsion reduction then apply
+    if apply_n_clicks == 0 or experiment_id is None:
+        raise PreventUpdate
+    latent_vectors = np.array(latent_vectors)
+
+    input_params = {}
+    if children:
+        for child in children['props']['children']:
+            key   = child["props"]["children"][1]["props"]["id"]["param_key"]
+            value = child["props"]["children"][1]["props"]["value"]
+            input_params[key] = value
+    print("Clustering params:", input_params)
+ 
+    if selected_algo == "KMeans":
+        obj = MiniBatchKMeans(n_clusters=input_params['n_clusters'])
+    elif selected_algo == "DBSCAN":
+        obj = DBSCAN(eps=input_params['eps'], min_samples=input_params['min_samples'])
+    elif selected_algo == "HDBSCAN":
+        obj = HDBSCAN(min_cluster_size=input_params['min_cluster_size'])
+
+    clusters, options = None, None
+    if obj:
+        clusters = obj.fit_predict(latent_vectors)
+        output_path = OUTPUT_DIR / experiment_id
         np.save(output_path/'clusters.npy', clusters)
         unique_clusters = np.unique(clusters)
         options = [{'label': f'Cluster {cluster}', 'value': cluster} for cluster in unique_clusters if cluster != -1]
         options.insert(0, {'label': 'All', 'value': -1})
-        return latent_vectors, clusters, options, 0
-    else:
-        return None, [], {'label': 'All', 'value':-1}, -1
+
+    return clusters, options
 
 @app.callback(
     Output('scatter', 'figure'),
@@ -281,18 +370,19 @@ def update_latent_vectors_and_clusters(n_intervals, experiment_id):
         Input('cluster-dropdown', 'value'),
         Input('label-dropdown', 'value'),
         Input('scatter-color', 'value'),
+        Input('clusters', 'data'), #move clusters to the input
     ],
     [
         State('scatter', 'figure'),
         State('scatter', 'selectedData'),
         State('additional-model-params', 'children'),
-        State('clusters', 'data'),
+
         State('input_labels', 'data'),
         State('label_schema', 'data'),
     ]
 )
-def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatter_color,
-                        current_figure, selected_data, children, clusters, labels, label_names):
+def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatter_color, clusters,
+                        current_figure, selected_data, children, labels, label_names):
     '''
     This callback update the scater plot
     Args:
@@ -319,7 +409,9 @@ def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatte
         selected_indices = [point['customdata'][0] for point in selected_data['points']]
     else:
         selected_indices = None
-
+    
+    if not clusters: # when clusters is None, i.e., after submit dimension reduction but before apply clustering
+        clusters = [-1 for i in range(latent_vectors.shape[0])]
     cluster_names = {a: a for a in np.unique(clusters).astype(int)}
     
     scatter_data = generate_scatter_data(latent_vectors,
@@ -459,6 +551,65 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
         html.Br(),
         f"Labels represented: {labels_str}",
     ]
+
+@app.callback(
+    [Output("modal", "is_open"), Output("modal-body", "children")],
+    [
+        Input('run-algo', 'n_clicks'), 
+        Input('run-cluster-algo', 'n_clicks'),
+    ],
+    [
+        State("modal", "is_open"), 
+        State('input_data', 'data'),
+    ]
+)
+def toggle_modal(n_submit, n_apply,
+                 is_open, input_data):
+    '''
+    This callback pop up a winder to remind user to follow this flow: 
+        select dataset -> Submit dimension reduction job -> Apply clustering
+    Args:
+        n_submit (int):     Number of clicks on the 'Submit' button.
+        n_apply (int):      Number of clicks on the 'Apply' button.
+        is_open (bool):     Current state of the modal window (open/closed).
+        input_data (list):         User selected data
+    Returns:
+        is_open (bool):     New state of the modal window.
+        modal_body_text (str): Text to be displayed in the modal body.
+    '''
+    
+    if n_submit and input_data is None:
+        return True, "Please select an example dataset or upload your own zipped dataset."
+    elif n_apply and input_data is None:
+        return True, "Please select an example dataset or upload your own zipped dataset."
+    elif n_apply and n_submit is None:
+        return True, "Please select a dimension reduction algorithm and click 'Submit' button before clustering."
+            
+    return False, "No alert."
+
+
+@app.callback(
+    Output('feature-vector-model-list', 'options'),
+    Input('interval-for-dc', 'n_intervals'),
+    # prevent_initial_call=True
+)
+def update_trained_model_list(interval):
+    '''
+    This callback updates the list of trained models
+    Args:
+        tab_value:                      Tab option
+        prob_refresh_n_clicks:          Button to refresh the list of probability-based trained models
+        similarity_refresh_n_clicks:    Button to refresh the list of similarity-based trained models
+    Returns:
+        prob_model_list:                List of trained models in mlcoach
+        similarity_model_list:          List of trained models in data clinic and mlcoach
+    '''
+    data_clinic_models = get_trained_models_list(USER, 'data_clinic')
+    ml_coach_models = get_trained_models_list(USER, 'mlcoach')
+    feature_vector_models = data_clinic_models + ml_coach_models
+    print(feature_vector_models)
+
+    return feature_vector_models
 
 
 if __name__ == '__main__':
