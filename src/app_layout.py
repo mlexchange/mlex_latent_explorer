@@ -13,9 +13,8 @@ import templates
 from file_manager.main import FileManager
 
 ### GLOBAL VARIABLES
-ALGORITHM_DATABASE = {"PCA": "PCA",
-                      "UMAP": "UMAP",
-                      }
+ALGORITHM_DATABASE = {"PCA": "PCA", "UMAP": "UMAP",}
+CLUSTER_ALGORITHM_DATABASE = {"KMeans": "KMeans", "DBSCAN": "DBSCAN", "HDBSCAN": "HDBSCAN"}
 
 DATA_OPTION = [
     {"label": "Synthetic Shapes", "value": "data/example_shapes/Demoshapes.npz"},
@@ -36,21 +35,31 @@ app = Dash(__name__,
 server = app.server
 
 dash_file_explorer = FileManager(DOCKER_DATA, 
-                                 UPLOAD_FOLDER_ROOT)
+                                 UPLOAD_FOLDER_ROOT,
+                                 open_explorer=False)
 dash_file_explorer.init_callbacks(app)
 du.configure_upload(app, UPLOAD_FOLDER_ROOT, use_upload_id=False)
 
 #### BEGIN DASH CODE ####
 header = templates.header()
-# left panel: uploader, scatter plot, individual image  plot
+# right panel: uploader, scatter plot, individual image  plot
 image_panel = [
     dbc.Card(
         id="image-card",
         children=[
             dbc.CardHeader(
-                [
+                [   
+                    dbc.Label('Upload your own zipped dataset', className='mr-2'),
                     dash_file_explorer.file_explorer,
-                    dbc.Label('Try Example Dataset', className='mr-2'),
+                    dbc.Label('Or select Data Clinic modal', className='mr-2'),
+                    dcc.Dropdown(
+                        id='feature-vector-model-list',
+                        #options=DATA_OPTION,
+                        #value = DATA_OPTION[0]['value'],
+                        clearable=False,
+                        style={'margin-bottom': '1rem'}
+                    ),
+                    dbc.Label('Or try Example Dataset', className='mr-2'),
                     dcc.Dropdown(
                         id='dataset-selection',
                         options=DATA_OPTION,
@@ -76,14 +85,14 @@ image_panel = [
     )
 ]
 
-# right panel: choose algorithm, submit job, choose scatter plot attributes, and statistics...
+# left panel: choose algorithms, submit job, choose scatter plot attributes, and statistics...
 algo_panel = html.Div(
     [dbc.Card(
         id="algo-card",
         style={"width": "100%"},
         children=[
             dbc.Collapse(children=[
-                dbc.CardHeader("Dimension Reduction Algorithms"),
+                dbc.CardHeader("Select Dimension Reduction Algorithms"),
                 dbc.CardBody(
                     [
                                 dbc.Label("Algorithm", className='mr-2'),
@@ -109,7 +118,7 @@ algo_panel = html.Div(
                                     className='row',
                                     style={'align-items': 'center', 'justify-content': 'center'}
                                 ),
-                                html.Div(id='invisible-submit-div')
+                                html.Div(id='invisible-apply-div')
                     ]
                 )
             ],
@@ -119,6 +128,52 @@ algo_panel = html.Div(
             )
         ]
     )
+    ]
+)
+
+cluster_algo_panel = html.Div(
+    [
+        dbc.Card(
+            id="cluster-algo-card",
+            style={"width": "100%"},
+            children=[
+                dbc.Collapse(children=[
+                        dbc.CardHeader("Select Clustering Algorithms"),
+                        dbc.CardBody([
+                            dbc.Label("Algorithm", className='mr-2'),
+                            dcc.Dropdown(id="cluster-algo-dropdown",
+                                            options=[{"label": entry, "value": entry} for entry in CLUSTER_ALGORITHM_DATABASE],
+                                            style={'min-width': '250px'},
+                                            value='DBSCAN',
+                                            ),
+                            html.Div(id='additional-cluster-params'),
+                            html.Hr(),
+                            html.Div(
+                                [
+                                    dbc.Button(
+                                        "Apply",
+                                        color="secondary",
+                                        id="run-cluster-algo",
+                                        outline=True,
+                                        size="lg",
+                                        className="m-1",
+                                        style={'width':'50%'}
+                                    ),
+                                ],
+                                className='row',
+                                style={'align-items': 'center', 'justify-content': 'center'}
+                            ),
+                            html.Div(id='invisible-submit-div')
+                        ]
+
+                        )
+                    ],
+                id="cluster-model-collapse",
+                is_open=True,
+                style = {'margin-bottom': '0rem'}
+                )
+            ]
+        )
     ]
 )
 
@@ -153,9 +208,15 @@ scatter_control_panel =  html.Div(
     dcc.Interval(
         id='interval-component',
         interval=3000, # in milliseconds
-        max_intervals=-1,  # keep triggering indefinitely
-        n_intervals=0
-    )
+        max_intervals=-1,  # keep triggering indefinitely, None
+        n_intervals=0,
+    ),
+    dcc.Interval(
+        id='interval-for-dc',
+        interval=1000, # in milliseconds
+        max_intervals=-1,  # keep triggering indefinitely, None
+        n_intervals=0,
+    ),
     ]
 )
 
@@ -194,7 +255,23 @@ heatmap_control_panel =  html.Div(
     )]
 )
 
-control_panel = [algo_panel, scatter_control_panel, heatmap_control_panel] #TODO: add controls for scatter plot and statistics
+# add alert pop up window
+modal = html.Div(
+    [
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("Header")),
+                dbc.ModalBody("This is the content of the modal", id="modal-body"),
+            ],
+            id="modal",
+            is_open=False,
+        ),
+    ]
+)
+
+
+control_panel = [algo_panel, cluster_algo_panel, scatter_control_panel, heatmap_control_panel, modal]
+
 
 # metadata
 meta = [
@@ -224,12 +301,13 @@ app.layout = html.Div(
     [
         header, 
         dbc.Container(
-            [
+            children = [
                 dbc.Row([ dbc.Col(control_panel, width=4), 
                          dbc.Col(image_panel, width=7)
                         ]),
                 dbc.Row(dbc.Col(meta)),
             ]
-        )
+        ),
+        modal
     ]
 )

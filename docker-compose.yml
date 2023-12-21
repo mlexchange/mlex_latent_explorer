@@ -10,6 +10,7 @@ services:
     mem_limit: 2g
     environment:
       DATA_DIR: "${PWD}/data/"
+      # USER: "$USER"
     volumes:
       - ./data:/app/work/data
       - ./src:/app/work/src
