@@ -1,6 +1,5 @@
 from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
-from dash import dcc
 from dash_iconify import DashIconify
 from dash.long_callback import DiskcacheLongCallbackManager
 import plotly.graph_objects as go

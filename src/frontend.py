@@ -405,8 +405,14 @@ def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatte
 
     n_components = children['props']['children'][0]["props"]["children"][1]["props"]["value"]
 
+    # if selected_data is not None and len(selected_data.get('points', [])) > 0:
+    #     selected_indices = [point['customdata'][0] for point in selected_data['points']]
     if selected_data is not None and len(selected_data.get('points', [])) > 0:
-        selected_indices = [point['customdata'][0] for point in selected_data['points']]
+        selected_indices = []
+        for point in selected_data['points']:
+            if 'customdata' in point and len(point['customdata']):
+                selected_indices.append(point['customdata'][0])
+        print("selected indices: ", selected_indices)
     else:
         selected_indices = None
     
@@ -614,5 +620,3 @@ def update_trained_model_list(interval):
 
 if __name__ == '__main__':
     app.run_server(debug=True, host='0.0.0.0', port=8070, )
-
-
