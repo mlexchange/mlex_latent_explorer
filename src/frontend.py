@@ -516,10 +516,9 @@ def update_heatmap(click_data, selected_data, display_option, input_data):
         State('clusters', 'data'),
         State('input_labels', 'data'),
         State('label_schema', 'data'),
-        State('latent_vectors', 'data'),
     ]
 )
-def update_statistics(selected_data, clusters, assigned_labels, label_names, latent_vectors):
+def update_statistics(selected_data, clusters, assigned_labels, label_names):
     '''
     This callback update the statistics panel
     Args:
