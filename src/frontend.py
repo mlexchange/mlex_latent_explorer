@@ -515,10 +515,11 @@ def update_heatmap(click_data, selected_data, display_option, input_data):
     [
         State('clusters', 'data'),
         State('input_labels', 'data'),
-        State('label_schema', 'data')
+        State('label_schema', 'data'),
+        State('latent_vectors', 'data'),
     ]
 )
-def update_statistics(selected_data, clusters, assigned_labels, label_names):
+def update_statistics(selected_data, clusters, assigned_labels, label_names, latent_vectors):
     '''
     This callback update the statistics panel
     Args:
@@ -529,12 +530,16 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
     Returns:
         [num_images, clusters, labels]:     statistics
     '''
+
     clusters = np.array(clusters)
     assigned_labels = np.array(assigned_labels)
+
     if selected_data is not None and len(selected_data['points']) > 0:
         selected_indices = [point['customdata'][0] for point in
                             selected_data['points']]  # Access customdata for the original indices
-        selected_clusters = clusters[selected_indices]
+        selected_clusters = []
+        if clusters:
+            selected_clusters = clusters[selected_indices]
         selected_labels = assigned_labels[selected_indices]
 
         num_images = len(selected_indices)
@@ -594,28 +599,28 @@ def toggle_modal(n_submit, n_apply,
     return False, "No alert."
 
 
-@app.callback(
-    Output('feature-vector-model-list', 'options'),
-    Input('interval-for-dc', 'n_intervals'),
-    # prevent_initial_call=True
-)
-def update_trained_model_list(interval):
-    '''
-    This callback updates the list of trained models
-    Args:
-        tab_value:                      Tab option
-        prob_refresh_n_clicks:          Button to refresh the list of probability-based trained models
-        similarity_refresh_n_clicks:    Button to refresh the list of similarity-based trained models
-    Returns:
-        prob_model_list:                List of trained models in mlcoach
-        similarity_model_list:          List of trained models in data clinic and mlcoach
-    '''
-    data_clinic_models = get_trained_models_list(USER, 'data_clinic')
-    ml_coach_models = get_trained_models_list(USER, 'mlcoach')
-    feature_vector_models = data_clinic_models + ml_coach_models
-    print(feature_vector_models)
+# @app.callback(
+#     Output('feature-vector-model-list', 'options'),
+#     Input('interval-for-dc', 'n_intervals'),
+#     # prevent_initial_call=True
+# )
+# def update_trained_model_list(interval):
+#     '''
+#     This callback updates the list of trained models
+#     Args:
+#         tab_value:                      Tab option
+#         prob_refresh_n_clicks:          Button to refresh the list of probability-based trained models
+#         similarity_refresh_n_clicks:    Button to refresh the list of similarity-based trained models
+#     Returns:
+#         prob_model_list:                List of trained models in mlcoach
+#         similarity_model_list:          List of trained models in data clinic and mlcoach
+#     '''
+#     data_clinic_models = get_trained_models_list(USER, 'data_clinic')
+#     ml_coach_models = get_trained_models_list(USER, 'mlcoach')
+#     feature_vector_models = data_clinic_models + ml_coach_models
+#     #print(feature_vector_models)
 
-    return feature_vector_models
+#     return feature_vector_models
 
 
 if __name__ == '__main__':

@@ -210,12 +210,12 @@ scatter_control_panel =  html.Div(
         max_intervals=-1,  # keep triggering indefinitely, None
         n_intervals=0,
     ),
-    dcc.Interval(
-        id='interval-for-dc',
-        interval=1000, # in milliseconds
-        max_intervals=-1,  # keep triggering indefinitely, None
-        n_intervals=0,
-    ),
+    # dcc.Interval(
+    #     id='interval-for-dc',
+    #     interval=1000, # in milliseconds
+    #     max_intervals=-1,  # keep triggering indefinitely, None
+    #     n_intervals=0,
+    # ),
     ]
 )
 
