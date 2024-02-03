@@ -1,6 +1,5 @@
 from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
-from dash import dcc
 from dash_iconify import DashIconify
 from dash.long_callback import DiskcacheLongCallbackManager
 import plotly.graph_objects as go
@@ -22,6 +21,8 @@ DATA_OPTION = [
 ]
 DOCKER_DATA = pathlib.Path.home() / 'data'  #/app/work/data
 UPLOAD_FOLDER_ROOT = DOCKER_DATA / 'upload' #/app/work/data/upload
+
+# DATA_CLINIC_OPTION = 
 
 #### SETUP DASH APP ####
 cache = diskcache.Cache("./cache")
@@ -54,8 +55,6 @@ image_panel = [
                     dbc.Label('Or select Data Clinic modal', className='mr-2'),
                     dcc.Dropdown(
                         id='feature-vector-model-list',
-                        #options=DATA_OPTION,
-                        #value = DATA_OPTION[0]['value'],
                         clearable=False,
                         style={'margin-bottom': '1rem'}
                     ),
@@ -208,12 +207,6 @@ scatter_control_panel =  html.Div(
     dcc.Interval(
         id='interval-component',
         interval=3000, # in milliseconds
-        max_intervals=-1,  # keep triggering indefinitely, None
-        n_intervals=0,
-    ),
-    dcc.Interval(
-        id='interval-for-dc',
-        interval=1000, # in milliseconds
         max_intervals=-1,  # keep triggering indefinitely, None
         n_intervals=0,
     ),
