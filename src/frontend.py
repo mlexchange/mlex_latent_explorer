@@ -598,28 +598,27 @@ def toggle_modal(n_submit, n_apply,
     return False, "No alert."
 
 
-# @app.callback(
-#     Output('feature-vector-model-list', 'options'),
-#     Input('interval-for-dc', 'n_intervals'),
-#     # prevent_initial_call=True
-# )
-# def update_trained_model_list(interval):
-#     '''
-#     This callback updates the list of trained models
-#     Args:
-#         tab_value:                      Tab option
-#         prob_refresh_n_clicks:          Button to refresh the list of probability-based trained models
-#         similarity_refresh_n_clicks:    Button to refresh the list of similarity-based trained models
-#     Returns:
-#         prob_model_list:                List of trained models in mlcoach
-#         similarity_model_list:          List of trained models in data clinic and mlcoach
-#     '''
-#     data_clinic_models = get_trained_models_list(USER, 'data_clinic')
-#     ml_coach_models = get_trained_models_list(USER, 'mlcoach')
-#     feature_vector_models = data_clinic_models + ml_coach_models
-#     #print(feature_vector_models)
+@app.callback(
+    Output('feature-vector-model-list', 'options'),
+    Input('interval-component', 'n_intervals'),
+)
+def update_trained_model_list(interval):
+    '''
+    This callback updates the list of trained models
+    Args:
+        tab_value:                      Tab option
+        prob_refresh_n_clicks:          Button to refresh the list of probability-based trained models
+        similarity_refresh_n_clicks:    Button to refresh the list of similarity-based trained models
+    Returns:
+        prob_model_list:                List of trained models in mlcoach
+        similarity_model_list:          List of trained models in data clinic and mlcoach
+    '''
+    data_clinic_models = get_trained_models_list(USER, 'data_clinic')
+    ml_coach_models = get_trained_models_list(USER, 'mlcoach')
+    feature_vector_models = data_clinic_models + ml_coach_models
+    #print(feature_vector_models)
 
-#     return feature_vector_models
+    return feature_vector_models
 
 
 if __name__ == '__main__':
