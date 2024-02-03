@@ -405,8 +405,14 @@ def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatte
 
     n_components = children['props']['children'][0]["props"]["children"][1]["props"]["value"]
 
+    # if selected_data is not None and len(selected_data.get('points', [])) > 0:
+    #     selected_indices = [point['customdata'][0] for point in selected_data['points']]
     if selected_data is not None and len(selected_data.get('points', [])) > 0:
-        selected_indices = [point['customdata'][0] for point in selected_data['points']]
+        selected_indices = []
+        for point in selected_data['points']:
+            if 'customdata' in point and len(point['customdata']):
+                selected_indices.append(point['customdata'][0])
+        print("selected indices: ", selected_indices)
     else:
         selected_indices = None
     
@@ -509,7 +515,7 @@ def update_heatmap(click_data, selected_data, display_option, input_data):
     [
         State('clusters', 'data'),
         State('input_labels', 'data'),
-        State('label_schema', 'data')
+        State('label_schema', 'data'),
     ]
 )
 def update_statistics(selected_data, clusters, assigned_labels, label_names):
@@ -523,12 +529,16 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
     Returns:
         [num_images, clusters, labels]:     statistics
     '''
+
     clusters = np.array(clusters)
     assigned_labels = np.array(assigned_labels)
+
     if selected_data is not None and len(selected_data['points']) > 0:
         selected_indices = [point['customdata'][0] for point in
                             selected_data['points']]  # Access customdata for the original indices
-        selected_clusters = clusters[selected_indices]
+        selected_clusters = []
+        if clusters:
+            selected_clusters = clusters[selected_indices]
         selected_labels = assigned_labels[selected_indices]
 
         num_images = len(selected_indices)
@@ -590,8 +600,7 @@ def toggle_modal(n_submit, n_apply,
 
 @app.callback(
     Output('feature-vector-model-list', 'options'),
-    Input('interval-for-dc', 'n_intervals'),
-    # prevent_initial_call=True
+    Input('interval-component', 'n_intervals'),
 )
 def update_trained_model_list(interval):
     '''
@@ -607,12 +616,10 @@ def update_trained_model_list(interval):
     data_clinic_models = get_trained_models_list(USER, 'data_clinic')
     ml_coach_models = get_trained_models_list(USER, 'mlcoach')
     feature_vector_models = data_clinic_models + ml_coach_models
-    print(feature_vector_models)
+    #print(feature_vector_models)
 
     return feature_vector_models
 
 
 if __name__ == '__main__':
     app.run_server(debug=True, host='0.0.0.0', port=8070, )
-
-
