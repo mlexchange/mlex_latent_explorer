@@ -576,7 +576,7 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
 def toggle_modal(n_submit, n_apply,
                  is_open, input_data):
     '''
-    This callback pop up a winder to remind user to follow this flow: 
+    This callback pop up a window to remind user to follow this flow: 
         select dataset -> Submit dimension reduction job -> Apply clustering
     Args:
         n_submit (int):     Number of clicks on the 'Submit' button.
