@@ -15,7 +15,7 @@ import requests
 from file_manager.data_project import DataProject
 
 from app_layout import app, DOCKER_DATA, UPLOAD_FOLDER_ROOT
-from latentxp_utils import kmeans_kwargs, dbscan_kwargs, hdbscan_kwargs, hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, get_trained_models_list
+from latentxp_utils import kmeans_kwargs, dbscan_kwargs, hdbscan_kwargs, hex_to_rgba, generate_scatter_data, remove_key_from_dict_list, get_content, get_trained_models_list, load_images_by_indices
 from dash_component_editor import JSONParameterEditor
 
 
@@ -503,8 +503,9 @@ def update_heatmap(click_data, selected_data, display_option,
         elif data_clinic_file_path is not None:
             print("data_clinic_file_path")
             print(data_clinic_file_path)
-            df = pd.read_parquet(data_clinic_file_path)
-            selected_images = df.iloc[selected_indices].values
+            directory_path = os.path.dirname(data_clinic_file_path)
+            selected_images = load_images_by_indices(directory_path, selected_indices)
+
         ### Example dataset
         elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
             print("Demoshapes.npz")
@@ -534,8 +535,8 @@ def update_heatmap(click_data, selected_data, display_option,
             clicked_image, uri = data_project.data[selected_index].read_data(export='pillow')
         ### DataClinic
         elif data_clinic_file_path is not None:
-            df = pd.read_parquet(data_clinic_file_path)
-            clicked_image = df.iloc[selected_index].values
+            directory_path = os.path.dirname(data_clinic_file_path)
+            selected_images = load_images_by_indices(directory_path, selected_indices)
         ### Example dataset
         elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
             clicked_image = np.load("/app/work/" + selected_example_dataset)['arr_0'][selected_index]
