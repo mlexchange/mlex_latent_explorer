@@ -279,6 +279,8 @@ meta = [
             dcc.Store(id='experiment-id', data=None),
             # data_label_schema, latent vectors, clusters
             dcc.Store(id='input_data', data=None),
+            # to store the example dataset 
+            dcc.Store(id='example_data', data=None),
             dcc.Store(id='input_labels', data=None),
             dcc.Store(id='label_schema', data=None),
             dcc.Store(id='model_id', data=None),

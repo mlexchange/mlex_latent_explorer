@@ -82,12 +82,12 @@ def show_clustering_gui_layouts(selected_algo):
     return item_list
 
 @app.callback(
-    Output('input_data', 'data'),
+    Output('input_data', 'data'), #Output('example_data', 'data'),
     Output('input_labels', 'data'),
     Output('label_schema', 'data'),
     Output('label-dropdown', 'options'),
     Output('user-upload-data-dir', 'data'),
-    Input('dataset-selection', 'value'), # Example dataset
+    Input('dataset-selection', 'value'),
     Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'), # FM
     Input('feature-vector-model-list', 'value'), # data clinic
 )
@@ -180,7 +180,6 @@ def job_content_dict(content):
         State('dataset-selection', 'value'),
         State('user-upload-data-dir', 'data'),
         State('feature-vector-model-list', 'value'),
-        State('input_data', 'data'),
         State('model_id', 'data'),
         State('algo-dropdown', 'value'),
         State('additional-model-params', 'children'),
@@ -188,8 +187,7 @@ def job_content_dict(content):
     prevent_initial_call=True
 )
 def submit_dimension_reduction_job(submit_n_clicks,
-                                   selected_dataset, user_upload_data_dir, data_clinic_file_path,
-                                   input_data, model_id, selected_algo, children):
+                                   selected_dataset, user_upload_data_dir, data_clinic_file_path, model_id, selected_algo, children):
     """
     This callback is triggered every time the Submit button is hit:
         - compute latent vectors, which will be saved in data/output/experiment_id
@@ -210,7 +208,9 @@ def submit_dimension_reduction_job(submit_n_clicks,
         heatmap:                empty heatmap figure
         interval:               set interval component to trigger to find the latent_vectors.npy file (-1)
     """
-    if not submit_n_clicks or not input_data:
+    if not submit_n_clicks:
+        raise PreventUpdate
+    if not selected_dataset and not user_upload_data_dir and not data_clinic_file_path:
         raise PreventUpdate
 
     input_params = {}
