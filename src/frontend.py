@@ -570,11 +570,13 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
     ],
     [
         State("modal", "is_open"), 
-        State('input_data', 'data'),
+        State('dataset-selection', 'value'),
+        State('user-upload-data-dir', 'data'),
+        State('feature-vector-model-list', 'value'),
     ]
 )
 def toggle_modal(n_submit, n_apply,
-                 is_open, input_data):
+                 is_open, selected_dataset, user_upload_data_dir, data_clinic_file_path):
     '''
     This callback pop up a window to remind user to follow this flow: 
         select dataset -> Submit dimension reduction job -> Apply clustering
@@ -587,10 +589,13 @@ def toggle_modal(n_submit, n_apply,
         is_open (bool):     New state of the modal window.
         modal_body_text (str): Text to be displayed in the modal body.
     '''
+    at_least_one_dataset_selected = False
+    if selected_dataset or user_upload_data_dir or data_clinic_file_path:
+        at_least_one_dataset_selected = True
     
-    if n_submit and input_data is None:
+    if n_submit and not at_least_one_dataset_selected:
         return True, "Please select an example dataset or upload your own zipped dataset."
-    elif n_apply and input_data is None:
+    elif n_apply and not at_least_one_dataset_selected:
         return True, "Please select an example dataset or upload your own zipped dataset."
     elif n_apply and n_submit is None:
         return True, "Please select a dimension reduction algorithm and click 'Submit' button before clustering."
