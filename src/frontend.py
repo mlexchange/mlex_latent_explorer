@@ -480,13 +480,8 @@ def update_heatmap(click_data, selected_data, display_option,
     Returns:
         fig:                updated heatmap
     '''
-    ##################
-    print("seleced_example_dataset:", selected_example_dataset)
-
     if not selected_example_dataset and not upload_file_paths and not data_clinic_file_path:
         raise PreventUpdate
-    
-    print(selected_data is not None)
     
     # user select a group of points
     if selected_data is not None and len(selected_data['points']) > 0:
@@ -500,12 +495,14 @@ def update_heatmap(click_data, selected_data, display_option,
         data_project.init_from_dict(upload_file_paths)
         data_set = data_project.data
         if len(data_set) > 0:
+            print("FM file")
             for i in selected_indices:
                 image, uri = data_project.data[i].read_data(export='pillow')
                 selected_images.append(np.array(image))
         ### DataClinic
         elif data_clinic_file_path is not None:
             print("data_clinic_file_path")
+            print(data_clinic_file_path)
             df = pd.read_parquet(data_clinic_file_path)
             selected_images = df.iloc[selected_indices].values
         ### Example dataset
@@ -546,7 +543,6 @@ def update_heatmap(click_data, selected_data, display_option,
             df = pd.read_parquet("/app/work/" + selected_example_dataset)
             clicked_image = df.iloc[selected_index].values
         clicked_image = np.array(clicked_image)
-
         
         heatmap_data = go.Heatmap(z=clicked_image)
 
@@ -592,8 +588,7 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
     Returns:
         [num_images, clusters, labels]:     statistics
     '''
-
-    clusters = np.array(clusters)
+    
     assigned_labels = np.array(assigned_labels)
 
     if selected_data is not None and len(selected_data['points']) > 0:
@@ -601,6 +596,7 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
                             selected_data['points']]  # Access customdata for the original indices
         selected_clusters = []
         if clusters is not None:
+            clusters = np.array(clusters)
             selected_clusters = clusters[selected_indices]
         selected_labels = assigned_labels[selected_indices]
 
