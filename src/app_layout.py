@@ -60,7 +60,7 @@ image_panel = [
                     ),
                     dbc.Label('Or try Example Dataset', className='mr-2'),
                     dcc.Dropdown(
-                        id='dataset-selection',
+                        id='example-dataset-selection',
                         options=DATA_OPTION,
                         #value = DATA_OPTION[0]['value'],
                         clearable=False,
@@ -279,8 +279,7 @@ meta = [
             dcc.Store(id='experiment-id', data=None),
             # data_label_schema, latent vectors, clusters
             dcc.Store(id='input_data', data=None),
-            # to store the example dataset 
-            dcc.Store(id='example_data', data=None),
+            dcc.Store(id='example_data', data=None), # to store the example dataset 
             dcc.Store(id='input_labels', data=None),
             dcc.Store(id='label_schema', data=None),
             dcc.Store(id='model_id', data=None),

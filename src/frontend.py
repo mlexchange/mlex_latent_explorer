@@ -595,10 +595,9 @@ def toggle_modal(n_submit, n_apply,
     if selected_example_dataset or user_upload_data_dir or data_clinic_file_path:
         at_least_one_dataset_selected = True
     
-    if n_submit and not at_least_one_dataset_selected:
-        return True, "Please select an example dataset or upload your own zipped dataset."
-    elif n_apply and not at_least_one_dataset_selected:
-        return True, "Please select an example dataset or upload your own zipped dataset."
+    if ((n_submit and not at_least_one_dataset_selected) or
+        (n_apply and not at_least_one_dataset_selected)):
+        return True, "Please select an example dataset or upload your own zipped dataset or choose DataClinic outpu."
     elif n_apply and n_submit is None:
         return True, "Please select a dimension reduction algorithm and click 'Submit' button before clustering."
             
