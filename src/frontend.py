@@ -87,15 +87,15 @@ def show_clustering_gui_layouts(selected_algo):
     Output('label_schema', 'data'),
     Output('label-dropdown', 'options'),
     Output('user-upload-data-dir', 'data'),
-    Input('dataset-selection', 'value'),
-    Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'), # FM
-    Input('feature-vector-model-list', 'value'), # data clinic
+    Input('example-dataset-selection', 'value'),                            # example dataset
+    Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'), # FM dataset
+    Input('feature-vector-model-list', 'value'),                            # data clinic dataset
 )
-def update_data_n_label_schema(selected_dataset, upload_file_paths, data_clinic_file_path):
+def update_data_n_label_schema(selected_example_dataset, upload_file_paths, data_clinic_file_path):
     '''
     This callback updates the selected dataset from the provided example datasets, as well as labels, and label schema
     Args:
-        dataset-selection:      selected dataset from the provided example datasets, not the one that user uploaded
+        example-dataset-selection:      selected dataset from the provided example datasets, not the one that user uploaded
         upload_file_pahts:      Data project info, the user uploaded zip file using FileManager, list
     Returns:
         input_data:             input image data, numpy.ndarray
@@ -126,14 +126,14 @@ def update_data_n_label_schema(selected_dataset, upload_file_paths, data_clinic_
         labels = np.full((data.shape[0],), -1)
         user_upload_data_dir = os.path.dirname(upload_file_paths[0]['uri'])
     # Example dataset option 1
-    elif selected_dataset == "data/example_shapes/Demoshapes.npz":
-        data = np.load("/app/work/" + selected_dataset)['arr_0']
+    elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
+        data = np.load("/app/work/" + selected_example_dataset)['arr_0']
         labels = np.load("/app/work/data/example_shapes/DemoLabels.npy")
         f = open("/app/work/data/example_shapes/label_schema.json")
         label_schema = json.load(f)
     # Example dataset option 2
-    elif selected_dataset == "data/example_latentrepresentation/f_vectors.parquet":
-        df = pd.read_parquet("/app/work/" + selected_dataset)
+    elif selected_example_dataset == "data/example_latentrepresentation/f_vectors.parquet":
+        df = pd.read_parquet("/app/work/" + selected_example_dataset)
         data = df.values
         labels = np.full((df.shape[0],), -1)
     # DataClinic options
@@ -177,7 +177,7 @@ def job_content_dict(content):
     ],
     Input('run-algo', 'n_clicks'),
     [
-        State('dataset-selection', 'value'),
+        State('example-dataset-selection', 'value'),
         State('user-upload-data-dir', 'data'),
         State('feature-vector-model-list', 'value'),
         State('model_id', 'data'),
@@ -187,7 +187,7 @@ def job_content_dict(content):
     prevent_initial_call=True
 )
 def submit_dimension_reduction_job(submit_n_clicks,
-                                   selected_dataset, user_upload_data_dir, data_clinic_file_path, model_id, selected_algo, children):
+                                   selected_example_dataset, user_upload_data_dir, data_clinic_file_path, model_id, selected_algo, children):
     """
     This callback is triggered every time the Submit button is hit:
         - compute latent vectors, which will be saved in data/output/experiment_id
@@ -195,7 +195,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
         - reset heatmap to no image
     Args:
         submit_n_clicks:        num of clicks for the submit button
-        selected_dataset:       selected example dataset
+        selected_example_dataset:       selected example dataset
         user_upload_data_dir:   user uploaded dataset
         model_id:               uid of selected dimension reduciton algo
         selected_algo:          selected dimension reduction algo
@@ -210,7 +210,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
     """
     if not submit_n_clicks:
         raise PreventUpdate
-    if not selected_dataset and not user_upload_data_dir and not data_clinic_file_path:
+    if not selected_example_dataset and not user_upload_data_dir and not data_clinic_file_path:
         raise PreventUpdate
 
     input_params = {}
@@ -247,6 +247,8 @@ def submit_dimension_reduction_job(submit_n_clicks,
         selected_dataset = user_upload_data_dir
     elif data_clinic_file_path is not None:
         selected_dataset = data_clinic_file_path
+    else:
+        selected_dataset = selected_example_dataset
     
     # check which dimension reduction algo, then compose command
     if selected_algo == 'PCA':
@@ -570,13 +572,13 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
     ],
     [
         State("modal", "is_open"), 
-        State('dataset-selection', 'value'),
+        State('example-dataset-selection', 'value'),
         State('user-upload-data-dir', 'data'),
         State('feature-vector-model-list', 'value'),
     ]
 )
 def toggle_modal(n_submit, n_apply,
-                 is_open, selected_dataset, user_upload_data_dir, data_clinic_file_path):
+                 is_open, selected_example_dataset, user_upload_data_dir, data_clinic_file_path):
     '''
     This callback pop up a window to remind user to follow this flow: 
         select dataset -> Submit dimension reduction job -> Apply clustering
@@ -590,7 +592,7 @@ def toggle_modal(n_submit, n_apply,
         modal_body_text (str): Text to be displayed in the modal body.
     '''
     at_least_one_dataset_selected = False
-    if selected_dataset or user_upload_data_dir or data_clinic_file_path:
+    if selected_example_dataset or user_upload_data_dir or data_clinic_file_path:
         at_least_one_dataset_selected = True
     
     if n_submit and not at_least_one_dataset_selected:
