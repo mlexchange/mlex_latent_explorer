@@ -82,14 +82,17 @@ def show_clustering_gui_layouts(selected_algo):
     return item_list
 
 @app.callback(
-    Output('input_data', 'data'), #Output('example_data', 'data'),
-    Output('input_labels', 'data'),
-    Output('label_schema', 'data'),
-    Output('label-dropdown', 'options'),
-    Output('user-upload-data-dir', 'data'),
-    Input('example-dataset-selection', 'value'),                            # example dataset
-    Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'), # FM dataset
-    Input('feature-vector-model-list', 'value'),                            # data clinic dataset
+    [
+        Output('input_labels', 'data'),
+        Output('label_schema', 'data'),
+        Output('label-dropdown', 'options'),
+        Output('user-upload-data-dir', 'data'),
+    ],
+    [
+        Input('example-dataset-selection', 'value'),                            # example dataset
+        Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'), # FM dataset
+        Input('feature-vector-model-list', 'value'),                            # data clinic dataset
+    ]
 )
 def update_data_n_label_schema(selected_example_dataset, upload_file_paths, data_clinic_file_path):
     '''
@@ -104,50 +107,45 @@ def update_data_n_label_schema(selected_example_dataset, upload_file_paths, data
         label_dropdown:         label dropdown options
         user_upload_data_dir:   dir name for the user uploaded zip file
     '''
-    # FM
+    labels = None
+    label_schema = {}
+
+    # check if user is using user uploaded zip file or example dataset or data clinic file
+    # priority level: FileManage > DataClinic > Example Datasets
+
+    # FileManager - user uploaded zip file of images
     data_project = DataProject()
     data_project.init_from_dict(upload_file_paths)
     data_set = data_project.data # list of len 1920, each element is a local_dataset.LocalDataset object
-
-    data = None
-    labels = None
-    label_schema = {}
     options = []
     user_upload_data_dir = None
-
-    # FM options
     if len(data_set) > 0:
-        data = []
-        for i in range(len(data_set)): #if dataset too large, dash will exit with code 247, 137
-            image, uri = data_project.data[i].read_data(export='pillow')
-            data.append(np.array(image))
-        data = np.array(data)
-        print(data.shape)
-        labels = np.full((data.shape[0],), -1)
+        labels = np.full((len(data_set),), -1)
         user_upload_data_dir = os.path.dirname(upload_file_paths[0]['uri'])
+    # DataClinic options
+    elif data_clinic_file_path is not None:
+        df = pd.read_parquet(data_clinic_file_path)
+        # data = df.values
+        labels = np.full((df.shape[0],), -1)
     # Example dataset option 1
     elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
-        data = np.load("/app/work/" + selected_example_dataset)['arr_0']
+        # data = np.load("/app/work/" + selected_example_dataset)['arr_0']
         labels = np.load("/app/work/data/example_shapes/DemoLabels.npy")
         f = open("/app/work/data/example_shapes/label_schema.json")
         label_schema = json.load(f)
     # Example dataset option 2
     elif selected_example_dataset == "data/example_latentrepresentation/f_vectors.parquet":
         df = pd.read_parquet("/app/work/" + selected_example_dataset)
-        data = df.values
+        # data = df.values
         labels = np.full((df.shape[0],), -1)
-    # DataClinic options
-    elif data_clinic_file_path is not None:
-        df = pd.read_parquet(data_clinic_file_path)
-        data = df.values
-        labels = np.full((df.shape[0],), -1)
+
 
     if label_schema: 
         options = [{'label': f'Label {label}', 'value': label} for label in label_schema]
     options.insert(0, {'label': 'Unlabeled', 'value': -1})
     options.insert(0, {'label': 'All', 'value': -2})
 
-    return data, labels, label_schema, options, user_upload_data_dir
+    return labels, label_schema, options, user_upload_data_dir
 
 def job_content_dict(content):
     job_content = {# 'mlex_app': content['name'],
@@ -177,9 +175,9 @@ def job_content_dict(content):
     ],
     Input('run-algo', 'n_clicks'),
     [
-        State('example-dataset-selection', 'value'),
-        State('user-upload-data-dir', 'data'),
-        State('feature-vector-model-list', 'value'),
+        State('example-dataset-selection', 'value'), # 2 example dataset
+        State('user-upload-data-dir', 'data'),       # FM
+        State('feature-vector-model-list', 'value'), # DataClinic
         State('model_id', 'data'),
         State('algo-dropdown', 'value'),
         State('additional-model-params', 'children'),
@@ -187,7 +185,8 @@ def job_content_dict(content):
     prevent_initial_call=True
 )
 def submit_dimension_reduction_job(submit_n_clicks,
-                                   selected_example_dataset, user_upload_data_dir, data_clinic_file_path, model_id, selected_algo, children):
+                                   selected_example_dataset, user_upload_data_dir, data_clinic_file_path, 
+                                   model_id, selected_algo, children):
     """
     This callback is triggered every time the Submit button is hit:
         - compute latent vectors, which will be saved in data/output/experiment_id
@@ -242,7 +241,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
     output_path = OUTPUT_DIR / experiment_id
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # check if user is using user uploaded zip file or example dataset or data clinic file
+    # check if user is using user uploaded zip file or example dataset or data clinic file 
     if user_upload_data_dir is not None:
         selected_dataset = user_upload_data_dir
     elif data_clinic_file_path is not None:
@@ -265,7 +264,6 @@ def submit_dimension_reduction_job(submit_n_clicks,
     response = requests.post('http://job-service:8080/api/v0/workflows', json=compute_dict)
     print("respnse: ", response)
     # job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
-    
     
     return experiment_id, 'cluster', -1, -2, go.Figure(go.Heatmap()), -1
 
@@ -404,6 +402,7 @@ def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatte
     if latent_vectors is None or children is None:
         raise PreventUpdate
     latent_vectors = np.array(latent_vectors)
+    print("latent vector shape:", latent_vectors.shape)
 
     n_components = children['props']['children'][0]["props"]["children"][1]["props"]["value"]
 
@@ -461,34 +460,96 @@ def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatte
         Input('scatter', 'selectedData'),
         Input('mean-std-toggle', 'value'),
     ],
-    State('input_data', 'data'),
+    [
+        State('example-dataset-selection', 'value'),                            # example dataset
+        State({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'), # FM dataset
+        State('feature-vector-model-list', 'value'),                            # data clinic dataset
+
+    ],
     prevent_initial_call=True
+
 )
-def update_heatmap(click_data, selected_data, display_option, input_data):
+def update_heatmap(click_data, selected_data, display_option,
+                   selected_example_dataset, upload_file_paths, data_clinic_file_path):
     '''
     This callback update the heatmap
     Args:
         click_data:         clicked data on scatter figure
         selected_data:      lasso or rect selected data points on scatter figure
         display_option:     option to display mean or std
-        input_data:         input image data
     Returns:
         fig:                updated heatmap
     '''
-    if input_data is None:
+    ##################
+    print("seleced_example_dataset:", selected_example_dataset)
+
+    if not selected_example_dataset and not upload_file_paths and not data_clinic_file_path:
         raise PreventUpdate
     
-    images = np.array(input_data)
+    print(selected_data is not None)
+    
+    # user select a group of points
     if selected_data is not None and len(selected_data['points']) > 0:
         selected_indices = [point['customdata'][0] for point in selected_data['points']]  # Access customdata for the original indices
-        selected_images = images[selected_indices]
+        print("selected_indices", selected_indices)
+        
+        ### FileManager
+        # print("upload_file_paths") # if not selected, its an empty list not None
+        selected_images = []
+        data_project = DataProject()
+        data_project.init_from_dict(upload_file_paths)
+        data_set = data_project.data
+        if len(data_set) > 0:
+            for i in selected_indices:
+                image, uri = data_project.data[i].read_data(export='pillow')
+                selected_images.append(np.array(image))
+        ### DataClinic
+        elif data_clinic_file_path is not None:
+            print("data_clinic_file_path")
+            df = pd.read_parquet(data_clinic_file_path)
+            selected_images = df.iloc[selected_indices].values
+        ### Example dataset
+        elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
+            print("Demoshapes.npz")
+            selected_images = np.load("/app/work/" + selected_example_dataset)['arr_0'][selected_indices]
+            print(selected_images.shape)
+        elif selected_example_dataset == "data/example_latentrepresentation/f_vectors.parquet":
+            print("f_vectors.parque")
+            df = pd.read_parquet("/app/work/" + selected_example_dataset)
+            selected_images = df.iloc[selected_indices].values
+        selected_images = np.array(selected_images)
+
+        print("selected_images shape:", selected_images.shape)
+        
+        # display options
         if display_option == 'mean':
             heatmap_data = go.Heatmap(z=np.mean(selected_images, axis=0))
         elif display_option == 'sigma':
             heatmap_data = go.Heatmap(z=np.std(selected_images, axis=0))
+
     elif click_data is not None and len(click_data['points']) > 0:
         selected_index = click_data['points'][0]['customdata'][0]  # click_data['points'][0]['pointIndex']
-        heatmap_data = go.Heatmap(z=images[selected_index])
+        ### FileManager
+        clicked_image = []
+        data_project = DataProject()
+        data_project.init_from_dict(upload_file_paths)
+        data_set = data_project.data
+        if len(data_set) > 0:
+            clicked_image = data_project.data[selected_index].read_data(export='pillow')
+        ### DataClinic
+        elif data_clinic_file_path is not None:
+            df = pd.read_parquet(data_clinic_file_path)
+            clicked_image = df.iloc[selected_index].values
+        ### Example dataset
+        elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
+            clicked_image = np.load("/app/work/" + selected_example_dataset)['arr_0'][selected_index]
+        elif selected_example_dataset == "data/example_latentrepresentation/f_vectors.parquet":
+            df = pd.read_parquet("/app/work/" + selected_example_dataset)
+            clicked_image = df.iloc[selected_index].values
+        clicked_image = np.array(clicked_image)
+
+        heatmap_data = go.Heatmap(z=clicked_image)
+
     else:
         heatmap_data = go.Heatmap()
 
