@@ -530,12 +530,11 @@ def update_heatmap(click_data, selected_data, display_option,
     elif click_data is not None and len(click_data['points']) > 0:
         selected_index = click_data['points'][0]['customdata'][0]  # click_data['points'][0]['pointIndex']
         ### FileManager
-        clicked_image = []
         data_project = DataProject()
         data_project.init_from_dict(upload_file_paths)
         data_set = data_project.data
         if len(data_set) > 0:
-            clicked_image = data_project.data[selected_index].read_data(export='pillow')
+            clicked_image, uri = data_project.data[selected_index].read_data(export='pillow')
         ### DataClinic
         elif data_clinic_file_path is not None:
             df = pd.read_parquet(data_clinic_file_path)
@@ -548,6 +547,7 @@ def update_heatmap(click_data, selected_data, display_option,
             clicked_image = df.iloc[selected_index].values
         clicked_image = np.array(clicked_image)
 
+        
         heatmap_data = go.Heatmap(z=clicked_image)
 
     else:
@@ -600,7 +600,7 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
         selected_indices = [point['customdata'][0] for point in
                             selected_data['points']]  # Access customdata for the original indices
         selected_clusters = []
-        if clusters:
+        if clusters is not None:
             selected_clusters = clusters[selected_indices]
         selected_labels = assigned_labels[selected_indices]
 
