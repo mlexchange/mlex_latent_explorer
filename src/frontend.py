@@ -21,8 +21,8 @@ from dash_component_editor import JSONParameterEditor
 
 #### GLOBAL PARAMS ####
 DATA_DIR = str(os.environ['DATA_DIR'])
-OUTPUT_DIR = pathlib.Path('data/mlexchange_store/admin')
 USER = 'admin' #'mlexchange-team' # move to env file
+OUTPUT_DIR = pathlib.Path('data/mlexchange_store/' + USER)
 UPLOAD_FOLDER_ROOT = "data/upload"
 
 @app.callback(
