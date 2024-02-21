@@ -536,7 +536,7 @@ def update_heatmap(click_data, selected_data, display_option,
         ### DataClinic
         elif data_clinic_file_path is not None:
             directory_path = os.path.dirname(data_clinic_file_path)
-            selected_images = load_images_by_indices(directory_path, selected_indices)
+            clicked_image = load_images_by_indices(directory_path, [selected_index])
         ### Example dataset
         elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
             clicked_image = np.load("/app/work/" + selected_example_dataset)['arr_0'][selected_index]
@@ -559,7 +559,9 @@ def update_heatmap(click_data, selected_data, display_option,
     aspect_y = 1
     if heatmap_data['z'] is not None:
         if heatmap_data['z'].size > 0:
-            aspect_y, aspect_x = np.shape(heatmap_data['z'])
+            print("aaa")
+            print(np.shape(heatmap_data['z']))
+            aspect_y, aspect_x = np.shape(heatmap_data['z'])[-2:]
 
     return go.Figure(
         data=heatmap_data,
