@@ -149,7 +149,7 @@ def update_data_n_label_schema(selected_example_dataset, upload_file_paths, data
 
 def job_content_dict(content):
     job_content = {# 'mlex_app': content['name'],
-                   'mlex_app': 'dimension reduction demo',
+                   'mlex_app': 'latent_space_explorer',
                    'service_type': content['service_type'],
                    'working_directory': DATA_DIR,
                    'job_kwargs': {'uri': content['uri'], 
@@ -559,7 +559,6 @@ def update_heatmap(click_data, selected_data, display_option,
     aspect_y = 1
     if heatmap_data['z'] is not None:
         if heatmap_data['z'].size > 0:
-            print("aaa")
             print(np.shape(heatmap_data['z']))
             aspect_y, aspect_x = np.shape(heatmap_data['z'])[-2:]
 
