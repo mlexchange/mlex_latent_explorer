@@ -231,7 +231,16 @@ def submit_dimension_reduction_job(submit_n_clicks,
     job_content = job_content_dict(model_content)
     job_content['job_kwargs']['kwargs'] = {}
     job_content['job_kwargs']['kwargs']['parameters'] = input_params
-    #TODO: other kwargs
+    
+
+    # prefect
+    job_uid = schedule_prefect_flow(
+                    FLOW__NAME,
+                    parameters=TRAIN_PARAMS_EXAMPLE,
+                    flow_run_name=f"{job_name} {current_time}",
+                    tags=PREFECT_TAGS + ["train", project_name],
+                )
+    job_message = f"Job has been succesfully submitted with uid: {job_uid} and mask uri: {mask_uri}"
 
     compute_dict = {'user_uid': USER,
                     'host_list': ['mlsandbox.als.lbl.gov', 'local.als.lbl.gov', 'vaughan.als.lbl.gov'],
