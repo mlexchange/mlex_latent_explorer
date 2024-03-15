@@ -13,3 +13,5 @@ diskcache==5.6.3
 pandas
 numpy
 Pillow
+# prefect
+prefect-client==2.14.21
