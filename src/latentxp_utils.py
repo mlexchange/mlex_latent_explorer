@@ -388,3 +388,5 @@ def load_images_by_indices(directory_path, indices):
 
     image_data = np.array(image_data)
     return image_data
+
+
