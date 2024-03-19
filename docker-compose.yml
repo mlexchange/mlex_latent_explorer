@@ -11,7 +11,11 @@ services:
     mem_limit: 2g
     environment:
       DATA_DIR: "${PWD}/data/"
-      # USER: "$USER"
+      PREFECT_TAGS: "${PREFECT_TAGS}"
+      PREFECT_API_URL: '${PREFECT_API_URL}'
+      FLOW_NAME: '${FLOW_NAME}'
+      TIMEZONE: "${TIMEZONE}"
+      USER: "${USER}"
     volumes:
       - ./data:/app/work/data
       - ./src:/app/work/src
