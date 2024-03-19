@@ -106,7 +106,7 @@ algo_panel = html.Div(
                                     [
                                         dbc.Label('Name your job', className='mr-2'),
                                         dcc.Input(
-                                            id="job_name",
+                                            id="job-name",
                                             placeholder="test0",
                                             style={'width':'100%'}
                                         ),

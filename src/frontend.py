@@ -11,6 +11,9 @@ import uuid
 import requests
 import os
 import requests
+import pytz
+from datetime import datetime
+
 
 from file_manager.data_project import DataProject
 
@@ -31,6 +34,52 @@ DATA_DIR = str(os.environ['DATA_DIR'])
 USER = 'admin' #'mlexchange-team' # move to env file
 OUTPUT_DIR = pathlib.Path('data/mlexchange_store/' + USER)
 UPLOAD_FOLDER_ROOT = "data/upload"
+PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
+TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
+FLOW_NAME = os.getenv("FLOW_NAME", "")
+
+
+# TODO: Get model parameters from UI
+TRAIN_PARAMS_EXAMPLE = {
+    "flow_type": "podman",
+    "params_list": [
+        {
+            "image_name": "ghcr.io/mlexchange/mlex_latent_explorer",
+            "image_tag": "main",
+            "command": 'python -c \\"import time; time.sleep(30)\\"',
+            "params": {
+                "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
+            },
+            "volumes": [f"{DATA_DIR}:/app/work/data"],
+        },
+        {
+            "image_name": "ghcr.io/mlexchange/mlex_latent_explorer",
+            "image_tag": "main",
+            "command": 'python -c \\"import time; time.sleep(10)\\"',
+            "params": {
+                "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
+            },
+            "volumes": [f"{DATA_DIR}:/app/work/data"],
+        },
+    ],
+}
+
+INFERENCE_PARAMS_EXAMPLE = {
+    "flow_type": "podman",
+    "params_list": [
+        {
+            "image_name": "ghcr.io/mlexchange/mlex_latent_explorer",
+            "image_tag": "main",
+            "command": 'python -c \\"import time; time.sleep(30)\\"',
+            "params": {
+                "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
+            },
+            "volumes": [f"{DATA_DIR}:/app/work/data"],
+        },
+    ],
+}
+
+
 
 @app.callback(
     Output('additional-model-params', 'children'),
@@ -182,6 +231,7 @@ def job_content_dict(content):
     ],
     Input('run-algo', 'n_clicks'),
     [
+        State('job-name', 'value'),                  # job_name
         State('example-dataset-selection', 'value'), # 2 example dataset
         State('user-upload-data-dir', 'data'),       # FM
         State('feature-vector-model-list', 'value'), # DataClinic
@@ -192,6 +242,7 @@ def job_content_dict(content):
     prevent_initial_call=True
 )
 def submit_dimension_reduction_job(submit_n_clicks,
+                                   job_name,
                                    selected_example_dataset, user_upload_data_dir, data_clinic_file_path, 
                                    model_id, selected_algo, children):
     """
@@ -226,37 +277,13 @@ def submit_dimension_reduction_job(submit_n_clicks,
             value = child["props"]["children"][1]["props"]["value"]
             input_params[key] = value
     print("Dimension reduction algo params: ", input_params)
+
     model_content = get_content(model_id)
     print(model_content)
     job_content = job_content_dict(model_content)
     job_content['job_kwargs']['kwargs'] = {}
     job_content['job_kwargs']['kwargs']['parameters'] = input_params
     
-
-    # prefect
-    job_uid = schedule_prefect_flow(
-                    FLOW__NAME,
-                    parameters=TRAIN_PARAMS_EXAMPLE,
-                    flow_run_name=f"{job_name} {current_time}",
-                    tags=PREFECT_TAGS + ["train", project_name],
-                )
-    job_message = f"Job has been succesfully submitted with uid: {job_uid} and mask uri: {mask_uri}"
-
-    compute_dict = {'user_uid': USER,
-                    'host_list': ['mlsandbox.als.lbl.gov', 'local.als.lbl.gov', 'vaughan.als.lbl.gov'],
-                    'requirements': {'num_processors': 2,
-                                     'num_gpus': 0,
-                                     'num_nodes': 2},
-                    }
-    compute_dict['job_list'] = [job_content]
-    compute_dict['dependencies'] = {'0':[]}
-    compute_dict['requirements']['num_nodes'] = 1
-
-    # create user directory to store users data/experiments
-    experiment_id = str(uuid.uuid4())  # create unique id for experiment
-    output_path = OUTPUT_DIR / experiment_id
-    output_path.mkdir(parents=True, exist_ok=True)
-
     # check if user is using user uploaded zip file or example dataset or data clinic file 
     if user_upload_data_dir is not None:
         selected_dataset = user_upload_data_dir
@@ -264,6 +291,39 @@ def submit_dimension_reduction_job(submit_n_clicks,
         selected_dataset = data_clinic_file_path
     else:
         selected_dataset = selected_example_dataset
+    print(selected_dataset)
+
+    # prefect
+    current_time = datetime.now(pytz.timezone(TIMEZONE)).strftime("%Y/%m/%d %H:%M:%S")
+    if not job_name:
+        job_name = "test0"
+    project_name = selected_dataset.split("/")[-1] # name of the dataset, get it from FM
+    print(PREFECT_TAGS, flush=True)
+    # job_uid is the
+    job_uid = schedule_prefect_flow(
+                    FLOW_NAME,
+                    parameters=TRAIN_PARAMS_EXAMPLE,
+                    flow_run_name=f"{job_name} {current_time}",
+                    tags=PREFECT_TAGS + ["train", project_name],
+                )
+    job_message = f"Job has been succesfully submitted with uid: {job_uid}."
+    print("Job message")
+    print(job_message, flush=True)
+
+    # compute_dict = {'user_uid': USER,
+    #                 'host_list': ['mlsandbox.als.lbl.gov', 'local.als.lbl.gov', 'vaughan.als.lbl.gov'],
+    #                 'requirements': {'num_processors': 2,
+    #                                  'num_gpus': 0,
+    #                                  'num_nodes': 2},
+    #                 }
+    # compute_dict['job_list'] = [job_content]
+    # compute_dict['dependencies'] = {'0':[]}
+    # compute_dict['requirements']['num_nodes'] = 1
+
+    # create user directory to store users data/experiments
+    experiment_id = str(uuid.uuid4())  # create unique id for experiment
+    output_path = OUTPUT_DIR / experiment_id
+    output_path.mkdir(parents=True, exist_ok=True)
     
     # check which dimension reduction algo, then compose command
     if selected_algo == 'PCA':
@@ -275,10 +335,10 @@ def submit_dimension_reduction_job(submit_n_clicks,
     #print(docker_cmd)
     docker_cmd = docker_cmd + ' \'' + json.dumps(input_params) + '\''
     #print(docker_cmd)
-    job_content['job_kwargs']['cmd'] = docker_cmd
+    #job_content['job_kwargs']['cmd'] = docker_cmd
 
-    response = requests.post('http://job-service:8080/api/v0/workflows', json=compute_dict)
-    print("respnse: ", response)
+    # response = requests.post('http://job-service:8080/api/v0/workflows', json=compute_dict)
+    # print("respnse: ", response)
     # job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
     
     return experiment_id, 'cluster', -1, -2, go.Figure(go.Heatmap()), -1
@@ -679,27 +739,27 @@ def toggle_modal(n_submit, n_apply,
     return False, "No alert."
 
 
-@app.callback(
-    Output('feature-vector-model-list', 'options'),
-    Input('interval-component', 'n_intervals'),
-)
-def update_trained_model_list(interval):
-    '''
-    This callback updates the list of trained models
-    Args:
-        tab_value:                      Tab option
-        prob_refresh_n_clicks:          Button to refresh the list of probability-based trained models
-        similarity_refresh_n_clicks:    Button to refresh the list of similarity-based trained models
-    Returns:
-        prob_model_list:                List of trained models in mlcoach
-        similarity_model_list:          List of trained models in data clinic and mlcoach
-    '''
-    data_clinic_models = get_trained_models_list(USER, 'data_clinic')
-    ml_coach_models = get_trained_models_list(USER, 'mlcoach')
-    feature_vector_models = data_clinic_models + ml_coach_models
-    #print(feature_vector_models)
+# @app.callback(
+#     Output('feature-vector-model-list', 'options'),
+#     Input('interval-component', 'n_intervals'),
+# )
+# def update_trained_model_list(interval):
+#     '''
+#     This callback updates the list of trained models
+#     Args:
+#         tab_value:                      Tab option
+#         prob_refresh_n_clicks:          Button to refresh the list of probability-based trained models
+#         similarity_refresh_n_clicks:    Button to refresh the list of similarity-based trained models
+#     Returns:
+#         prob_model_list:                List of trained models in mlcoach
+#         similarity_model_list:          List of trained models in data clinic and mlcoach
+#     '''
+#     data_clinic_models = get_trained_models_list(USER, 'data_clinic')
+#     ml_coach_models = get_trained_models_list(USER, 'mlcoach')
+#     feature_vector_models = data_clinic_models + ml_coach_models
+#     #print(feature_vector_models)
 
-    return feature_vector_models
+#     return feature_vector_models
 
 
 if __name__ == '__main__':
