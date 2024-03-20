@@ -44,23 +44,14 @@ TRAIN_PARAMS_EXAMPLE = {
     "flow_type": "podman",
     "params_list": [
         {
-            "image_name": "ghcr.io/mlexchange/mlex_latent_explorer",
+            "image_name": "ghcr.io/runboj/mlex_dimension_reduction_pca",
             "image_tag": "main",
             "command": 'python -c \\"import time; time.sleep(30)\\"',
             "params": {
                 "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
             },
             "volumes": [f"{DATA_DIR}:/app/work/data"],
-        },
-        {
-            "image_name": "ghcr.io/mlexchange/mlex_latent_explorer",
-            "image_tag": "main",
-            "command": 'python -c \\"import time; time.sleep(10)\\"',
-            "params": {
-                "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
-            },
-            "volumes": [f"{DATA_DIR}:/app/work/data"],
-        },
+        }
     ],
 }
 
@@ -68,7 +59,7 @@ INFERENCE_PARAMS_EXAMPLE = {
     "flow_type": "podman",
     "params_list": [
         {
-            "image_name": "ghcr.io/mlexchange/mlex_latent_explorer",
+            "image_name": "ghcr.io/runboj/mlex_dimension_reduction_pca",
             "image_tag": "main",
             "command": 'python -c \\"import time; time.sleep(30)\\"',
             "params": {
@@ -203,18 +194,18 @@ def update_data_n_label_schema(selected_example_dataset, upload_file_paths, data
 
     return labels, label_schema, options, user_upload_data_dir
 
-def job_content_dict(content):
-    job_content = {# 'mlex_app': content['name'],
-                   'mlex_app': 'latent_space_explorer',
-                   'service_type': content['service_type'],
-                   'working_directory': DATA_DIR,
-                   'job_kwargs': {'uri': content['uri'], 
-                                  'cmd': content['cmd'][0]}
-    }
-    if 'map' in content:
-        job_content['job_kwargs']['map'] = content['map']
+# def job_content_dict(content):
+#     job_content = {# 'mlex_app': content['name'],
+#                    'mlex_app': 'latent_space_explorer',
+#                    'service_type': content['service_type'],
+#                    'working_directory': DATA_DIR,
+#                    'job_kwargs': {'uri': content['uri'], 
+#                                   'cmd': content['cmd'][0]}
+#     }
+#     if 'map' in content:
+#         job_content['job_kwargs']['map'] = content['map']
     
-    return job_content
+#     return job_content
 
 @app.callback(
     [
@@ -277,12 +268,6 @@ def submit_dimension_reduction_job(submit_n_clicks,
             value = child["props"]["children"][1]["props"]["value"]
             input_params[key] = value
     print("Dimension reduction algo params: ", input_params)
-
-    model_content = get_content(model_id)
-    print(model_content)
-    job_content = job_content_dict(model_content)
-    job_content['job_kwargs']['kwargs'] = {}
-    job_content['job_kwargs']['kwargs']['parameters'] = input_params
     
     # check if user is using user uploaded zip file or example dataset or data clinic file 
     if user_upload_data_dir is not None:
@@ -295,11 +280,28 @@ def submit_dimension_reduction_job(submit_n_clicks,
 
     # prefect
     current_time = datetime.now(pytz.timezone(TIMEZONE)).strftime("%Y/%m/%d %H:%M:%S")
-    if not job_name:
-        job_name = "test0"
+    if not job_name: job_name = "test0"
+    # job_name += " " + str(current_time)
     project_name = selected_dataset.split("/")[-1] # name of the dataset, get it from FM
     print(PREFECT_TAGS, flush=True)
-    # job_uid is the
+    
+    # create user directory to store users data/experiments
+    experiment_id = experiment_id = str(uuid.uuid4())
+    output_path = OUTPUT_DIR / experiment_id
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # check which dimension reduction algo, then compose command
+    if selected_algo == 'PCA':
+        TRAIN_PARAMS_EXAMPLE["params_list"][0]["command"] = "python pca_run.py"
+    elif selected_algo == 'UMAP':
+        TRAIN_PARAMS_EXAMPLE["params_list"][0]["command"] = "python umap_run.py"
+    
+    TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["io_parameters"]["images_dir"] = selected_dataset
+    TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["io_parameters"]["output_dir"] = str(output_path)
+    TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["model_parameters"] = input_params
+    print(TRAIN_PARAMS_EXAMPLE)
+
+    # run prefect job, job_uid is the new experiment id
     job_uid = schedule_prefect_flow(
                     FLOW_NAME,
                     parameters=TRAIN_PARAMS_EXAMPLE,
@@ -307,39 +309,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
                     tags=PREFECT_TAGS + ["train", project_name],
                 )
     job_message = f"Job has been succesfully submitted with uid: {job_uid}."
-    print("Job message")
     print(job_message, flush=True)
-
-    # compute_dict = {'user_uid': USER,
-    #                 'host_list': ['mlsandbox.als.lbl.gov', 'local.als.lbl.gov', 'vaughan.als.lbl.gov'],
-    #                 'requirements': {'num_processors': 2,
-    #                                  'num_gpus': 0,
-    #                                  'num_nodes': 2},
-    #                 }
-    # compute_dict['job_list'] = [job_content]
-    # compute_dict['dependencies'] = {'0':[]}
-    # compute_dict['requirements']['num_nodes'] = 1
-
-    # create user directory to store users data/experiments
-    experiment_id = str(uuid.uuid4())  # create unique id for experiment
-    output_path = OUTPUT_DIR / experiment_id
-    output_path.mkdir(parents=True, exist_ok=True)
-    
-    # check which dimension reduction algo, then compose command
-    if selected_algo == 'PCA':
-        cmd_list = ["python pca_run.py", selected_dataset, str(output_path)]
-    elif selected_algo == 'UMAP':
-        cmd_list = ["python umap_run.py", selected_dataset, str(output_path)]
-        
-    docker_cmd = " ".join(cmd_list)
-    #print(docker_cmd)
-    docker_cmd = docker_cmd + ' \'' + json.dumps(input_params) + '\''
-    #print(docker_cmd)
-    #job_content['job_kwargs']['cmd'] = docker_cmd
-
-    # response = requests.post('http://job-service:8080/api/v0/workflows', json=compute_dict)
-    # print("respnse: ", response)
-    # job_response = get_job(user=None, mlex_app=job_content['mlex_app'])
     
     return experiment_id, 'cluster', -1, -2, go.Figure(go.Heatmap()), -1
 
