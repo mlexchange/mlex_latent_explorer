@@ -194,19 +194,6 @@ def update_data_n_label_schema(selected_example_dataset, upload_file_paths, data
 
     return labels, label_schema, options, user_upload_data_dir
 
-# def job_content_dict(content):
-#     job_content = {# 'mlex_app': content['name'],
-#                    'mlex_app': 'latent_space_explorer',
-#                    'service_type': content['service_type'],
-#                    'working_directory': DATA_DIR,
-#                    'job_kwargs': {'uri': content['uri'], 
-#                                   'cmd': content['cmd'][0]}
-#     }
-#     if 'map' in content:
-#         job_content['job_kwargs']['map'] = content['map']
-    
-#     return job_content
-
 @app.callback(
     [
         # flag the read variable
