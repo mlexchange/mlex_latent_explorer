@@ -19,6 +19,7 @@ services:
     volumes:
       - ./data:/app/work/data
       - ./src:/app/work/src
+      - ../mlex_file_manager/file_manager:/app/work/src/file_manager
     ports:
       - "8070:8070"
     networks:

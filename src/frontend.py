@@ -133,15 +133,15 @@ def show_clustering_gui_layouts(selected_algo):
         Output('input_labels', 'data'),
         Output('label_schema', 'data'),
         Output('label-dropdown', 'options'),
-        Output('user-upload-data-dir', 'data'),
+        # Output('user-upload-data-dir', 'data'),
     ],
     [
         Input('example-dataset-selection', 'value'),                            # example dataset
-        Input({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'), # FM dataset
+        Input({'base_id': 'file-manager', 'name': 'data-project-dict'},'data'), # FM dataset
         Input('feature-vector-model-list', 'value'),                            # data clinic dataset
     ]
 )
-def update_data_n_label_schema(selected_example_dataset, upload_file_paths, data_clinic_file_path):
+def update_data_n_label_schema(selected_example_dataset, data_project_dict, data_clinic_file_path):
     '''
     This callback updates the selected dataset from the provided example datasets, as well as labels, and label schema
     Args:
@@ -161,14 +161,16 @@ def update_data_n_label_schema(selected_example_dataset, upload_file_paths, data
     # priority level: FileManage > DataClinic > Example Datasets
 
     # FileManager - user uploaded zip file of images
-    data_project = DataProject()
-    data_project.init_from_dict(upload_file_paths)
-    data_set = data_project.data # list of len 1920, each element is a local_dataset.LocalDataset object
+    # data_project = DataProject()
+    # data_project.init_from_dict(upload_file_paths)
+
+    data_project = DataProject.from_dict(data_project_dict)
+    data_set_len = data_project.datasets[-1].cumulative_data_count - 1 # list of len 1920, each element is a local_dataset.LocalDataset object
     options = []
-    user_upload_data_dir = None
-    if len(data_set) > 0:
-        labels = np.full((len(data_set),), -1)
-        user_upload_data_dir = os.path.dirname(upload_file_paths[0]['uri'])
+    #user_upload_data_dir = None
+    if data_set_len > 0:
+        labels = np.full((data_set_len,), -1)
+        # user_upload_data_dir = os.path.dirname(data_project_dict[0]['uri'])
     # DataClinic options
     elif data_clinic_file_path is not None:
         df = pd.read_parquet(data_clinic_file_path)
@@ -192,7 +194,7 @@ def update_data_n_label_schema(selected_example_dataset, upload_file_paths, data
     options.insert(0, {'label': 'Unlabeled', 'value': -1})
     options.insert(0, {'label': 'All', 'value': -2})
 
-    return labels, label_schema, options, user_upload_data_dir
+    return labels, label_schema, options #, user_upload_data_dir
 
 @app.callback(
     [
@@ -211,18 +213,20 @@ def update_data_n_label_schema(selected_example_dataset, upload_file_paths, data
     [
         State('job-name', 'value'),                  # job_name
         State('example-dataset-selection', 'value'), # 2 example dataset
-        State('user-upload-data-dir', 'data'),       # FM
+        # State('user-upload-data-dir', 'data'),       # FM
         State('feature-vector-model-list', 'value'), # DataClinic
         State('model_id', 'data'),
         State('algo-dropdown', 'value'),
         State('additional-model-params', 'children'),
+        State({"base_id": "file-manager", "name": "data-project-dict"}, "data") # DataProject for FM
+       
     ],
     prevent_initial_call=True
 )
 def submit_dimension_reduction_job(submit_n_clicks,
                                    job_name,
-                                   selected_example_dataset, user_upload_data_dir, data_clinic_file_path, 
-                                   model_id, selected_algo, children):
+                                   selected_example_dataset, data_clinic_file_path, 
+                                   model_id, selected_algo, children, data_project_dict):
     """
     This callback is triggered every time the Submit button is hit:
         - compute latent vectors, which will be saved in data/output/experiment_id
@@ -245,7 +249,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
     """
     if not submit_n_clicks:
         raise PreventUpdate
-    if not selected_example_dataset and not user_upload_data_dir and not data_clinic_file_path:
+    if not selected_example_dataset and not data_project_dict and not data_clinic_file_path:
         raise PreventUpdate
 
     input_params = {}
@@ -254,28 +258,41 @@ def submit_dimension_reduction_job(submit_n_clicks,
             key   = child["props"]["children"][1]["props"]["id"]["param_key"]
             value = child["props"]["children"][1]["props"]["value"]
             input_params[key] = value
-    print("Dimension reduction algo params: ", input_params)
+    print("Dimension reduction algo params: ", input_params, flush=True)
     
     # check if user is using user uploaded zip file or example dataset or data clinic file 
-    if user_upload_data_dir is not None:
-        selected_dataset = user_upload_data_dir
-    elif data_clinic_file_path is not None:
-        selected_dataset = data_clinic_file_path
+    data_project = DataProject.from_dict(data_project_dict)
+    if len(data_project.datasets) > 0:
+        print("FMM", flush=True)
+        data_project = DataProject.from_dict(data_project_dict)
+        io_parameters = {"data_uris": [dataset.uri for dataset in data_project.datasets], 
+                         "data_tiled_api_key": data_project.api_key,
+                         "data_type": data_project.data_type,
+                         "root_uri": data_project.root_uri,
+                         }
+
+    # elif data_clinic_file_path is not None:
+    #     selected_dataset = data_clinic_file_path
     else:
-        selected_dataset = selected_example_dataset
-    print(selected_dataset)
+        print("selected_example_dataset: " + selected_example_dataset, flush=True)
+        io_parameters = {"data_uris": [selected_example_dataset], 
+                         "data_tiled_api_key": None,
+                         "data_type": "file",
+                         "root_uri": None,
+                         }
 
     # prefect
     current_time = datetime.now(pytz.timezone(TIMEZONE)).strftime("%Y/%m/%d %H:%M:%S")
     if not job_name: job_name = "test0"
-    # job_name += " " + str(current_time)
-    project_name = selected_dataset.split("/")[-1] # name of the dataset, get it from FM
+    job_name += " " + str(current_time)
+    # project_name = selected_dataset.split("/")[-1] # name of the dataset, get it from FM ## this is an issue
+    project_name = "fake_name"
     print(PREFECT_TAGS, flush=True)
     
     # create user directory to store users data/experiments
-    experiment_id = experiment_id = str(uuid.uuid4())
-    output_path = OUTPUT_DIR / experiment_id
-    output_path.mkdir(parents=True, exist_ok=True)
+    # experiment_id = str(uuid.uuid4())
+    # output_path = OUTPUT_DIR / experiment_id
+    # output_path.mkdir(parents=True, exist_ok=True)
 
     # check which dimension reduction algo, then compose command
     if selected_algo == 'PCA':
@@ -283,12 +300,13 @@ def submit_dimension_reduction_job(submit_n_clicks,
     elif selected_algo == 'UMAP':
         TRAIN_PARAMS_EXAMPLE["params_list"][0]["command"] = "python umap_run.py"
     
-    TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["io_parameters"]["images_dir"] = selected_dataset
-    TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["io_parameters"]["output_dir"] = str(output_path)
+    TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["io_parameters"] = io_parameters
+    TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["io_parameters"]["output_dir"] = str(OUTPUT_DIR)
+    TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["io_parameters"]["uid_save"] = ""
     TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["model_parameters"] = input_params
     print(TRAIN_PARAMS_EXAMPLE)
 
-    # run prefect job, job_uid is the new experiment id
+    # run prefect job, job_uid is the new experiment id -> uid_save in the pca_example.yaml file
     job_uid = schedule_prefect_flow(
                     FLOW_NAME,
                     parameters=TRAIN_PARAMS_EXAMPLE,
@@ -298,7 +316,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
     job_message = f"Job has been succesfully submitted with uid: {job_uid}."
     print(job_message, flush=True)
     
-    return experiment_id, 'cluster', -1, -2, go.Figure(go.Heatmap()), -1
+    return job_uid, 'cluster', -1, -2, go.Figure(go.Heatmap()), -1
 
 @app.callback(
     [   
@@ -325,9 +343,13 @@ def read_latent_vectors(n_intervals, experiment_id, max_intervals):
     """
     if experiment_id is None or n_intervals == 0 or max_intervals == 0:
         raise PreventUpdate
+    
+    children_flows = get_children_flow_run_ids(experiment_id)
+    print("child flow")
+    print(children_flows)
 
     #read the latent vectors from the output dir
-    output_path = OUTPUT_DIR / experiment_id
+    output_path = OUTPUT_DIR / children_flows[0]
     npz_files = list(output_path.glob('*.npy'))
     if len(npz_files) > 0 :
         lv_filepath = npz_files[0] # latent vector file path
@@ -494,16 +516,16 @@ def update_scatter_plot(latent_vectors, selected_cluster, selected_label, scatte
         Input('mean-std-toggle', 'value'),
     ],
     [
-        State('example-dataset-selection', 'value'),                            # example dataset
-        State({'base_id': 'file-manager', 'name': 'docker-file-paths'},'data'), # FM dataset
-        State('feature-vector-model-list', 'value'),                            # data clinic dataset
+        State('example-dataset-selection', 'value'),                             # example dataset
+        State({"base_id": "file-manager", "name": "data-project-dict"}, "data"), # DataProject for FM
+        State('feature-vector-model-list', 'value'),                             # data clinic dataset
 
     ],
     prevent_initial_call=True
 
 )
 def update_heatmap(click_data, selected_data, display_option,
-                   selected_example_dataset, upload_file_paths, data_clinic_file_path):
+                   selected_example_dataset, data_project_dict, data_clinic_file_path):
     '''
     This callback update the heatmap
     Args:
@@ -513,7 +535,7 @@ def update_heatmap(click_data, selected_data, display_option,
     Returns:
         fig:                updated heatmap
     '''
-    if not selected_example_dataset and not upload_file_paths and not data_clinic_file_path:
+    if not selected_example_dataset and not data_project_dict and not data_clinic_file_path:
         raise PreventUpdate
     
     # user select a group of points
@@ -524,21 +546,18 @@ def update_heatmap(click_data, selected_data, display_option,
         ### FileManager
         # print("upload_file_paths") # if not selected, its an empty list not None
         selected_images = []
-        data_project = DataProject()
-        data_project.init_from_dict(upload_file_paths)
-        data_set = data_project.data
-        if len(data_set) > 0:
+
+        data_project = DataProject.from_dict(data_project_dict)
+        data_set_len = data_project.datasets[-1].cumulative_data_count - 1
+        if data_set_len > 0:
             print("FM file")
-            for i in selected_indices:
-                image, uri = data_project.data[i].read_data(export='pillow')
-                selected_images.append(np.array(image))
+            selected_images, _ = data_project.read(selected_indices, export='pillow')
         ### DataClinic
         elif data_clinic_file_path is not None:
             print("data_clinic_file_path")
             print(data_clinic_file_path)
             directory_path = os.path.dirname(data_clinic_file_path)
             selected_images = load_images_by_indices(directory_path, selected_indices)
-
         ### Example dataset
         elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
             print("Demoshapes.npz")
@@ -559,13 +578,12 @@ def update_heatmap(click_data, selected_data, display_option,
             heatmap_data = go.Heatmap(z=np.std(selected_images, axis=0))
 
     elif click_data is not None and len(click_data['points']) > 0:
-        selected_index = click_data['points'][0]['customdata'][0]  # click_data['points'][0]['pointIndex']
+        selected_index = click_data['points'][0]['customdata'][0]
         ### FileManager
-        data_project = DataProject()
-        data_project.init_from_dict(upload_file_paths)
-        data_set = data_project.data
-        if len(data_set) > 0:
-            clicked_image, uri = data_project.data[selected_index].read_data(export='pillow')
+        data_project = DataProject.from_dict(data_project_dict)
+        data_set_len = data_project.datasets[-1].cumulative_data_count - 1
+        if data_set_len > 0:
+            selected_images, _ = data_project.read([selected_index], export='pillow')
         ### DataClinic
         elif data_clinic_file_path is not None:
             directory_path = os.path.dirname(data_clinic_file_path)
