@@ -671,44 +671,44 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
         f"Labels represented: {labels_str}",
     ]
 
-@app.callback(
-    [Output("modal", "is_open"), Output("modal-body", "children")],
-    [
-        Input('run-algo', 'n_clicks'), 
-        Input('run-cluster-algo', 'n_clicks'),
-    ],
-    [
-        State("modal", "is_open"), 
-        State('example-dataset-selection', 'value'),
-        State('user-upload-data-dir', 'data'),
-        State('feature-vector-model-list', 'value'),
-    ]
-)
-def toggle_modal(n_submit, n_apply,
-                 is_open, selected_example_dataset, user_upload_data_dir, data_clinic_file_path):
-    '''
-    This callback pop up a window to remind user to follow this flow: 
-        select dataset -> Submit dimension reduction job -> Apply clustering
-    Args:
-        n_submit (int):     Number of clicks on the 'Submit' button.
-        n_apply (int):      Number of clicks on the 'Apply' button.
-        is_open (bool):     Current state of the modal window (open/closed).
-        input_data (list):         User selected data
-    Returns:
-        is_open (bool):     New state of the modal window.
-        modal_body_text (str): Text to be displayed in the modal body.
-    '''
-    at_least_one_dataset_selected = False
-    if selected_example_dataset or user_upload_data_dir or data_clinic_file_path:
-        at_least_one_dataset_selected = True
+# @app.callback(
+#     [Output("modal", "is_open"), Output("modal-body", "children")],
+#     [
+#         Input('run-algo', 'n_clicks'), 
+#         Input('run-cluster-algo', 'n_clicks'),
+#     ],
+#     [
+#         State("modal", "is_open"), 
+#         State('example-dataset-selection', 'value'),
+#         State('user-upload-data-dir', 'data'),
+#         State('feature-vector-model-list', 'value'),
+#     ]
+# )
+# def toggle_modal(n_submit, n_apply,
+#                  is_open, selected_example_dataset, user_upload_data_dir, data_clinic_file_path):
+#     '''
+#     This callback pop up a window to remind user to follow this flow: 
+#         select dataset -> Submit dimension reduction job -> Apply clustering
+#     Args:
+#         n_submit (int):     Number of clicks on the 'Submit' button.
+#         n_apply (int):      Number of clicks on the 'Apply' button.
+#         is_open (bool):     Current state of the modal window (open/closed).
+#         input_data (list):         User selected data
+#     Returns:
+#         is_open (bool):     New state of the modal window.
+#         modal_body_text (str): Text to be displayed in the modal body.
+#     '''
+#     at_least_one_dataset_selected = False
+#     if selected_example_dataset or user_upload_data_dir or data_clinic_file_path:
+#         at_least_one_dataset_selected = True
     
-    if ((n_submit and not at_least_one_dataset_selected) or
-        (n_apply and not at_least_one_dataset_selected)):
-        return True, "Please select an example dataset or upload your own zipped dataset or choose DataClinic outpu."
-    elif n_apply and n_submit is None:
-        return True, "Please select a dimension reduction algorithm and click 'Submit' button before clustering."
+#     if ((n_submit and not at_least_one_dataset_selected) or
+#         (n_apply and not at_least_one_dataset_selected)):
+#         return True, "Please select an example dataset or upload your own zipped dataset or choose DataClinic outpu."
+#     elif n_apply and n_submit is None:
+#         return True, "Please select a dimension reduction algorithm and click 'Submit' button before clustering."
             
-    return False, "No alert."
+#     return False, "No alert."
 
 
 # @app.callback(
