@@ -165,11 +165,10 @@ def update_data_n_label_schema(selected_example_dataset, data_project_dict, data
     # data_project.init_from_dict(upload_file_paths)
 
     data_project = DataProject.from_dict(data_project_dict)
-    data_set_len = data_project.datasets[-1].cumulative_data_count - 1 # list of len 1920, each element is a local_dataset.LocalDataset object
     options = []
     #user_upload_data_dir = None
-    if data_set_len > 0:
-        labels = np.full((data_set_len,), -1)
+    if len(data_project.datasets) > 0:
+        labels = np.full((len(data_project.datasets),), -1)
         # user_upload_data_dir = os.path.dirname(data_project_dict[0]['uri'])
     # DataClinic options
     elif data_clinic_file_path is not None:
@@ -263,7 +262,7 @@ def submit_dimension_reduction_job(submit_n_clicks,
     # check if user is using user uploaded zip file or example dataset or data clinic file 
     data_project = DataProject.from_dict(data_project_dict)
     if len(data_project.datasets) > 0:
-        print("FMM", flush=True)
+        print("FM", flush=True)
         data_project = DataProject.from_dict(data_project_dict)
         io_parameters = {"data_uris": [dataset.uri for dataset in data_project.datasets], 
                          "data_tiled_api_key": data_project.api_key,
@@ -548,8 +547,7 @@ def update_heatmap(click_data, selected_data, display_option,
         selected_images = []
 
         data_project = DataProject.from_dict(data_project_dict)
-        data_set_len = data_project.datasets[-1].cumulative_data_count - 1
-        if data_set_len > 0:
+        if len(data_project.datasets) > 0:
             print("FM file")
             selected_images, _ = data_project.read(selected_indices, export='pillow')
         ### DataClinic
@@ -581,8 +579,7 @@ def update_heatmap(click_data, selected_data, display_option,
         selected_index = click_data['points'][0]['customdata'][0]
         ### FileManager
         data_project = DataProject.from_dict(data_project_dict)
-        data_set_len = data_project.datasets[-1].cumulative_data_count - 1
-        if data_set_len > 0:
+        if len(data_project.datasets) > 0:
             selected_images, _ = data_project.read([selected_index], export='pillow')
         ### DataClinic
         elif data_clinic_file_path is not None:
