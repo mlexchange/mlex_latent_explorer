@@ -10,23 +10,21 @@ services:
       dockerfile: "docker/Dockerfile"
     mem_limit: 2g
     environment:
-      DATA_DIR: "${PWD}/data/"
+      DATA_DIR: "${DATA_DIR}"
       PREFECT_TAGS: "${PREFECT_TAGS}"
       PREFECT_API_URL: '${PREFECT_API_URL}'
       FLOW_NAME: '${FLOW_NAME}'
       TIMEZONE: "${TIMEZONE}"
       USER: "${USER}"
     volumes:
-      - ./data:/app/work/data
+      - $DATA_DIR:/app/work/data
       - ./src:/app/work/src
       - ../mlex_file_manager/file_manager:/app/work/src/file_manager
     ports:
-      - "8070:8070"
+      - "127.0.0.1:8070:8070"
     networks:
       mlex_mle_net:
 
 networks:
   mlex_mle_net:
     external: true
-
-# env file: set up pwd
