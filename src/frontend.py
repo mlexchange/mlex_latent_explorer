@@ -11,11 +11,11 @@ import pytz
 import requests
 from dash import Input, Output, State, html
 from dash.exceptions import PreventUpdate
+from dash_component_editor import JSONParameterEditor
 from file_manager.data_project import DataProject
 from sklearn.cluster import DBSCAN, HDBSCAN, MiniBatchKMeans
 
 from app_layout import app
-from dash_component_editor import JSONParameterEditor
 from latentxp_utils import (
     dbscan_kwargs,
     generate_scatter_data,
@@ -35,7 +35,6 @@ UPLOAD_FOLDER_ROOT = "data/upload"
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
 FLOW_NAME = os.getenv("FLOW_NAME", "")
-
 
 # TODO: Get model parameters from UI
 TRAIN_PARAMS_EXAMPLE = {
@@ -326,7 +325,14 @@ def submit_dimension_reduction_job(
     job_message = f"Job has been succesfully submitted with uid: {job_uid}."
     print(job_message, flush=True)
 
-    return job_uid, "cluster", -1, -2, go.Figure(go.Heatmap()), -1
+    fig = go.Figure(
+        go.Heatmap(),
+        layout=go.Layout(
+            autosize=True,
+            margin=go.layout.Margin(l=20, r=20, b=20, t=20, pad=0),
+        ),
+    )
+    return job_uid, "cluster", -1, -2, fig, -1
 
 
 @app.callback(
@@ -356,19 +362,16 @@ def read_latent_vectors(n_intervals, experiment_id, max_intervals):
         raise PreventUpdate
 
     children_flows = get_children_flow_run_ids(experiment_id)
-    print("child flow")
-    print(children_flows)
-
-    # read the latent vectors from the output dir
-    output_path = OUTPUT_DIR / children_flows[0]
-    npz_files = list(output_path.glob("*.npy"))
-    if len(npz_files) > 0:
-        lv_filepath = npz_files[0]  # latent vector file path
-        latent_vectors = np.load(str(lv_filepath))
-        print("latent vector", latent_vectors.shape)
-        return latent_vectors, 0
-    else:
-        return None, -1
+    if len(children_flows) > 0:
+        # read the latent vectors from the output dir
+        output_path = OUTPUT_DIR / children_flows[0]
+        npz_files = list(output_path.glob("*.npy"))
+        if len(npz_files) > 0:
+            lv_filepath = npz_files[0]  # latent vector file path
+            latent_vectors = np.load(str(lv_filepath))
+            print("latent vector", latent_vectors.shape)
+            return latent_vectors, 0
+    return None, -1
 
 
 @app.callback(
@@ -518,7 +521,10 @@ def update_scatter_plot(
     )
 
     fig = go.Figure(scatter_data)
-    fig.update_layout(legend=dict(tracegroupgap=20))
+    fig.update_layout(
+        margin=go.layout.Margin(l=20, r=20, b=20, t=20, pad=0),
+        legend=dict(tracegroupgap=20),
+    )
 
     if (
         current_figure
@@ -600,7 +606,9 @@ def update_heatmap(
         data_project = DataProject.from_dict(data_project_dict)
         if len(data_project.datasets) > 0:
             print("FM file")
-            selected_images, _ = data_project.read(selected_indices, export="pillow")
+            selected_images, _ = data_project.read_datasets(
+                selected_indices, export="pillow"
+            )
         # DataClinic
         elif data_clinic_file_path is not None:
             print("data_clinic_file_path")
@@ -675,6 +683,7 @@ def update_heatmap(
         data=heatmap_data,
         layout=dict(
             autosize=True,
+            margin=go.layout.Margin(l=20, r=20, b=20, t=20, pad=0),
             yaxis=dict(scaleanchor="x", scaleratio=aspect_y / aspect_x),
         ),
     )
@@ -700,10 +709,14 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
     Returns:
         [num_images, clusters, labels]:     statistics
     """
-
     assigned_labels = np.array(assigned_labels)
+    print("assigned_labels", assigned_labels, flush=True)
 
-    if selected_data is not None and len(selected_data["points"]) > 0:
+    if (
+        selected_data is not None
+        and len(selected_data["points"]) > 0
+        and assigned_labels != [-1]
+    ):
         selected_indices = [
             point["customdata"][0] for point in selected_data["points"]
         ]  # Access customdata for the original indices

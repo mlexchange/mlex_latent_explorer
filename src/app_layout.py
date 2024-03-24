@@ -76,12 +76,51 @@ image_panel = [
                 ]
             ),
             dbc.CardBody(
-                dcc.Graph(
-                    id="scatter",
-                    figure=go.Figure(go.Scattergl(mode="markers")),
-                )
+                [
+                    dbc.Row(
+                        [
+                            dbc.Col(
+                                dcc.Graph(
+                                    id="scatter",
+                                    figure=go.Figure(
+                                        go.Scattergl(mode="markers"),
+                                        layout=go.Layout(
+                                            autosize=True,
+                                            margin=go.layout.Margin(
+                                                l=20,
+                                                r=20,
+                                                b=20,
+                                                t=20,
+                                                pad=0,
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                                width=6,
+                            ),
+                            dbc.Col(
+                                dcc.Graph(
+                                    id="heatmap",
+                                    figure=go.Figure(
+                                        go.Heatmap(),
+                                        layout=go.Layout(
+                                            autosize=True,
+                                            margin=go.layout.Margin(
+                                                l=20,
+                                                r=20,
+                                                b=20,
+                                                t=20,
+                                                pad=0,
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                                width=6,
+                            ),
+                        ]
+                    ),
+                ]
             ),
-            dbc.CardFooter(dcc.Graph(id="heatmap", figure=go.Figure(go.Heatmap()))),
         ],
     )
 ]
@@ -356,10 +395,11 @@ app.layout = html.Div(
         dbc.Container(
             children=[
                 dbc.Row(
-                    [dbc.Col(control_panel, width=4), dbc.Col(image_panel, width=7)]
+                    [dbc.Col(control_panel, width=4), dbc.Col(image_panel, width=8)]
                 ),
                 dbc.Row(dbc.Col(meta)),
-            ]
+            ],
+            fluid=True,
         ),
-    ]
+    ],
 )
