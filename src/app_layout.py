@@ -361,6 +361,5 @@ app.layout = html.Div(
                 dbc.Row(dbc.Col(meta)),
             ]
         ),
-        modal,
     ]
 )
