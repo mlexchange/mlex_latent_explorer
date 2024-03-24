@@ -425,16 +425,18 @@ def apply_clustering(
 
     clusters, options = None, None
     if obj:
-        clusters = obj.fit_predict(latent_vectors)
-        output_path = OUTPUT_DIR / experiment_id
-        np.save(output_path / "clusters.npy", clusters)
-        unique_clusters = np.unique(clusters)
-        options = [
-            {"label": f"Cluster {cluster}", "value": cluster}
-            for cluster in unique_clusters
-            if cluster != -1
-        ]
-        options.insert(0, {"label": "All", "value": -1})
+        children_flows = get_children_flow_run_ids(experiment_id)
+        if len(children_flows) > 0:
+            clusters = obj.fit_predict(latent_vectors)
+            output_path = OUTPUT_DIR / children_flows[0]
+            np.save(output_path / "clusters.npy", clusters)
+            unique_clusters = np.unique(clusters)
+            options = [
+                {"label": f"Cluster {cluster}", "value": cluster}
+                for cluster in unique_clusters
+                if cluster != -1
+            ]
+            options.insert(0, {"label": "All", "value": -1})
 
     return clusters, options
 
