@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import pathlib
@@ -32,7 +33,7 @@ from utils_prefect import (
 
 # GLOBAL PARAMS
 DATA_DIR = str(os.environ["DATA_DIR"])
-USER = "admin"  # 'mlexchange-team' move to env file
+USER = ""  # 'mlexchange-team' move to env file
 OUTPUT_DIR = pathlib.Path("data/mlexchange_store/" + USER)
 UPLOAD_FOLDER_ROOT = "data/upload"
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
@@ -294,6 +295,7 @@ def submit_dimension_reduction_job(
     ):
         raise PreventUpdate
 
+    job_params = job_params = copy.deepcopy(TRAIN_PARAMS_EXAMPLE)
     input_params = {}
     if children:
         for child in children["props"]["children"]:
@@ -323,43 +325,75 @@ def submit_dimension_reduction_job(
             "root_uri": None,
         }
 
+    # Autoencoder
+    if data_clinic_file_path is not None:
+        auto_io_params = io_parameters.copy()
+        auto_io_params["model_dir"] = data_clinic_file_path + "/last.ckpt"
+        if FLOW_TYPE == "podman":
+            autoencoder_params = {
+                "image_name": "ghcr.io/mlexchange/mlex_pytorch_autoencoders:main",
+                "image_tag": "main",
+                "command": "python src/predict_model.py",
+                "params": {
+                    "io_parameters": auto_io_params,
+                    "target_width": 64,
+                    "target_height": 64,
+                    "batch_size": 32,
+                },
+                "volumes": [f"{DATA_DIR}:/app/work/data"],
+            }
+        else:
+            autoencoder_params = {
+                "conda_env_name": "pytorch_autoencoders",
+                "params": {
+                    "io_parameters": auto_io_params,
+                    "target_width": 64,
+                    "target_height": 64,
+                    "batch_size": 32,
+                },
+                "python_file_name": "mlex_pytorch_autoencoders/src/predict_model.py",
+            }
+        job_params["params_list"].insert(0, autoencoder_params)
+
     # prefect
     current_time = datetime.now(pytz.timezone(TIMEZONE)).strftime("%Y/%m/%d %H:%M:%S")
     if not job_name:
         job_name = "test0"
     job_name += " " + str(current_time)
-    # project_name = selected_dataset.split("/")[-1] # name of the dataset, get it from FM ## this is an issue
+    # TODO: Hash root_uri + data_uris
     project_name = "fake_name"
     print(PREFECT_TAGS, flush=True)
 
     # check which dimension reduction algo, then compose command
     if selected_algo == "PCA":
         if FLOW_TYPE == "podman":
-            TRAIN_PARAMS_EXAMPLE["params_list"][0]["command"] = "python pca_run.py"
+            job_params["params_list"][-1]["command"] = "python pca_run.py"
         else:
-            TRAIN_PARAMS_EXAMPLE["params_list"][0][
+            job_params["params_list"][-1][
                 "python_file_name"
             ] = "mlex_dimension_reduction_pca/pca_run.py"
     elif selected_algo == "UMAP":
         if FLOW_TYPE == "podman":
-            TRAIN_PARAMS_EXAMPLE["params_list"][0]["command"] = "python umap_run.py"
+            job_params["params_list"][-1]["command"] = "python umap_run.py"
         else:
-            TRAIN_PARAMS_EXAMPLE["params_list"][0][
+            job_params["params_list"][-1][
                 "python_file_name"
             ] = "mlex_dimension_reduction_umap/umap_run.py"
 
-    TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["io_parameters"] = io_parameters
-    TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["io_parameters"]["output_dir"] = (
-        str(OUTPUT_DIR)
+    job_params["params_list"][-1]["params"]["io_parameters"] = io_parameters
+    job_params["params_list"][-1]["params"]["io_parameters"]["output_dir"] = str(
+        OUTPUT_DIR
     )
-    TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["io_parameters"]["uid_save"] = ""
-    TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["model_parameters"] = input_params
-    print(TRAIN_PARAMS_EXAMPLE)
+    job_params["params_list"][-1]["params"]["io_parameters"]["uid_save"] = ""
+    job_params["params_list"][-1]["params"]["io_parameters"]["uid_retrieve"] = ""
+    job_params["params_list"][-1]["params"]["model_parameters"] = input_params
+    print(job_params)
+    print(TRAIN_PARAMS_EXAMPLE, flush=True)
 
     # run prefect job, job_uid is the new experiment id -> uid_save in the pca_example.yaml file
     job_uid = schedule_prefect_flow(
         FLOW_NAME,
-        parameters=TRAIN_PARAMS_EXAMPLE,
+        parameters=job_params,
         flow_run_name=f"{job_name} {current_time}",
         tags=PREFECT_TAGS + ["train", project_name],
     )
@@ -405,7 +439,7 @@ def read_latent_vectors(n_intervals, experiment_id, max_intervals):
     children_flows = get_children_flow_run_ids(experiment_id)
     if len(children_flows) > 0:
         # read the latent vectors from the output dir
-        output_path = OUTPUT_DIR / children_flows[0]
+        output_path = OUTPUT_DIR / children_flows[-1]
         npz_files = list(output_path.glob("*.npy"))
         if len(npz_files) > 0:
             lv_filepath = npz_files[0]  # latent vector file path
