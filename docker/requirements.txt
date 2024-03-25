@@ -1,5 +1,4 @@
 dash==2.9.3
-# dash_component_editor==0.0.7
 dash-core-components==2.0.0
 dash-bootstrap-components==1.0.2
 dash-html-components==2.0.0
@@ -12,3 +11,5 @@ pyarrow==11.0.0
 diskcache==5.6.3
 pandas
 numpy
+Pillow
+prefect-client==2.14.21

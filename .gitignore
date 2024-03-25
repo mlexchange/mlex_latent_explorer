@@ -11,8 +11,6 @@ data/.file_manager_vars.pkl
 data/mlexchange_store/
 .DS_Store
 
-src/dash_component_editor.py
-
 # C extensions
 *.so
 
