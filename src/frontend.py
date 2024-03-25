@@ -22,7 +22,6 @@ from latentxp_utils import (
     hdbscan_kwargs,
     hex_to_rgba,
     kmeans_kwargs,
-    load_images_by_indices,
     remove_key_from_dict_list,
 )
 from utils_prefect import (
@@ -39,37 +38,65 @@ UPLOAD_FOLDER_ROOT = "data/upload"
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
 FLOW_NAME = os.getenv("FLOW_NAME", "")
+MODEL_DIR = "data/models"
+FLOW_TYPE = "conda"
+CONDA_ENV_NAME = "dimension_reduction_pca"
 
-# TODO: Get model parameters from UI
-TRAIN_PARAMS_EXAMPLE = {
-    "flow_type": "podman",
-    "params_list": [
-        {
-            "image_name": "ghcr.io/runboj/mlex_dimension_reduction_pca",
-            "image_tag": "main",
-            "command": 'python -c \\"import time; time.sleep(30)\\"',
-            "params": {
-                "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
-            },
-            "volumes": [f"{DATA_DIR}:/app/work/data"],
-        }
-    ],
-}
 
-INFERENCE_PARAMS_EXAMPLE = {
-    "flow_type": "podman",
-    "params_list": [
-        {
-            "image_name": "ghcr.io/runboj/mlex_dimension_reduction_pca",
-            "image_tag": "main",
-            "command": 'python -c \\"import time; time.sleep(30)\\"',
-            "params": {
-                "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
+if FLOW_TYPE == "podman":
+    TRAIN_PARAMS_EXAMPLE = {
+        "flow_type": "podman",
+        "params_list": [
+            {
+                "image_name": "ghcr.io/runboj/mlex_dimension_reduction_pca",
+                "image_tag": "main",
+                "command": 'python -c \\"import time; time.sleep(30)\\"',
+                "params": {
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
+                },
+                "volumes": [f"{DATA_DIR}:/app/work/data"],
+            }
+        ],
+    }
+
+    INFERENCE_PARAMS_EXAMPLE = {
+        "flow_type": "podman",
+        "params_list": [
+            {
+                "image_name": "ghcr.io/runboj/mlex_dimension_reduction_pca",
+                "image_tag": "main",
+                "command": 'python -c \\"import time; time.sleep(30)\\"',
+                "params": {
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
+                },
+                "volumes": [f"{DATA_DIR}:/app/work/data"],
             },
-            "volumes": [f"{DATA_DIR}:/app/work/data"],
-        },
-    ],
-}
+        ],
+    }
+else:
+    TRAIN_PARAMS_EXAMPLE = {
+        "flow_type": "conda",
+        "params_list": [
+            {
+                "conda_env_name": f"{CONDA_ENV_NAME}",
+                "params": {
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
+                },
+            }
+        ],
+    }
+
+    INFERENCE_PARAMS_EXAMPLE = {
+        "flow_type": "conda",
+        "params_list": [
+            {
+                "conda_env_name": f"{CONDA_ENV_NAME}",
+                "params": {
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
+                },
+            },
+        ],
+    }
 
 
 @app.callback(
@@ -155,12 +182,9 @@ def update_job_selector(n_intervals):
         Input(
             {"base_id": "file-manager", "name": "data-project-dict"}, "data"
         ),  # FM dataset
-        Input("feature-vector-model-list", "value"),  # data clinic dataset
     ],
 )
-def update_data_n_label_schema(
-    selected_example_dataset, data_project_dict, data_clinic_file_path
-):
+def update_data_n_label_schema(selected_example_dataset, data_project_dict):
     """
     This callback updates the selected dataset from the provided example datasets, as well as labels, and label schema
     Args:
@@ -184,10 +208,6 @@ def update_data_n_label_schema(
     # user_upload_data_dir = None
     if len(data_project.datasets) > 0:
         labels = np.full((len(data_project.datasets),), -1)
-    # DataClinic options
-    elif data_clinic_file_path is not None:
-        df = pd.read_parquet(data_clinic_file_path)
-        labels = np.full((df.shape[0],), -1)
     # Example dataset option 1
     elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
         labels = np.load("/app/work/data/example_shapes/DemoLabels.npy")
@@ -314,9 +334,19 @@ def submit_dimension_reduction_job(
 
     # check which dimension reduction algo, then compose command
     if selected_algo == "PCA":
-        TRAIN_PARAMS_EXAMPLE["params_list"][0]["command"] = "python pca_run.py"
+        if FLOW_TYPE == "podman":
+            TRAIN_PARAMS_EXAMPLE["params_list"][0]["command"] = "python pca_run.py"
+        else:
+            TRAIN_PARAMS_EXAMPLE["params_list"][0][
+                "python_file_name"
+            ] = "mlex_dimension_reduction_pca/pca_run.py"
     elif selected_algo == "UMAP":
-        TRAIN_PARAMS_EXAMPLE["params_list"][0]["command"] = "python umap_run.py"
+        if FLOW_TYPE == "podman":
+            TRAIN_PARAMS_EXAMPLE["params_list"][0]["command"] = "python umap_run.py"
+        else:
+            TRAIN_PARAMS_EXAMPLE["params_list"][0][
+                "python_file_name"
+            ] = "mlex_dimension_reduction_umap/umap_run.py"
 
     TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["io_parameters"] = io_parameters
     TRAIN_PARAMS_EXAMPLE["params_list"][0]["params"]["io_parameters"]["output_dir"] = (
@@ -579,7 +609,6 @@ def update_scatter_plot(
         State(
             {"base_id": "file-manager", "name": "data-project-dict"}, "data"
         ),  # DataProject for FM
-        State("feature-vector-model-list", "value"),  # data clinic dataset
     ],
     prevent_initial_call=True,
 )
@@ -589,7 +618,6 @@ def update_heatmap(
     display_option,
     selected_example_dataset,
     data_project_dict,
-    data_clinic_file_path,
 ):
     """
     This callback update the heatmap
@@ -600,11 +628,7 @@ def update_heatmap(
     Returns:
         fig:                updated heatmap
     """
-    if (
-        not selected_example_dataset
-        and not data_project_dict
-        and not data_clinic_file_path
-    ):
+    if not selected_example_dataset and not data_project_dict:
         raise PreventUpdate
 
     # user select a group of points
@@ -624,12 +648,6 @@ def update_heatmap(
             selected_images, _ = data_project.read_datasets(
                 selected_indices, export="pillow"
             )
-        # DataClinic
-        elif data_clinic_file_path is not None:
-            print("data_clinic_file_path")
-            print(data_clinic_file_path)
-            directory_path = os.path.dirname(data_clinic_file_path)
-            selected_images = load_images_by_indices(directory_path, selected_indices)
         # Example dataset
         elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
             print("Demoshapes.npz")
@@ -662,10 +680,6 @@ def update_heatmap(
             selected_images, _ = data_project.read_datasets(
                 [selected_index], export="pillow"
             )
-        # DataClinic
-        elif data_clinic_file_path is not None:
-            directory_path = os.path.dirname(data_clinic_file_path)
-            clicked_image = load_images_by_indices(directory_path, [selected_index])
         # Example dataset
         elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
             clicked_image = np.load("/app/work/" + selected_example_dataset)["arr_0"][
@@ -765,6 +779,28 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
         html.Br(),
         f"Labels represented: {labels_str}",
     ]
+
+
+@app.callback(
+    Output("feature-vector-model-list", "options"),
+    Input("interval-component", "n_intervals"),
+)
+def update_feature_vector_model_list(n_intervals):
+    """
+    This callback update the feature vector model list
+    Args:
+        n_intervals:         interval component
+    Returns:
+        options:            feature vector model list
+    """
+    # TODO: Connect to data clinic
+    # TODO: Check if inference has already taken place in this dataset
+    folder_names = [
+        os.path.join(dirpath, dir)
+        for dirpath, dirs, _ in os.walk(MODEL_DIR)
+        for dir in dirs
+    ]
+    return folder_names
 
 
 if __name__ == "__main__":
