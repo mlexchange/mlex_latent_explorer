@@ -25,7 +25,11 @@ from latentxp_utils import (
     load_images_by_indices,
     remove_key_from_dict_list,
 )
-from utils_prefect import get_children_flow_run_ids, schedule_prefect_flow
+from utils_prefect import (
+    get_children_flow_run_ids,
+    get_flow_runs_by_name,
+    schedule_prefect_flow,
+)
 
 # GLOBAL PARAMS
 DATA_DIR = str(os.environ["DATA_DIR"])
@@ -131,6 +135,16 @@ def show_clustering_gui_layouts(selected_algo):
 
 
 @app.callback(
+    Output("job-selector", "options"),
+    Input("interval-component", "n_intervals"),
+)
+def update_job_selector(n_intervals):
+    # TODO: Split train/inference and add data project name
+    jobs = get_flow_runs_by_name(tags=PREFECT_TAGS)
+    return jobs
+
+
+@app.callback(
     [
         Output("input_labels", "data"),
         Output("label_schema", "data"),
@@ -199,8 +213,6 @@ def update_data_n_label_schema(
 
 @app.callback(
     [
-        # flag the read variable
-        Output("experiment-id", "data"),
         # reset scatter plot control panel
         Output("scatter-color", "value"),
         Output("cluster-dropdown", "value"),
@@ -247,7 +259,6 @@ def submit_dimension_reduction_job(
         selected_algo:          selected dimension reduction algo
         children:               div for algo's parameters
     Returns:
-        experiment-id:          uuid for current run
         cluster-dropdown:       options for cluster dropdown
         scatter-color:          default scatter-color value
         cluster-dropdown:       default cluster-dropdown value
@@ -332,7 +343,7 @@ def submit_dimension_reduction_job(
             margin=go.layout.Margin(l=20, r=20, b=20, t=20, pad=0),
         ),
     )
-    return job_uid, "cluster", -1, -2, fig, -1
+    return "cluster", -1, -2, fig, -1
 
 
 @app.callback(
@@ -341,7 +352,7 @@ def submit_dimension_reduction_job(
         Output("interval-component", "max_intervals", allow_duplicate=True),
     ],
     Input("interval-component", "n_intervals"),
-    State("experiment-id", "data"),
+    State("job-selector", "value"),
     State("interval-component", "max_intervals"),
     prevent_initial_call=True,
 )
@@ -384,7 +395,7 @@ def read_latent_vectors(n_intervals, experiment_id, max_intervals):
         State("latent_vectors", "data"),
         State("cluster-algo-dropdown", "value"),
         State("additional-cluster-params", "children"),
-        State("experiment-id", "data"),
+        State("job-selector", "value"),
     ],
 )
 def apply_clustering(
@@ -414,7 +425,7 @@ def apply_clustering(
             key = child["props"]["children"][1]["props"]["id"]["param_key"]
             value = child["props"]["children"][1]["props"]["value"]
             input_params[key] = value
-    print("Clustering params:", input_params)
+    print("Clustering params:", input_params, flush=True)
 
     if selected_algo == "KMeans":
         obj = MiniBatchKMeans(n_clusters=input_params["n_clusters"])
@@ -437,6 +448,8 @@ def apply_clustering(
                 if cluster != -1
             ]
             options.insert(0, {"label": "All", "value": -1})
+
+    print("clusters", clusters, flush=True)
 
     return clusters, options
 
@@ -489,7 +502,7 @@ def update_scatter_plot(
     if latent_vectors is None or children is None:
         raise PreventUpdate
     latent_vectors = np.array(latent_vectors)
-    print("latent vector shape:", latent_vectors.shape)
+    print("latent vector shape:", latent_vectors.shape, flush=True)
 
     n_components = children["props"]["children"][0]["props"]["children"][1]["props"][
         "value"
@@ -646,7 +659,9 @@ def update_heatmap(
         # FileManager
         data_project = DataProject.from_dict(data_project_dict)
         if len(data_project.datasets) > 0:
-            selected_images, _ = data_project.read([selected_index], export="pillow")
+            selected_images, _ = data_project.read_datasets(
+                [selected_index], export="pillow"
+            )
         # DataClinic
         elif data_clinic_file_path is not None:
             directory_path = os.path.dirname(data_clinic_file_path)

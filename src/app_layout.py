@@ -155,8 +155,13 @@ algo_panel = html.Div(
                                         dcc.Input(
                                             id="job-name",
                                             placeholder="test0",
-                                            style={"width": "100%"},
+                                            style={
+                                                "width": "100%",
+                                                "margin-bottom": "1rem",
+                                            },
                                         ),
+                                        dbc.Label("Select a job..."),
+                                        dcc.Dropdown(id="job-selector"),
                                     ]
                                 ),
                                 html.Hr(),
