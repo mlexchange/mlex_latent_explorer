@@ -13,7 +13,7 @@ from file_manager.main import FileManager
 
 import templates
 
-load_dotenv(".env")
+load_dotenv(".env", override=True)
 
 # GLOBAL VARIABLES
 ALGORITHM_DATABASE = {
@@ -33,11 +33,9 @@ DATA_OPTION = [
         "value": "data/example_latentrepresentation/f_vectors.parquet",
     },
 ]
-DATA_DIR = pathlib.Path(
-    os.getenv("DATA_DIR")
-)  # pathlib.Path.home() / "data"  # /app/work/data
-UPLOAD_FOLDER_ROOT = DATA_DIR / "upload"  # /app/work/data/upload
-TILED_API_KEY = os.getenv("TILED_API_KEY")
+DATA_DIR = pathlib.Path(os.getenv("DATA_DIR"))
+UPLOAD_FOLDER_ROOT = "data/upload"
+TILED_API_KEY = os.getenv("TILED_API_KEY", None)
 
 # SETUP DASH APP
 cache = diskcache.Cache("./cache")
