@@ -1,3 +1,4 @@
+import os
 import pathlib
 
 import dash_bootstrap_components as dbc
@@ -7,9 +8,12 @@ import plotly.graph_objects as go
 from dash import Dash, dcc, html
 from dash.long_callback import DiskcacheLongCallbackManager
 from dash_iconify import DashIconify
+from dotenv import load_dotenv
 from file_manager.main import FileManager
 
 import templates
+
+load_dotenv(".env", override=True)
 
 # GLOBAL VARIABLES
 ALGORITHM_DATABASE = {
@@ -29,8 +33,9 @@ DATA_OPTION = [
         "value": "data/example_latentrepresentation/f_vectors.parquet",
     },
 ]
-DOCKER_DATA = pathlib.Path.home() / "data"  # /app/work/data
-UPLOAD_FOLDER_ROOT = DOCKER_DATA / "upload"  # /app/work/data/upload
+DATA_DIR = pathlib.Path(os.getenv("DATA_DIR"))
+UPLOAD_FOLDER_ROOT = "data/upload"
+TILED_API_KEY = os.getenv("TILED_API_KEY", None)
 
 # SETUP DASH APP
 cache = diskcache.Cache("./cache")
@@ -45,7 +50,9 @@ app = Dash(
 
 server = app.server
 
-dash_file_explorer = FileManager(DOCKER_DATA, UPLOAD_FOLDER_ROOT, open_explorer=False)
+dash_file_explorer = FileManager(
+    DATA_DIR, UPLOAD_FOLDER_ROOT, open_explorer=False, api_key=TILED_API_KEY
+)
 dash_file_explorer.init_callbacks(app)
 du.configure_upload(app, UPLOAD_FOLDER_ROOT, use_upload_id=False)
 

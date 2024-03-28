@@ -1,7 +1,6 @@
 import copy
 import json
 import os
-import pathlib
 import uuid
 from datetime import datetime
 
@@ -12,11 +11,12 @@ import pytz
 import requests
 from dash import Input, Output, State, html
 from dash.exceptions import PreventUpdate
-from dash_component_editor import JSONParameterEditor
+from dotenv import load_dotenv
 from file_manager.data_project import DataProject
 from sklearn.cluster import DBSCAN, HDBSCAN, MiniBatchKMeans
 
 from app_layout import app
+from dash_component_editor import JSONParameterEditor
 from latentxp_utils import (
     dbscan_kwargs,
     generate_scatter_data,
@@ -31,17 +31,24 @@ from utils_prefect import (
     schedule_prefect_flow,
 )
 
+load_dotenv(".env")
+
 # GLOBAL PARAMS
-DATA_DIR = str(os.environ["DATA_DIR"])
-USER = ""  # 'mlexchange-team' move to env file
-OUTPUT_DIR = pathlib.Path("data/mlexchange_store/" + USER)
-UPLOAD_FOLDER_ROOT = "data/upload"
+USER = os.getenv("USER", "")  # 'mlexchange-team' move to env file
+
+DATA_DIR = os.getenv("DATA_DIR", "data")
+MODEL_DIR = "data/models"
+OUTPUT_DIR = f"data/mlexchange_store/{USER}"
+UPLOAD_FOLDER_ROOT = f"{DATA_DIR}/upload"
+
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
 FLOW_NAME = os.getenv("FLOW_NAME", "")
-MODEL_DIR = "data/models"
 FLOW_TYPE = "conda"
 CONDA_ENV_NAME = "dimension_reduction_pca"
+
+CONTENT_API_URL = os.getenv("CONTENT_API_URL", "http://localhost:8000/api/v0/models")
+DEFAULT_ALGORITHM_DESCRIPTION = os.getenv("DEFAULT_ALGORITHM_DESCRIPTION")
 
 
 if FLOW_TYPE == "podman":
@@ -53,7 +60,7 @@ if FLOW_TYPE == "podman":
                 "image_tag": "main",
                 "command": 'python -c \\"import time; time.sleep(30)\\"',
                 "params": {
-                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
                 },
                 "volumes": [f"{DATA_DIR}:/app/work/data"],
             }
@@ -68,7 +75,7 @@ if FLOW_TYPE == "podman":
                 "image_tag": "main",
                 "command": 'python -c \\"import time; time.sleep(30)\\"',
                 "params": {
-                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
                 },
                 "volumes": [f"{DATA_DIR}:/app/work/data"],
             },
@@ -81,7 +88,7 @@ else:
             {
                 "conda_env_name": f"{CONDA_ENV_NAME}",
                 "params": {
-                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
                 },
             }
         ],
@@ -93,7 +100,7 @@ else:
             {
                 "conda_env_name": f"{CONDA_ENV_NAME}",
                 "params": {
-                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": "uid0001"}
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
                 },
             },
         ],
@@ -114,7 +121,12 @@ def show_dimension_reduction_gui_layouts(selected_algo):
         item_list:          dropdown menu html code
         model_uid:          selected algo's uid
     """
-    data = requests.get("http://content-api:8000/api/v0/models").json()  # all model
+    try:
+        data = requests.get(CONTENT_API_URL).json()  # all model
+    except Exception as e:
+        print(f"Cannot access content api: {e}", flush=True)
+        with open(DEFAULT_ALGORITHM_DESCRIPTION, "r") as f:
+            data = [json.load(f)]
 
     if selected_algo == "PCA":
         conditions = {"name": "PCA"}
@@ -385,7 +397,7 @@ def submit_dimension_reduction_job(
         OUTPUT_DIR
     )
     job_params["params_list"][-1]["params"]["io_parameters"]["uid_save"] = ""
-    job_params["params_list"][-1]["params"]["io_parameters"]["uid_retrieve"] = ""
+    job_params["params_list"][-1]["params"]["io_parameters"]["uid_retrieve"] = None
     job_params["params_list"][-1]["params"]["model_parameters"] = input_params
     print(job_params)
     print(TRAIN_PARAMS_EXAMPLE, flush=True)
@@ -439,11 +451,10 @@ def read_latent_vectors(n_intervals, experiment_id, max_intervals):
     children_flows = get_children_flow_run_ids(experiment_id)
     if len(children_flows) > 0:
         # read the latent vectors from the output dir
-        output_path = OUTPUT_DIR / children_flows[-1]
-        npz_files = list(output_path.glob("*.npy"))
-        if len(npz_files) > 0:
-            lv_filepath = npz_files[0]  # latent vector file path
-            latent_vectors = np.load(str(lv_filepath))
+        output_path = f"{OUTPUT_DIR}/{children_flows[-1]}/latent_vectors.npy"
+        print(output_path, flush=True)
+        if os.path.exists(output_path):
+            latent_vectors = np.load(output_path)
             print("latent vector", latent_vectors.shape)
             return latent_vectors, 0
     return None, -1
@@ -503,8 +514,8 @@ def apply_clustering(
         children_flows = get_children_flow_run_ids(experiment_id)
         if len(children_flows) > 0:
             clusters = obj.fit_predict(latent_vectors)
-            output_path = OUTPUT_DIR / children_flows[0]
-            np.save(output_path / "clusters.npy", clusters)
+            output_path = f"{OUTPUT_DIR}/{children_flows[0]}"
+            np.save(f"{output_path}/clusters.npy", clusters)
             unique_clusters = np.unique(clusters)
             options = [
                 {"label": f"Cluster {cluster}", "value": cluster}
@@ -749,7 +760,9 @@ def update_heatmap(
         layout=dict(
             autosize=True,
             margin=go.layout.Margin(l=20, r=20, b=20, t=20, pad=0),
-            yaxis=dict(scaleanchor="x", scaleratio=aspect_y / aspect_x),
+            yaxis=dict(
+                scaleanchor="x", scaleratio=aspect_y / aspect_x, autorange="reversed"
+            ),
         ),
     )
 
@@ -780,7 +793,7 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
     if (
         selected_data is not None
         and len(selected_data["points"]) > 0
-        and assigned_labels != [-1]
+        and (assigned_labels != [-1]).all()
     ):
         selected_indices = [
             point["customdata"][0] for point in selected_data["points"]
