@@ -38,7 +38,8 @@ USER = os.getenv("USER", "")  # 'mlexchange-team' move to env file
 
 DATA_DIR = os.getenv("DATA_DIR", "data")
 MODEL_DIR = "data/models"
-OUTPUT_DIR = f"data/mlexchange_store/{USER}"
+OUTPUT_DIR = os.getenv("OUTPUT_DIR", "data")
+OUTPUT_DIR = f"{OUTPUT_DIR}/mlexchange_store/{USER}"
 UPLOAD_FOLDER_ROOT = f"{DATA_DIR}/upload"
 
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
