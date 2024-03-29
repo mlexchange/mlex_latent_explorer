@@ -1,5 +1,4 @@
 import os
-import pathlib
 
 import dash_bootstrap_components as dbc
 import dash_uploader as du
@@ -33,7 +32,7 @@ DATA_OPTION = [
         "value": "data/example_latentrepresentation/f_vectors.parquet",
     },
 ]
-DATA_DIR = pathlib.Path(os.getenv("DATA_DIR"))
+READ_DIR = os.getenv("READ_DIR")
 UPLOAD_FOLDER_ROOT = "data/upload"
 TILED_API_KEY = os.getenv("TILED_API_KEY", None)
 
@@ -51,7 +50,7 @@ app = Dash(
 server = app.server
 
 dash_file_explorer = FileManager(
-    DATA_DIR, UPLOAD_FOLDER_ROOT, open_explorer=False, api_key=TILED_API_KEY
+    READ_DIR, UPLOAD_FOLDER_ROOT, open_explorer=False, api_key=TILED_API_KEY
 )
 dash_file_explorer.init_callbacks(app)
 du.configure_upload(app, UPLOAD_FOLDER_ROOT, use_upload_id=False)

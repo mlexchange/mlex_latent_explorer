@@ -34,13 +34,11 @@ from utils_prefect import (
 load_dotenv(".env")
 
 # GLOBAL PARAMS
-USER = os.getenv("USER", "")  # 'mlexchange-team' move to env file
+READ_DIR = os.getenv("READ_DIR", "data")
+WRITE_DIR = os.getenv("WRITE_DIR", "mlex_store")
 
-DATA_DIR = os.getenv("DATA_DIR", "data")
 MODEL_DIR = "data/models"
-OUTPUT_DIR = os.getenv("OUTPUT_DIR", "data")
-OUTPUT_DIR = f"{OUTPUT_DIR}/mlexchange_store/{USER}"
-UPLOAD_FOLDER_ROOT = f"{DATA_DIR}/upload"
+UPLOAD_FOLDER_ROOT = "data/upload"
 
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
@@ -63,7 +61,10 @@ if FLOW_TYPE == "podman":
                 "params": {
                     "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
                 },
-                "volumes": [f"{DATA_DIR}:/app/work/data"],
+                "volumes": [
+                    f"{READ_DIR}:/app/work/data",
+                    f"{WRITE_DIR}:/app/work/mlex_store",
+                ],
             }
         ],
     }
@@ -78,7 +79,10 @@ if FLOW_TYPE == "podman":
                 "params": {
                     "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
                 },
-                "volumes": [f"{DATA_DIR}:/app/work/data"],
+                "volumes": [
+                    f"{READ_DIR}:/app/work/data",
+                    f"{WRITE_DIR}:/app/work/mlex_store",
+                ],
             },
         ],
     }
@@ -219,7 +223,6 @@ def update_data_n_label_schema(selected_example_dataset, data_project_dict):
 
     data_project = DataProject.from_dict(data_project_dict)
     options = []
-    # user_upload_data_dir = None
     if len(data_project.datasets) > 0:
         labels = np.full((len(data_project.datasets),), -1)
     # Example dataset option 1
@@ -353,7 +356,10 @@ def submit_dimension_reduction_job(
                     "target_height": 64,
                     "batch_size": 32,
                 },
-                "volumes": [f"{DATA_DIR}:/app/work/data"],
+                "volumes": [
+                    f"{READ_DIR}:/app/work/data",
+                    f"{WRITE_DIR}:/app/work/mlex_store",
+                ],
             }
         else:
             autoencoder_params = {
@@ -394,9 +400,9 @@ def submit_dimension_reduction_job(
             ] = "mlex_dimension_reduction_umap/umap_run.py"
 
     job_params["params_list"][-1]["params"]["io_parameters"] = io_parameters
-    job_params["params_list"][-1]["params"]["io_parameters"]["output_dir"] = str(
-        OUTPUT_DIR
-    )
+    job_params["params_list"][-1]["params"]["io_parameters"][
+        "output_dir"
+    ] = "mlex_store"
     job_params["params_list"][-1]["params"]["io_parameters"]["uid_save"] = ""
     job_params["params_list"][-1]["params"]["io_parameters"]["uid_retrieve"] = None
     job_params["params_list"][-1]["params"]["model_parameters"] = input_params
@@ -452,7 +458,7 @@ def read_latent_vectors(n_intervals, experiment_id, max_intervals):
     children_flows = get_children_flow_run_ids(experiment_id)
     if len(children_flows) > 0:
         # read the latent vectors from the output dir
-        output_path = f"{OUTPUT_DIR}/{children_flows[-1]}/latent_vectors.npy"
+        output_path = f"mlex_store/{children_flows[-1]}/latent_vectors.npy"
         print(output_path, flush=True)
         if os.path.exists(output_path):
             latent_vectors = np.load(output_path)
@@ -515,7 +521,7 @@ def apply_clustering(
         children_flows = get_children_flow_run_ids(experiment_id)
         if len(children_flows) > 0:
             clusters = obj.fit_predict(latent_vectors)
-            output_path = f"{OUTPUT_DIR}/{children_flows[0]}"
+            output_path = f"mlex_store/{children_flows[0]}"
             np.save(f"{output_path}/clusters.npy", clusters)
             unique_clusters = np.unique(clusters)
             options = [
