@@ -32,7 +32,7 @@ DATA_OPTION = [
         "value": "data/example_latentrepresentation/f_vectors.parquet",
     },
 ]
-READ_DIR = os.getenv("READ_DIR")
+READ_DIR = "data"
 UPLOAD_FOLDER_ROOT = "data/upload"
 TILED_API_KEY = os.getenv("TILED_API_KEY", None)
 
