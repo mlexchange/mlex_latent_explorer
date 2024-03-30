@@ -57,205 +57,7 @@ du.configure_upload(app, UPLOAD_FOLDER_ROOT, use_upload_id=False)
 
 # BEGIN DASH CODE
 header = templates.header()
-# right panel: uploader, scatter plot, individual image  plot
-image_panel = [
-    dbc.Card(
-        id="image-card",
-        children=[
-            dbc.CardHeader(
-                [
-                    dbc.Label("Upload your own zipped dataset", className="mr-2"),
-                    dash_file_explorer.file_explorer,
-                    dbc.Label("Or select Data Clinic modal", className="mr-2"),
-                    dcc.Dropdown(
-                        id="feature-vector-model-list",
-                        clearable=False,
-                        style={"margin-bottom": "1rem"},
-                    ),
-                    dbc.Label("Or try Example Dataset", className="mr-2"),
-                    dcc.Dropdown(
-                        id="example-dataset-selection",
-                        options=DATA_OPTION,
-                        clearable=False,
-                        style={"margin-bottom": "1rem"},
-                    ),
-                ]
-            ),
-            dbc.CardBody(
-                [
-                    dbc.Row(
-                        [
-                            dbc.Col(
-                                dcc.Graph(
-                                    id="scatter",
-                                    figure=go.Figure(
-                                        go.Scattergl(mode="markers"),
-                                        layout=go.Layout(
-                                            autosize=True,
-                                            margin=go.layout.Margin(
-                                                l=20,
-                                                r=20,
-                                                b=20,
-                                                t=20,
-                                                pad=0,
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                                width=6,
-                            ),
-                            dbc.Col(
-                                dcc.Graph(
-                                    id="heatmap",
-                                    figure=go.Figure(
-                                        go.Heatmap(),
-                                        layout=go.Layout(
-                                            autosize=True,
-                                            margin=go.layout.Margin(
-                                                l=20,
-                                                r=20,
-                                                b=20,
-                                                t=20,
-                                                pad=0,
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                                width=6,
-                            ),
-                        ]
-                    ),
-                ]
-            ),
-        ],
-    )
-]
-
-# left panel: choose algorithms, submit job, choose scatter plot attributes, and statistics...
-algo_panel = html.Div(
-    [
-        dbc.Card(
-            id="algo-card",
-            style={"width": "100%"},
-            children=[
-                dbc.Collapse(
-                    children=[
-                        dbc.CardHeader("Select Dimension Reduction Algorithms"),
-                        dbc.CardBody(
-                            [
-                                dbc.Label("Algorithm", className="mr-2"),
-                                dcc.Dropdown(
-                                    id="algo-dropdown",
-                                    options=[
-                                        {"label": entry, "value": entry}
-                                        for entry in ALGORITHM_DATABASE
-                                    ],
-                                    style={"min-width": "250px"},
-                                    value="PCA",
-                                ),
-                                html.Div(id="additional-model-params"),
-                                html.Hr(),
-                                html.Div(
-                                    [
-                                        dbc.Label("Name your job", className="mr-2"),
-                                        dcc.Input(
-                                            id="job-name",
-                                            placeholder="test0",
-                                            style={
-                                                "width": "100%",
-                                                "margin-bottom": "1rem",
-                                            },
-                                        ),
-                                        dbc.Label("Select a job..."),
-                                        dcc.Dropdown(id="job-selector"),
-                                    ]
-                                ),
-                                html.Hr(),
-                                html.Div(
-                                    [
-                                        dbc.Button(
-                                            "Submit",
-                                            color="secondary",
-                                            id="run-algo",
-                                            outline=True,
-                                            size="lg",
-                                            className="m-1",
-                                            style={"width": "50%"},
-                                        ),
-                                    ],
-                                    className="row",
-                                    style={
-                                        "align-items": "center",
-                                        "justify-content": "center",
-                                    },
-                                ),
-                                html.Div(id="invisible-apply-div"),
-                            ]
-                        ),
-                    ],
-                    id="model-collapse",
-                    is_open=True,
-                    style={"margin-bottom": "0rem"},
-                )
-            ],
-        )
-    ]
-)
-
-cluster_algo_panel = html.Div(
-    [
-        dbc.Card(
-            id="cluster-algo-card",
-            style={"width": "100%"},
-            children=[
-                dbc.Collapse(
-                    children=[
-                        dbc.CardHeader("Select Clustering Algorithms"),
-                        dbc.CardBody(
-                            [
-                                dbc.Label("Algorithm", className="mr-2"),
-                                dcc.Dropdown(
-                                    id="cluster-algo-dropdown",
-                                    options=[
-                                        {"label": entry, "value": entry}
-                                        for entry in CLUSTER_ALGORITHM_DATABASE
-                                    ],
-                                    style={"min-width": "250px"},
-                                    value="DBSCAN",
-                                ),
-                                html.Div(id="additional-cluster-params"),
-                                html.Hr(),
-                                html.Div(
-                                    [
-                                        dbc.Button(
-                                            "Apply",
-                                            color="secondary",
-                                            id="run-cluster-algo",
-                                            outline=True,
-                                            size="lg",
-                                            className="m-1",
-                                            style={"width": "50%"},
-                                        ),
-                                    ],
-                                    className="row",
-                                    style={
-                                        "align-items": "center",
-                                        "justify-content": "center",
-                                    },
-                                ),
-                                html.Div(id="invisible-submit-div"),
-                            ]
-                        ),
-                    ],
-                    id="cluster-model-collapse",
-                    is_open=True,
-                    style={"margin-bottom": "0rem"},
-                )
-            ],
-        )
-    ]
-)
-
+# right panel: file manager, scatter plot, individual image  plot
 scatter_control_panel = html.Div(
     [
         dbc.Card(
@@ -353,6 +155,227 @@ heatmap_control_panel = html.Div(
     ]
 )
 
+image_panel = [
+    dbc.Card(
+        id="image-card",
+        children=[
+            dbc.CardHeader(
+                [
+                    dbc.Label("Upload your own zipped dataset", className="mr-2"),
+                    dash_file_explorer.file_explorer,
+                    dbc.Label("Or select Data Clinic modal", className="mr-2"),
+                    dcc.Dropdown(
+                        id="feature-vector-model-list",
+                        clearable=False,
+                        style={"margin-bottom": "1rem"},
+                    ),
+                    dbc.Label("Or try Example Dataset", className="mr-2"),
+                    dcc.Dropdown(
+                        id="example-dataset-selection",
+                        options=DATA_OPTION,
+                        clearable=False,
+                        style={"margin-bottom": "1rem"},
+                    ),
+                ]
+            ),
+            dbc.CardBody(
+                [
+                    dbc.Row(
+                        [
+                            dbc.Col(
+                                dcc.Graph(
+                                    id="scatter",
+                                    figure=go.Figure(
+                                        go.Scattergl(mode="markers"),
+                                        layout=go.Layout(
+                                            autosize=True,
+                                            margin=go.layout.Margin(
+                                                l=20,
+                                                r=20,
+                                                b=20,
+                                                t=20,
+                                                pad=0,
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                                width=6,
+                            ),
+                            dbc.Col(
+                                dcc.Graph(
+                                    id="heatmap",
+                                    figure=go.Figure(
+                                        go.Heatmap(),
+                                        layout=go.Layout(
+                                            autosize=True,
+                                            margin=go.layout.Margin(
+                                                l=20,
+                                                r=20,
+                                                b=20,
+                                                t=20,
+                                                pad=0,
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                                width=6,
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            dbc.CardFooter(
+                [
+                    dbc.Row(
+                        [
+                            dbc.Col(
+                                scatter_control_panel,
+                                width=6,
+                            ),
+                            dbc.Col(
+                                heatmap_control_panel,
+                                width=6,
+                            ),
+                        ]
+                    )
+                ]
+                
+            )
+        ],
+    )
+]
+
+# left panel: choose algorithms, submit job, choose scatter plot attributes, and statistics...
+algo_panel = html.Div(
+    [
+        dbc.Card(
+            id="algo-card",
+            style={"width": "100%"},
+            children=[
+                dbc.Collapse(
+                    children=[
+                        dbc.CardHeader("Select Dimension Reduction Algorithms"),
+                        dbc.CardBody(
+                            [
+                                dbc.Label("Algorithm", className="mr-2"),
+                                dcc.Dropdown(
+                                    id="algo-dropdown",
+                                    options=[
+                                        {"label": entry, "value": entry}
+                                        for entry in ALGORITHM_DATABASE
+                                    ],
+                                    style={"min-width": "250px"},
+                                    value="PCA",
+                                ),
+                                html.Div(id="additional-model-params"),
+                                html.Hr(),
+                                html.Div(
+                                    [
+                                        dbc.Label("Name your job", className="mr-2"),
+                                        dcc.Input(
+                                            id="job-name",
+                                            placeholder="test0",
+                                            style={
+                                                "width": "100%",
+                                                "margin-bottom": "1rem",
+                                            },
+                                        ),
+                                    ]
+                                ),
+                                html.Div(
+                                    [
+                                        dbc.Button(
+                                            "Submit",
+                                            color="secondary",
+                                            id="run-algo",
+                                            outline=True,
+                                            size="lg",
+                                            className="m-1",
+                                            style={"width": "50%"},
+                                        ),
+                                    ],
+                                    className="row",
+                                    style={
+                                        "align-items": "center",
+                                        "justify-content": "center",
+                                    },
+                                ),
+                                html.Hr(),
+                                html.Div(
+                                    [
+                                        dbc.Label("Select a job..."),
+                                        dcc.Dropdown(id="job-selector"),
+                                    ]
+                                ),
+                                html.Div(id="invisible-apply-div"),
+                            ]
+                        ),
+                    ],
+                    id="model-collapse",
+                    is_open=True,
+                    style={"margin-bottom": "0rem"},
+                )
+            ],
+        )
+    ]
+)
+
+cluster_algo_panel = html.Div(
+    [
+        dbc.Card(
+            id="cluster-algo-card",
+            style={"width": "100%"},
+            children=[
+                dbc.Collapse(
+                    children=[
+                        dbc.CardHeader("Select Clustering Algorithms"),
+                        dbc.CardBody(
+                            [
+                                dbc.Label("Algorithm", className="mr-2"),
+                                dcc.Dropdown(
+                                    id="cluster-algo-dropdown",
+                                    options=[
+                                        {"label": entry, "value": entry}
+                                        for entry in CLUSTER_ALGORITHM_DATABASE
+                                    ],
+                                    style={"min-width": "250px"},
+                                    value="DBSCAN",
+                                ),
+                                html.Div(id="additional-cluster-params"),
+                                html.Hr(),
+                                html.Div(
+                                    [
+                                        dbc.Button(
+                                            "Apply",
+                                            color="secondary",
+                                            id="run-cluster-algo",
+                                            outline=True,
+                                            size="lg",
+                                            className="m-1",
+                                            style={"width": "50%"},
+                                        ),
+                                    ],
+                                    className="row",
+                                    style={
+                                        "align-items": "center",
+                                        "justify-content": "center",
+                                    },
+                                ),
+                                html.Div(id="invisible-submit-div"),
+                            ]
+                        ),
+                    ],
+                    id="cluster-model-collapse",
+                    is_open=True,
+                    style={"margin-bottom": "0rem"},
+                )
+            ],
+        )
+    ]
+)
+
+
+
 # add alert pop up window
 modal = html.Div(
     [
@@ -371,8 +394,8 @@ modal = html.Div(
 control_panel = [
     algo_panel,
     cluster_algo_panel,
-    scatter_control_panel,
-    heatmap_control_panel,
+    # scatter_control_panel,
+    # heatmap_control_panel,
     modal,
 ]
 
