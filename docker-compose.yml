@@ -20,7 +20,8 @@ services:
     volumes:
       - $READ_DIR:/app/work/data
       - $WRITE_DIR:/app/work/mlex_store
-      - ./src:/app/work/src
+      # - ./src:/app/work/src
+      - ../mlex_file_manager/file_manager:/app/work/src/file_manager
     ports:
       - "127.0.0.1:8070:8070"
     networks:
