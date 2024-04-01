@@ -246,134 +246,107 @@ image_panel = [
 ]
 
 # left panel: choose algorithms, submit job, choose scatter plot attributes, and statistics...
-algo_panel = html.Div(
+algo_panel = dbc.AccordionItem(
     [
-        dbc.Card(
-            id="algo-card",
-            style={"width": "100%"},
-            children=[
-                dbc.Collapse(
-                    children=[
-                        dbc.CardHeader("Select Dimension Reduction Algorithms"),
-                        dbc.CardBody(
-                            [
-                                dbc.Label("Algorithm", className="mr-2"),
-                                dcc.Dropdown(
-                                    id="algo-dropdown",
-                                    options=[
-                                        {"label": entry, "value": entry}
-                                        for entry in ALGORITHM_DATABASE
-                                    ],
-                                    style={"min-width": "250px"},
-                                    value="PCA",
-                                ),
-                                html.Div(id="additional-model-params"),
-                                html.Hr(),
-                                html.Div(
-                                    [
-                                        dbc.Label("Name your job", className="mr-2"),
-                                        dcc.Input(
-                                            id="job-name",
-                                            placeholder="test0",
-                                            style={
-                                                "width": "100%",
-                                                "margin-bottom": "1rem",
-                                            },
-                                        ),
-                                    ]
-                                ),
-                                html.Div(
-                                    [
-                                        dbc.Button(
-                                            "Submit",
-                                            color="secondary",
-                                            id="run-algo",
-                                            outline=True,
-                                            size="lg",
-                                            className="m-1",
-                                            style={"width": "50%"},
-                                        ),
-                                    ],
-                                    className="row",
-                                    style={
-                                        "align-items": "center",
-                                        "justify-content": "center",
-                                    },
-                                ),
-                                html.Hr(),
-                                html.Div(
-                                    [
-                                        dbc.Label("Select a job..."),
-                                        dcc.Dropdown(id="job-selector"),
-                                    ]
-                                ),
-                                html.Div(id="invisible-apply-div"),
-                            ]
+        dbc.CardBody(
+            [
+                dbc.Label("Algorithm", className="mr-2"),
+                dcc.Dropdown(
+                    id="algo-dropdown",
+                    options=[
+                        {"label": entry, "value": entry}
+                        for entry in ALGORITHM_DATABASE
+                    ],
+                    style={"min-width": "250px"},
+                    value="PCA",
+                ),
+                html.Div(id="additional-model-params"),
+                html.Hr(),
+                html.Div(
+                    [
+                        dbc.Label("Name your job", className="mr-2"),
+                        dcc.Input(
+                            id="job-name",
+                            placeholder="test0",
+                            style={
+                                "width": "100%",
+                                "margin-bottom": "1rem",
+                            },
+                        ),
+                    ]
+                ),
+                html.Div(
+                    [
+                        dbc.Button(
+                            "Submit",
+                            color="secondary",
+                            id="run-algo",
+                            outline=True,
+                            size="lg",
+                            className="m-1",
+                            style={"width": "50%"},
                         ),
                     ],
-                    id="model-collapse",
-                    is_open=True,
-                    style={"margin-bottom": "0rem"},
-                )
-            ],
-        )
-    ]
+                    className="row",
+                    style={
+                        "align-items": "center",
+                        "justify-content": "center",
+                    },
+                ),
+                html.Hr(),
+                html.Div(
+                    [
+                        dbc.Label("Select a job..."),
+                        dcc.Dropdown(id="job-selector"),
+                    ]
+                ),
+                html.Div(id="invisible-apply-div"),
+            ]
+        ),
+    ],
+    title="Select Dimension Reduction Algorithms",
 )
 
-cluster_algo_panel = html.Div(
+cluster_algo_panel = dbc.AccordionItem(
     [
-        dbc.Card(
-            id="cluster-algo-card",
-            style={"width": "100%"},
-            children=[
-                dbc.Collapse(
-                    children=[
-                        dbc.CardHeader("Select Clustering Algorithms"),
-                        dbc.CardBody(
-                            [
-                                dbc.Label("Algorithm", className="mr-2"),
-                                dcc.Dropdown(
-                                    id="cluster-algo-dropdown",
-                                    options=[
-                                        {"label": entry, "value": entry}
-                                        for entry in CLUSTER_ALGORITHM_DATABASE
-                                    ],
-                                    style={"min-width": "250px"},
-                                    value="DBSCAN",
-                                ),
-                                html.Div(id="additional-cluster-params"),
-                                html.Hr(),
-                                html.Div(
-                                    [
-                                        dbc.Button(
-                                            "Apply",
-                                            color="secondary",
-                                            id="run-cluster-algo",
-                                            outline=True,
-                                            size="lg",
-                                            className="m-1",
-                                            style={"width": "50%"},
-                                        ),
-                                    ],
-                                    className="row",
-                                    style={
-                                        "align-items": "center",
-                                        "justify-content": "center",
-                                    },
-                                ),
-                                html.Div(id="invisible-submit-div"),
-                            ]
+        dbc.CardBody(
+            [
+                dbc.Label("Algorithm", className="mr-2"),
+                dcc.Dropdown(
+                    id="cluster-algo-dropdown",
+                    options=[
+                        {"label": entry, "value": entry}
+                        for entry in CLUSTER_ALGORITHM_DATABASE
+                    ],
+                    style={"min-width": "250px"},
+                    value="DBSCAN",
+                ),
+                html.Div(id="additional-cluster-params"),
+                html.Hr(),
+                html.Div(
+                    [
+                        dbc.Button(
+                            "Apply",
+                            color="secondary",
+                            id="run-cluster-algo",
+                            outline=True,
+                            size="lg",
+                            className="m-1",
+                            style={"width": "50%"},
                         ),
                     ],
-                    id="cluster-model-collapse",
-                    is_open=True,
-                    style={"margin-bottom": "0rem"},
-                )
-            ],
-        )
-    ]
+                    className="row",
+                    style={
+                        "align-items": "center",
+                        "justify-content": "center",
+                    },
+                ),
+                html.Div(id="invisible-submit-div"),
+            ]
+        ),
+    ],
+    title="Select Clustering Algorithms",
 )
-
 
 
 # add alert pop up window
@@ -390,14 +363,17 @@ modal = html.Div(
     ]
 )
 
-
-control_panel = [
-    algo_panel,
-    cluster_algo_panel,
-    # scatter_control_panel,
-    # heatmap_control_panel,
-    modal,
-]
+control_panel = dbc.Accordion(
+        [
+            algo_panel, 
+            cluster_algo_panel
+        ],
+        style={
+            'position': 'sticky',
+            'top': '10%',
+            'width': '100%'
+            }
+    )
 
 
 # metadata
@@ -429,8 +405,12 @@ app.layout = html.Div(
         dbc.Container(
             children=[
                 dbc.Row(
-                    [dbc.Col(control_panel, width=4), dbc.Col(image_panel, width=8)]
+                    [
+                        dbc.Col(control_panel, width=4, style={'display': 'flex', 'margin-top': '1em'}), 
+                        dbc.Col(image_panel, width=8)
+                    ]
                 ),
+                dbc.Row(dbc.Col(modal)),
                 dbc.Row(dbc.Col(meta)),
             ],
             fluid=True,

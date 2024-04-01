@@ -32,3 +32,8 @@ label {
     margin: 0;
     border-style: solid;
 }
+
+.accordion-button {
+    font-size: large;
+    font-weight: bold;
+}

@@ -43,7 +43,7 @@ UPLOAD_FOLDER_ROOT = "data/upload"
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
 FLOW_NAME = os.getenv("FLOW_NAME", "")
-FLOW_TYPE = "conda"
+FLOW_TYPE = "podman" #"conda"
 CONDA_ENV_NAME = "dimension_reduction_pca"
 
 CONTENT_API_URL = os.getenv("CONTENT_API_URL", "http://localhost:8000/api/v0/models")
