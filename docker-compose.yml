@@ -18,6 +18,9 @@ services:
       TILED_API_KEY: '${TILED_API_KEY}'
       FLOW_NAME: '${FLOW_NAME}'
       TIMEZONE: "${TIMEZONE}"
+      PARTITIONS: "${PARTITIONS}"
+      RESERVATIONS: "${RESERVATIONS}"
+      MAX_TIME: "${MAX_TIME}"
     volumes:
       - $READ_DIR:/app/work/data
       - $WRITE_DIR:/app/work/mlex_store
