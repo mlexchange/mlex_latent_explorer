@@ -402,7 +402,7 @@ def submit_dimension_reduction_job(
     job_params["params_list"][-1]["params"]["io_parameters"] = io_parameters
     job_params["params_list"][-1]["params"]["io_parameters"][
         "output_dir"
-    ] = "mlex_store"
+    ] = f"{os.getcwd()}/mlex_store"
     job_params["params_list"][-1]["params"]["io_parameters"]["uid_save"] = ""
     job_params["params_list"][-1]["params"]["io_parameters"]["uid_retrieve"] = None
     job_params["params_list"][-1]["params"]["model_parameters"] = input_params
@@ -701,18 +701,18 @@ def update_heatmap(
                 selected_indices, export="pillow"
             )
         # Example dataset
-        elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
+        elif "data/example_shapes/Demoshapes.npz" in selected_example_dataset:
             print("Demoshapes.npz")
-            selected_images = np.load("/app/work/" + selected_example_dataset)["arr_0"][
+            selected_images = np.load(selected_example_dataset)["arr_0"][
                 selected_indices
             ]
             print(selected_images.shape)
         elif (
-            selected_example_dataset
-            == "data/example_latentrepresentation/f_vectors.parquet"
+            "data/example_latentrepresentation/f_vectors.parquet"
+            in selected_example_dataset
         ):
-            print("f_vectors.parque")
-            df = pd.read_parquet("/app/work/" + selected_example_dataset)
+            print("f_vectors.parquet")
+            df = pd.read_parquet(selected_example_dataset)
             selected_images = df.iloc[selected_indices].values
         selected_images = np.array(selected_images)
 

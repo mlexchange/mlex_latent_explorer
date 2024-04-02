@@ -26,10 +26,13 @@ CLUSTER_ALGORITHM_DATABASE = {
 }
 
 DATA_OPTION = [
-    {"label": "Synthetic Shapes", "value": "data/example_shapes/Demoshapes.npz"},
+    {
+        "label": "Synthetic Shapes",
+        "value": f"{os.getcwd()}/data/example_shapes/Demoshapes.npz",
+    },
     {
         "label": "Latent representations from encoder-decoder model",
-        "value": "data/example_latentrepresentation/f_vectors.parquet",
+        "value": f"{os.getcwd()}/data/example_latentrepresentation/f_vectors.parquet",
     },
 ]
 READ_DIR = "data"
@@ -239,8 +242,7 @@ image_panel = [
                         ]
                     )
                 ]
-                
-            )
+            ),
         ],
     )
 ]
@@ -373,7 +375,6 @@ cluster_algo_panel = html.Div(
         )
     ]
 )
-
 
 
 # add alert pop up window
