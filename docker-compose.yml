@@ -15,6 +15,7 @@ services:
       PREFECT_TAGS: "${PREFECT_TAGS}"
       PREFECT_API_URL: '${PREFECT_API_URL}'
       CONTENT_API_URL: '${CONTENT_API_URL}'
+      TILED_API_KEY: '${TILED_API_KEY}'
       FLOW_NAME: '${FLOW_NAME}'
       TIMEZONE: "${TIMEZONE}"
     volumes:
