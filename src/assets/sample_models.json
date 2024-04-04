@@ -1,0 +1,192 @@
+[
+    {
+        "content_id": "uid1",
+        "content_type": "model",
+        "name": "PCA",
+        "public": true,
+        "version": "1.0.0",
+        "type": "unsupervised",
+        "owner": "mlexchange team",
+        "service_type": "frontend",
+        "docker_image_uri": "ghcr.io/runboj/mlex_dimension_reduction_pca:main",
+        "conda_env_name": "mlex_dimension_reduction_pca",
+        "reference": "PCA algorithm",
+        "application": [
+            "dimension reduction"
+        ],
+        "description": "PCA-based dimension reduction",
+        "gui_parameters": [
+            {
+                "type": "dropdown",
+                "name": "ncomp-dropdown-menu",
+                "title": "Number of Components",
+                "value": 2,
+                "options": [
+                    {
+                        "label": "2",
+                        "value": 2
+                    },
+                    {
+                        "label": "3",
+                        "value": 3
+                    }
+                ],
+                "param_key": "n_components",
+                "comp_group": "all"
+            }
+        ],
+        "cmd": [
+            "python pca_run.py"
+        ],
+        "kwargs": {},
+        "compute_resources": {
+            "num_processors": 1,
+            "num_gpus": 0
+        }
+    },
+    {
+        "content_id": "uid2",
+        "content_type": "model",
+        "name": "UMAP",
+        "public": true,
+        "version": "1.0.0",
+        "type": "unsupervised",
+        "owner": "mlexchange team",
+        "service_type": "frontend",
+        "docker_image_uri": "ghcr.io/runboj/mlex_dimension_reduction_umap:main",
+        "conda_env_name": "mlex_dimension_reduction_umap",
+        "reference": "UMAP algorithm",
+        "application": [
+            "dimension reduction"
+        ],
+        "description": "UMAP algotihtm for dimension reduction",
+        "gui_parameters": [
+            {
+                "type": "dropdown",
+                "name": "ncomp-dropdown-menu-2",
+                "title": "Number of Components",
+                "value": 2,
+                "options": [
+                    {
+                        "label": "2",
+                        "value": 2
+                    },
+                    {
+                        "label": "3",
+                        "value": 3
+                    }
+                ],
+                "param_key": "n_components",
+                "comp_group": "all"
+            },
+            {
+                "type": "dropdown",
+                "name": "mindist-dropdown-menu",
+                "title": "Min distance between points",
+                "value": 0.1,
+                "options": [
+                    {
+                        "label": 0.1,
+                        "value": 0.1
+                    },
+                    {
+                        "label": 0.2,
+                        "value": 0.2
+                    },
+                    {
+                        "label": 0.3,
+                        "value": 0.3
+                    },
+                    {
+                        "label": 0.4,
+                        "value": 0.4
+                    },
+                    {
+                        "label": 0.5,
+                        "value": 0.5
+                    },
+                    {
+                        "label": 0.6,
+                        "value": 0.6
+                    },
+                    {
+                        "label": 0.7,
+                        "value": 0.7
+                    },
+                    {
+                        "label": 0.8,
+                        "value": 0.8
+                    },
+                    {
+                        "label": 0.9,
+                        "value": 0.9
+                    },
+                    {
+                        "label": 1.0,
+                        "value": 1.0
+                    }
+                ],
+                "param_key": "min_dist",
+                "comp_group": "all"
+            },
+            {
+                "type": "dropdown",
+                "name": "nneighbor-dropdown-menu",
+                "title": "Number of Nearest Neighbors",
+                "value": 15,
+                "options": [
+                    {
+                        "label": 5,
+                        "value": 5
+                    },
+                    {
+                        "label": 10,
+                        "value": 10
+                    },
+                    {
+                        "label": 15,
+                        "value": 15
+                    },
+                    {
+                        "label": 20,
+                        "value": 20
+                    },
+                    {
+                        "label": 25,
+                        "value": 25
+                    },
+                    {
+                        "label": 30,
+                        "value": 30
+                    },
+                    {
+                        "label": 35,
+                        "value": 35
+                    },
+                    {
+                        "label": 40,
+                        "value": 40
+                    },
+                    {
+                        "label": 45,
+                        "value": 45
+                    },
+                    {
+                        "label": 50,
+                        "value": 50
+                    }
+                ],
+                "param_key": "n_neighbors",
+                "comp_group": "all"
+            }
+        ],
+        "cmd": [
+            "python umap_run.py"
+        ],
+        "kwargs": {},
+        "compute_resources": {
+            "num_processors": 1,
+            "num_gpus": 0
+        }
+    }
+]
