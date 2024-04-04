@@ -1,6 +1,7 @@
 version: "3"
 
 services:
+
   front-end:
     restart: "unless-stopped"
     container_name: "latentxp"
@@ -9,18 +10,27 @@ services:
       dockerfile: "docker/Dockerfile"
     mem_limit: 2g
     environment:
-      DATA_DIR: "${PWD}/data/"
-      # USER: "$USER"
+      READ_DIR: "${READ_DIR}"
+      WRITE_DIR: "${WRITE_DIR}"
+      PREFECT_TAGS: "${PREFECT_TAGS}"
+      PREFECT_API_URL: '${PREFECT_API_URL}'
+      CONTENT_API_URL: '${CONTENT_API_URL}'
+      TILED_API_KEY: '${TILED_API_KEY}'
+      FLOW_NAME: '${FLOW_NAME}'
+      TIMEZONE: "${TIMEZONE}"
+      PARTITIONS: "${PARTITIONS}"
+      RESERVATIONS: "${RESERVATIONS}"
+      MAX_TIME: "${MAX_TIME}"
     volumes:
-      - ./data:/app/work/data
-      - ./src:/app/work/src
+      - $READ_DIR:/app/work/data
+      - $WRITE_DIR:/app/work/mlex_store
+      # - ./src:/app/work/src
+      - ../mlex_file_manager/file_manager:/app/work/src/file_manager
     ports:
-      - "8070:8070"
+      - "127.0.0.1:8070:8070"
     networks:
-      - computing_api_default  
+      mlex_mle_net:
 
 networks:
-  computing_api_default:
+  mlex_mle_net:
     external: true
-
-# env file: set up pwd
