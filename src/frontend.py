@@ -44,11 +44,13 @@ PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]')
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
 FLOW_NAME = os.getenv("FLOW_NAME", "")
 FLOW_TYPE = "conda"
-CONDA_ENV_NAME = "dimension_reduction_pca"
 
 CONTENT_API_URL = os.getenv("CONTENT_API_URL", "http://localhost:8000/api/v0/models")
 DEFAULT_ALGORITHM_DESCRIPTION = os.getenv("DEFAULT_ALGORITHM_DESCRIPTION")
 
+PARTITIONS = os.getenv("PARTITIONS", None)
+RESERVATIONS = os.getenv("RESERVATIONS", None)
+MAX_TIME = os.getenv("MAX_TIME", "1:00:00")
 
 if FLOW_TYPE == "podman":
     TRAIN_PARAMS_EXAMPLE = {
@@ -69,29 +71,12 @@ if FLOW_TYPE == "podman":
         ],
     }
 
-    INFERENCE_PARAMS_EXAMPLE = {
-        "flow_type": "podman",
-        "params_list": [
-            {
-                "image_name": "ghcr.io/runboj/mlex_dimension_reduction_pca",
-                "image_tag": "main",
-                "command": 'python -c \\"import time; time.sleep(30)\\"',
-                "params": {
-                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
-                },
-                "volumes": [
-                    f"{READ_DIR}:/app/work/data",
-                    f"{WRITE_DIR}:/app/work/mlex_store",
-                ],
-            },
-        ],
-    }
-else:
+elif FLOW_TYPE == "conda":
     TRAIN_PARAMS_EXAMPLE = {
         "flow_type": "conda",
         "params_list": [
             {
-                "conda_env_name": f"{CONDA_ENV_NAME}",
+                "conda_env_name": "mlex_dimension_reduction_pca",
                 "params": {
                     "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
                 },
@@ -99,15 +84,21 @@ else:
         ],
     }
 
-    INFERENCE_PARAMS_EXAMPLE = {
-        "flow_type": "conda",
+else:
+    TRAIN_PARAMS_EXAMPLE = {
+        "flow_type": "slurm",
         "params_list": [
             {
-                "conda_env_name": f"{CONDA_ENV_NAME}",
+                "job_name": "latent_space_explorer",
+                "num_nodes": 1,
+                "partitions": PARTITIONS,
+                "reservations": RESERVATIONS,
+                "max_time": MAX_TIME,
+                "conda_env_name": "mlex_dimension_reduction_pca",
                 "params": {
                     "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
                 },
-            },
+            }
         ],
     }
 
@@ -130,8 +121,8 @@ def show_dimension_reduction_gui_layouts(selected_algo):
         data = requests.get(CONTENT_API_URL).json()  # all model
     except Exception as e:
         print(f"Cannot access content api: {e}", flush=True)
-        with open(DEFAULT_ALGORITHM_DESCRIPTION, "r") as f:
-            data = [json.load(f)]
+        with open("src/assets/sample_models.json", "r") as f:
+            data = json.load(f)
 
     if selected_algo == "PCA":
         conditions = {"name": "PCA"}
@@ -345,32 +336,41 @@ def submit_dimension_reduction_job(
     if data_clinic_file_path is not None:
         auto_io_params = io_parameters.copy()
         auto_io_params["model_dir"] = data_clinic_file_path + "/last.ckpt"
+        auto_params = (
+            {
+                "io_parameters": auto_io_params,
+                "target_width": 64,
+                "target_height": 64,
+                "batch_size": 32,
+            },
+        )
+        # TODO: Use content registry to retrieve the model parameters
         if FLOW_TYPE == "podman":
             autoencoder_params = {
                 "image_name": "ghcr.io/mlexchange/mlex_pytorch_autoencoders:main",
                 "image_tag": "main",
                 "command": "python src/predict_model.py",
-                "params": {
-                    "io_parameters": auto_io_params,
-                    "target_width": 64,
-                    "target_height": 64,
-                    "batch_size": 32,
-                },
+                "params": auto_params,
                 "volumes": [
                     f"{READ_DIR}:/app/work/data",
                     f"{WRITE_DIR}:/app/work/mlex_store",
                 ],
             }
-        else:
+        elif FLOW_TYPE == "conda":
             autoencoder_params = {
                 "conda_env_name": "pytorch_autoencoders",
-                "params": {
-                    "io_parameters": auto_io_params,
-                    "target_width": 64,
-                    "target_height": 64,
-                    "batch_size": 32,
-                },
+                "params": auto_params,
                 "python_file_name": "mlex_pytorch_autoencoders/src/predict_model.py",
+            }
+        else:
+            autoencoder_params = {
+                "job_name": "latent_space_explorer",
+                "num_nodes": 1,
+                "partitions": PARTITIONS,
+                "reservations": RESERVATIONS,
+                "max_time": MAX_TIME,
+                "conda_env_name": "pytorch_autoencoders",
+                "params": auto_params,
             }
         job_params["params_list"].insert(0, autoencoder_params)
 
@@ -402,7 +402,7 @@ def submit_dimension_reduction_job(
     job_params["params_list"][-1]["params"]["io_parameters"] = io_parameters
     job_params["params_list"][-1]["params"]["io_parameters"][
         "output_dir"
-    ] = "mlex_store"
+    ] = f"{os.getcwd()}/mlex_store"
     job_params["params_list"][-1]["params"]["io_parameters"]["uid_save"] = ""
     job_params["params_list"][-1]["params"]["io_parameters"]["uid_retrieve"] = None
     job_params["params_list"][-1]["params"]["model_parameters"] = input_params
@@ -701,18 +701,18 @@ def update_heatmap(
                 selected_indices, export="pillow"
             )
         # Example dataset
-        elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
+        elif "data/example_shapes/Demoshapes.npz" in selected_example_dataset:
             print("Demoshapes.npz")
-            selected_images = np.load("/app/work/" + selected_example_dataset)["arr_0"][
+            selected_images = np.load(selected_example_dataset)["arr_0"][
                 selected_indices
             ]
             print(selected_images.shape)
         elif (
-            selected_example_dataset
-            == "data/example_latentrepresentation/f_vectors.parquet"
+            "data/example_latentrepresentation/f_vectors.parquet"
+            in selected_example_dataset
         ):
-            print("f_vectors.parque")
-            df = pd.read_parquet("/app/work/" + selected_example_dataset)
+            print("f_vectors.parquet")
+            df = pd.read_parquet(selected_example_dataset)
             selected_images = df.iloc[selected_indices].values
         selected_images = np.array(selected_images)
 
