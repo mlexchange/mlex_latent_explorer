@@ -26,7 +26,9 @@ CLUSTER_ALGORITHM_DATABASE = {
 
 READ_DIR = os.getenv("READ_DIR")
 WRITE_DIR = os.getenv("WRITE_DIR")
-TILED_API_KEY = os.getenv("TILED_API_KEY", None)
+API_KEY = os.getenv("API_KEY", None)
+if API_KEY == "":
+    API_KEY = None
 
 if os.path.exists(f"{os.getcwd()}/src/example_dataset"):
     EXAMPLE_DATASETS = [
@@ -51,7 +53,7 @@ app = Dash(
 
 server = app.server
 
-dash_file_explorer = FileManager(READ_DIR, open_explorer=False, api_key=TILED_API_KEY)
+dash_file_explorer = FileManager(READ_DIR, open_explorer=False, api_key=API_KEY)
 dash_file_explorer.init_callbacks(app)
 
 # BEGIN DASH CODE
