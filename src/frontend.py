@@ -36,6 +36,8 @@ load_dotenv(".env")
 READ_DIR = os.getenv("READ_DIR", "data")
 WRITE_DIR = os.getenv("WRITE_DIR", "mlex_store")
 MODEL_DIR = f"{WRITE_DIR}/models"
+READ_DIR_MOUNT = os.getenv("READ_DIR_MOUNT", None)
+WRITE_DIR_MOUNT = os.getenv("WRITE_DIR_MOUNT", None)
 
 # Prefect
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
@@ -66,8 +68,8 @@ if FLOW_TYPE == "podman":
                     "io_parameters": {"uid_save": "uid0001", "uid_retrieve": ""}
                 },
                 "volumes": [
-                    f"{READ_DIR}:/app/work/data",
-                    f"{WRITE_DIR}:/app/work/mlex_store",
+                    f"{READ_DIR_MOUNT}:/app/work/data",
+                    f"{WRITE_DIR_MOUNT}:/app/work/mlex_store",
                 ],
             }
         ],
@@ -358,8 +360,8 @@ def submit_dimension_reduction_job(
                 "command": "python src/predict_model.py",
                 "params": auto_params,
                 "volumes": [
-                    f"{READ_DIR}:/app/work/data",
-                    f"{WRITE_DIR}:/app/work/mlex_store",
+                    f"{READ_DIR_MOUNT}:/app/work/data",
+                    f"{WRITE_DIR_MOUNT}:/app/work/mlex_store",
                 ],
             }
         elif FLOW_TYPE == "conda":
