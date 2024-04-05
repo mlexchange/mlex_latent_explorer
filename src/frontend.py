@@ -63,7 +63,7 @@ if FLOW_TYPE == "podman":
                 "image_tag": "main",
                 "command": 'python -c \\"import time; time.sleep(30)\\"',
                 "params": {
-                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": ""}
                 },
                 "volumes": [
                     f"{READ_DIR}:/app/work/data",
@@ -80,7 +80,7 @@ elif FLOW_TYPE == "conda":
             {
                 "conda_env_name": "mlex_dimension_reduction_pca",
                 "params": {
-                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": ""}
                 },
             }
         ],
@@ -98,7 +98,7 @@ else:
                 "max_time": MAX_TIME_CPU,
                 "conda_env_name": "mlex_dimension_reduction_pca",
                 "params": {
-                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": ""}
                 },
             }
         ],
@@ -421,7 +421,7 @@ def submit_dimension_reduction_job(
         WRITE_DIR + "/feature_vectors"
     )
     job_params["params_list"][-1]["params"]["io_parameters"]["uid_save"] = ""
-    job_params["params_list"][-1]["params"]["io_parameters"]["uid_retrieve"] = None
+    job_params["params_list"][-1]["params"]["io_parameters"]["uid_retrieve"] = ""
     job_params["params_list"][-1]["params"]["model_parameters"] = input_params
 
     # run prefect job, job_uid is the new experiment id -> uid_save in the pca_example.yaml file
@@ -451,7 +451,7 @@ def submit_dimension_reduction_job(
 @app.callback(
     Output("latent_vectors", "data"),
     Input("interval-component", "n_intervals"),
-    Input("job-selector", "value"),
+    State("job-selector", "value"),
     State("latent_vectors", "data"),
     prevent_initial_call=True,
 )
@@ -467,21 +467,34 @@ def read_latent_vectors(n_intervals, experiment_id, current_latent_vectors):
     Returns:
         latent_vectors:         data from dimension reduction algos
     """
-    children_flows = get_children_flow_run_ids(experiment_id)
-    latent_vectors = None
-    if len(children_flows) > 0:
-        # read the latent vectors from the output dir
-        output_path = (
-            f"{WRITE_DIR}/feature_vectors/{children_flows[-1]}/latent_vectors.npy"
-        )
-        if os.path.exists(output_path):
-            latent_vectors = np.load(output_path)
-            if not np.array_equal(latent_vectors, current_latent_vectors):
-                print("latent vector", latent_vectors.shape)
+    if current_latent_vectors is None:
+        children_flows = get_children_flow_run_ids(experiment_id)
+        if len(children_flows) > 0:
+            # read the latent vectors from the output dir
+            output_path = (
+                f"{WRITE_DIR}/feature_vectors/{children_flows[-1]}/latent_vectors.npy"
+            )
+            if os.path.exists(output_path):
+                latent_vectors = np.load(output_path)
+                print("latent_vectors", latent_vectors.shape, flush=True)
                 return latent_vectors
-    if latent_vectors is None and current_latent_vectors is not None:
-        return latent_vectors
     raise PreventUpdate
+
+
+@app.callback(
+    Output("latent_vectors", "data", allow_duplicate=True),
+    Input("job-selector", "value"),
+    prevent_initial_call=True,
+)
+def set_latent_vectors_to_none(experiment_id):  # noqa: E302
+    """
+    This callback is trigged by the selection of a job in the job selector
+    Args:
+        experiment-id:          each run/submit has a unique experiment id
+    Returns:
+        latent_vectors:         data from dimension reduction algos
+    """
+    return None
 
 
 @app.callback(
