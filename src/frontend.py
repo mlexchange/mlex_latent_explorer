@@ -52,6 +52,8 @@ MAX_TIME_CPU = os.getenv("MAX_TIME_CPU", "1:00:00")
 PARTITIONS_GPU = os.getenv("PARTITIONS_CPU", [])
 RESERVATIONS_GPU = os.getenv("RESERVATIONS_CPU", [])
 MAX_TIME_GPU = os.getenv("MAX_TIME_CPU", "1:00:00")
+SUBMISSION_SSH_KEY = os.getenv("SUBMISSION_SSH_KEY", "")
+FORWARD_PORTS = os.getenv("FORWARD_PORTS", "")
 
 # Mlex content api
 CONTENT_API_URL = os.getenv("CONTENT_API_URL", "http://localhost:8000/api/v0/models")
@@ -99,6 +101,8 @@ else:
                 "reservations": RESERVATIONS_CPU,
                 "max_time": MAX_TIME_CPU,
                 "conda_env_name": "mlex_dimension_reduction_pca",
+                "submission_ssh_key": SUBMISSION_SSH_KEY,
+                "forward_ports": FORWARD_PORTS,
                 "params": {
                     "io_parameters": {"uid_save": "uid0001", "uid_retrieve": ""}
                 },
@@ -370,7 +374,7 @@ def submit_dimension_reduction_job(
                 "params": auto_params,
                 "python_file_name": "mlex_pytorch_autoencoders/src/predict_model.py",
             }
-        else:
+        else:  # slurm
             autoencoder_params = {
                 "job_name": "latent_space_explorer",
                 "num_nodes": 1,
@@ -378,6 +382,8 @@ def submit_dimension_reduction_job(
                 "reservations": RESERVATIONS_GPU,
                 "max_time": MAX_TIME_GPU,
                 "conda_env_name": "pytorch_autoencoders",
+                "submission_ssh_key": SUBMISSION_SSH_KEY,
+                "forward_ports": FORWARD_PORTS,
                 "params": auto_params,
             }
         job_params["params_list"].insert(0, autoencoder_params)
