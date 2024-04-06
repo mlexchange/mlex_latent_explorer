@@ -469,7 +469,9 @@ def read_latent_vectors(n_intervals, experiment_id, current_latent_vectors):
     Returns:
         latent_vectors:         data from dimension reduction algos
     """
-    if current_latent_vectors is None:
+    if current_latent_vectors is None and experiment_id is not None:
+        # TODO: check get_children_flow_run_ids is a query where experiment_id is optional
+        # if experiment_id is None, it will return a query with no filter
         children_flows = get_children_flow_run_ids(experiment_id)
         if len(children_flows) > 0:
             # read the latent vectors from the output dir
