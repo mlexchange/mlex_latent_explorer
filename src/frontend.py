@@ -46,14 +46,14 @@ FLOW_NAME = os.getenv("FLOW_NAME", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "podman")
 
 # Slurm
-PARTITIONS_CPU = os.getenv("PARTITIONS_CPU", [])
-RESERVATIONS_CPU = os.getenv("RESERVATIONS_CPU", [])
+PARTITIONS_CPU = json.loads(os.getenv("PARTITIONS_CPU", []))
+RESERVATIONS_CPU = json.loads(os.getenv("RESERVATIONS_CPU", []))
 MAX_TIME_CPU = os.getenv("MAX_TIME_CPU", "1:00:00")
-PARTITIONS_GPU = os.getenv("PARTITIONS_CPU", [])
-RESERVATIONS_GPU = os.getenv("RESERVATIONS_CPU", [])
+PARTITIONS_GPU = json.loads(os.getenv("PARTITIONS_CPU", []))
+RESERVATIONS_GPU = json.loads(os.getenv("RESERVATIONS_CPU", []))
 MAX_TIME_GPU = os.getenv("MAX_TIME_CPU", "1:00:00")
 SUBMISSION_SSH_KEY = os.getenv("SUBMISSION_SSH_KEY", "")
-FORWARD_PORTS = os.getenv("FORWARD_PORTS", "")
+FORWARD_PORTS = json.loads(os.getenv("FORWARD_PORTS", []))
 
 # Mlex content api
 CONTENT_API_URL = os.getenv("CONTENT_API_URL", "http://localhost:8000/api/v0/models")
