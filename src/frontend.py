@@ -370,7 +370,7 @@ def submit_dimension_reduction_job(
             }
         elif FLOW_TYPE == "conda":
             autoencoder_params = {
-                "conda_env_name": "pytorch_autoencoders",
+                "conda_env_name": "mlex_pytorch_autoencoders",
                 "params": auto_params,
                 "python_file_name": "mlex_pytorch_autoencoders/src/predict_model.py",
             }
@@ -381,7 +381,7 @@ def submit_dimension_reduction_job(
                 "partitions": PARTITIONS_GPU,
                 "reservations": RESERVATIONS_GPU,
                 "max_time": MAX_TIME_GPU,
-                "conda_env_name": "pytorch_autoencoders",
+                "conda_env_name": "mlex_pytorch_autoencoders",
                 "python_file_name": "mlex_pytorch_autoencoders/src/predict_model.py",
                 "submission_ssh_key": SUBMISSION_SSH_KEY,
                 "forward_ports": FORWARD_PORTS,
