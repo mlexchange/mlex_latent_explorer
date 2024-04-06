@@ -5,18 +5,17 @@ import uuid
 from datetime import datetime
 
 import numpy as np
-import pandas as pd
 import plotly.graph_objects as go
 import pytz
 import requests
 from dash import Input, Output, State, html
 from dash.exceptions import PreventUpdate
+from dash_component_editor import JSONParameterEditor
 from dotenv import load_dotenv
 from file_manager.data_project import DataProject
 from sklearn.cluster import DBSCAN, HDBSCAN, MiniBatchKMeans
 
 from app_layout import app
-from dash_component_editor import JSONParameterEditor
 from latentxp_utils import (
     dbscan_kwargs,
     generate_scatter_data,
@@ -33,24 +32,29 @@ from utils_prefect import (
 
 load_dotenv(".env")
 
-# GLOBAL PARAMS
+# Define directories
 READ_DIR = os.getenv("READ_DIR", "data")
 WRITE_DIR = os.getenv("WRITE_DIR", "mlex_store")
+MODEL_DIR = f"{WRITE_DIR}/models"
+READ_DIR_MOUNT = os.getenv("READ_DIR_MOUNT", None)
+WRITE_DIR_MOUNT = os.getenv("WRITE_DIR_MOUNT", None)
 
-MODEL_DIR = "data/models"
-UPLOAD_FOLDER_ROOT = "data/upload"
-
+# Prefect
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
 FLOW_NAME = os.getenv("FLOW_NAME", "")
-FLOW_TYPE = "conda"
+FLOW_TYPE = os.getenv("FLOW_TYPE", "podman")
 
+# Slurm
+PARTITIONS_CPU = os.getenv("PARTITIONS_CPU", [])
+RESERVATIONS_CPU = os.getenv("RESERVATIONS_CPU", [])
+MAX_TIME_CPU = os.getenv("MAX_TIME_CPU", "1:00:00")
+PARTITIONS_GPU = os.getenv("PARTITIONS_CPU", [])
+RESERVATIONS_GPU = os.getenv("RESERVATIONS_CPU", [])
+MAX_TIME_GPU = os.getenv("MAX_TIME_CPU", "1:00:00")
+
+# Mlex content api
 CONTENT_API_URL = os.getenv("CONTENT_API_URL", "http://localhost:8000/api/v0/models")
-DEFAULT_ALGORITHM_DESCRIPTION = os.getenv("DEFAULT_ALGORITHM_DESCRIPTION")
-
-PARTITIONS = os.getenv("PARTITIONS", None)
-RESERVATIONS = os.getenv("RESERVATIONS", None)
-MAX_TIME = os.getenv("MAX_TIME", "1:00:00")
 
 if FLOW_TYPE == "podman":
     TRAIN_PARAMS_EXAMPLE = {
@@ -61,11 +65,11 @@ if FLOW_TYPE == "podman":
                 "image_tag": "main",
                 "command": 'python -c \\"import time; time.sleep(30)\\"',
                 "params": {
-                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": ""}
                 },
                 "volumes": [
-                    f"{READ_DIR}:/app/work/data",
-                    f"{WRITE_DIR}:/app/work/mlex_store",
+                    f"{READ_DIR_MOUNT}:/app/work/data",
+                    f"{WRITE_DIR_MOUNT}:/app/work/mlex_store",
                 ],
             }
         ],
@@ -78,7 +82,7 @@ elif FLOW_TYPE == "conda":
             {
                 "conda_env_name": "mlex_dimension_reduction_pca",
                 "params": {
-                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": ""}
                 },
             }
         ],
@@ -91,12 +95,12 @@ else:
             {
                 "job_name": "latent_space_explorer",
                 "num_nodes": 1,
-                "partitions": PARTITIONS,
-                "reservations": RESERVATIONS,
-                "max_time": MAX_TIME,
+                "partitions": PARTITIONS_CPU,
+                "reservations": RESERVATIONS_CPU,
+                "max_time": MAX_TIME_CPU,
                 "conda_env_name": "mlex_dimension_reduction_pca",
                 "params": {
-                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": None}
+                    "io_parameters": {"uid_save": "uid0001", "uid_retrieve": ""}
                 },
             }
         ],
@@ -217,17 +221,10 @@ def update_data_n_label_schema(selected_example_dataset, data_project_dict):
     if len(data_project.datasets) > 0:
         labels = np.full((len(data_project.datasets),), -1)
     # Example dataset option 1
-    elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
-        labels = np.load("/app/work/data/example_shapes/DemoLabels.npy")
-        f = open("/app/work/data/example_shapes/label_schema.json")
+    elif selected_example_dataset == f"{WRITE_DIR}/example_dataset/Demoshapes.npz":
+        labels = np.load(f"{WRITE_DIR}/example_dataset/DemoLabels.npy")
+        f = open(f"{WRITE_DIR}/example_dataset/label_schema.json")
         label_schema = json.load(f)
-    # Example dataset option 2
-    elif (
-        selected_example_dataset
-        == "data/example_latentrepresentation/f_vectors.parquet"
-    ):
-        df = pd.read_parquet("/app/work/" + selected_example_dataset)
-        labels = np.full((df.shape[0],), -1)
 
     if label_schema:
         options = [
@@ -249,6 +246,10 @@ def update_data_n_label_schema(selected_example_dataset, data_project_dict):
         Output("heatmap", "figure", allow_duplicate=True),
         # reset interval value to
         Output("interval-component", "max_intervals"),
+        # alert
+        Output("job-alert", "children"),
+        Output("job-alert", "color"),
+        Output("job-alert", "is_open"),
     ],
     Input("run-algo", "n_clicks"),
     [
@@ -276,7 +277,7 @@ def submit_dimension_reduction_job(
 ):
     """
     This callback is triggered every time the Submit button is hit:
-        - compute latent vectors, which will be saved in data/output/experiment_id
+        - compute latent vectors, which will be saved in {WRITE_DIR}/job_uid
         - reset scatter plot control panel to default
         - reset heatmap to no image
     Args:
@@ -292,6 +293,9 @@ def submit_dimension_reduction_job(
         cluster-dropdown:       default cluster-dropdown value
         heatmap:                empty heatmap figure
         interval:               set interval component to trigger to find the latent_vectors.npy file (-1)
+        job-alert:              alert message
+        job-selector-color:     color of the job selector
+        job-selector-is_open:   open the job selector
     """
     if not submit_n_clicks:
         raise PreventUpdate
@@ -321,6 +325,7 @@ def submit_dimension_reduction_job(
             "data_tiled_api_key": data_project.api_key,
             "data_type": data_project.data_type,
             "root_uri": data_project.root_uri,
+            "output_dir": f"{WRITE_DIR}/feature_vectors",
         }
 
     else:
@@ -330,20 +335,23 @@ def submit_dimension_reduction_job(
             "data_tiled_api_key": None,
             "data_type": "file",
             "root_uri": None,
+            "output_dir": f"{WRITE_DIR}/feature_vectors",
         }
 
     # Autoencoder
     if data_clinic_file_path is not None:
         auto_io_params = io_parameters.copy()
         auto_io_params["model_dir"] = data_clinic_file_path + "/last.ckpt"
-        auto_params = (
-            {
-                "io_parameters": auto_io_params,
-                "target_width": 64,
-                "target_height": 64,
-                "batch_size": 32,
-            },
-        )
+        with open(f"{data_clinic_file_path}/arguments.json", "r") as f:
+            model_params = json.load(f)
+        auto_params = {
+            "io_parameters": auto_io_params,
+            "target_width": model_params["target_size"],
+            "target_height": model_params["target_size"],
+            "batch_size": 32,
+            "output_dir": WRITE_DIR + "/feature_vectors",
+            "log": model_params["log"],
+        }
         # TODO: Use content registry to retrieve the model parameters
         if FLOW_TYPE == "podman":
             autoencoder_params = {
@@ -352,8 +360,8 @@ def submit_dimension_reduction_job(
                 "command": "python src/predict_model.py",
                 "params": auto_params,
                 "volumes": [
-                    f"{READ_DIR}:/app/work/data",
-                    f"{WRITE_DIR}:/app/work/mlex_store",
+                    f"{READ_DIR_MOUNT}:/app/work/data",
+                    f"{WRITE_DIR_MOUNT}:/app/work/mlex_store",
                 ],
             }
         elif FLOW_TYPE == "conda":
@@ -366,9 +374,9 @@ def submit_dimension_reduction_job(
             autoencoder_params = {
                 "job_name": "latent_space_explorer",
                 "num_nodes": 1,
-                "partitions": PARTITIONS,
-                "reservations": RESERVATIONS,
-                "max_time": MAX_TIME,
+                "partitions": PARTITIONS_GPU,
+                "reservations": RESERVATIONS_GPU,
+                "max_time": MAX_TIME_GPU,
                 "conda_env_name": "pytorch_autoencoders",
                 "params": auto_params,
             }
@@ -378,46 +386,59 @@ def submit_dimension_reduction_job(
     current_time = datetime.now(pytz.timezone(TIMEZONE)).strftime("%Y/%m/%d %H:%M:%S")
     if not job_name:
         job_name = "test0"
-    job_name += " " + str(current_time)
     # TODO: Hash root_uri + data_uris
     project_name = "fake_name"
-    print(PREFECT_TAGS, flush=True)
 
     # check which dimension reduction algo, then compose command
+    # Get parameters from content registry
     if selected_algo == "PCA":
         if FLOW_TYPE == "podman":
+            job_params["params_list"][-1][
+                "image_name"
+            ] = "ghcr.io/runboj/mlex_dimension_reduction_pca"
             job_params["params_list"][-1]["command"] = "python pca_run.py"
         else:
+            job_params["params_list"][-1][
+                "conda_env_name"
+            ] = "mlex_dimension_reduction_pca"
             job_params["params_list"][-1][
                 "python_file_name"
             ] = "mlex_dimension_reduction_pca/pca_run.py"
     elif selected_algo == "UMAP":
         if FLOW_TYPE == "podman":
+            job_params["params_list"][-1][
+                "image_name"
+            ] = "ghcr.io/runboj/mlex_dimension_reduction_umap"
             job_params["params_list"][-1]["command"] = "python umap_run.py"
         else:
+            job_params["params_list"][-1][
+                "conda_env_name"
+            ] = "mlex_dimension_reduction_umap"
             job_params["params_list"][-1][
                 "python_file_name"
             ] = "mlex_dimension_reduction_umap/umap_run.py"
 
     job_params["params_list"][-1]["params"]["io_parameters"] = io_parameters
-    job_params["params_list"][-1]["params"]["io_parameters"][
-        "output_dir"
-    ] = f"{os.getcwd()}/mlex_store"
+    job_params["params_list"][-1]["params"]["io_parameters"]["output_dir"] = (
+        WRITE_DIR + "/feature_vectors"
+    )
     job_params["params_list"][-1]["params"]["io_parameters"]["uid_save"] = ""
-    job_params["params_list"][-1]["params"]["io_parameters"]["uid_retrieve"] = None
+    job_params["params_list"][-1]["params"]["io_parameters"]["uid_retrieve"] = ""
     job_params["params_list"][-1]["params"]["model_parameters"] = input_params
-    print(job_params)
-    print(TRAIN_PARAMS_EXAMPLE, flush=True)
 
     # run prefect job, job_uid is the new experiment id -> uid_save in the pca_example.yaml file
-    job_uid = schedule_prefect_flow(
-        FLOW_NAME,
-        parameters=job_params,
-        flow_run_name=f"{job_name} {current_time}",
-        tags=PREFECT_TAGS + ["train", project_name],
-    )
-    job_message = f"Job has been succesfully submitted with uid: {job_uid}."
-    print(job_message, flush=True)
+    try:
+        job_uid = schedule_prefect_flow(
+            FLOW_NAME,
+            parameters=job_params,
+            flow_run_name=f"{job_name} {current_time}",
+            tags=PREFECT_TAGS + ["train", project_name],
+        )
+        job_message = f"Job has been succesfully submitted with uid: {job_uid}."
+        alert_color = "success"
+    except Exception as e:
+        job_message = f"Job submission failed with error: {e}."
+        alert_color = "danger"
 
     fig = go.Figure(
         go.Heatmap(),
@@ -426,45 +447,58 @@ def submit_dimension_reduction_job(
             margin=go.layout.Margin(l=20, r=20, b=20, t=20, pad=0),
         ),
     )
-    return "cluster", -1, -2, fig, -1
+    return "cluster", -1, -2, fig, -1, job_message, alert_color, True
 
 
 @app.callback(
-    [
-        Output("latent_vectors", "data"),
-        Output("interval-component", "max_intervals", allow_duplicate=True),
-    ],
+    Output("latent_vectors", "data"),
     Input("interval-component", "n_intervals"),
     State("job-selector", "value"),
-    State("interval-component", "max_intervals"),
+    State("latent_vectors", "data"),
     prevent_initial_call=True,
 )
-def read_latent_vectors(n_intervals, experiment_id, max_intervals):
+def read_latent_vectors(n_intervals, experiment_id, current_latent_vectors):
     """
     This callback is trigged by the interval:
         - read latent vectors
-        - set interval to not trigger (0)
+        - if latent vectors have not changed, prevent update
     Args:
         n_intervals:            interval component
         experiment-id:          each run/submit has a unique experiment id
+        current_latent_vectors: current latent vectors
     Returns:
         latent_vectors:         data from dimension reduction algos
-        scatter_fig:            scatter plot the latent vectors (no cluster info yet)
-        max_intervals:          interval component that controls if trigger the interval indefintely
     """
-    if experiment_id is None or n_intervals == 0 or max_intervals == 0:
-        raise PreventUpdate
+    if current_latent_vectors is None and experiment_id is not None:
+        # TODO: check get_children_flow_run_ids is a query where experiment_id is optional
+        # if experiment_id is None, it will return a query with no filter
+        children_flows = get_children_flow_run_ids(experiment_id)
+        if len(children_flows) > 0:
+            # read the latent vectors from the output dir
+            output_path = (
+                f"{WRITE_DIR}/feature_vectors/{children_flows[-1]}/latent_vectors.npy"
+            )
+            if os.path.exists(output_path):
+                latent_vectors = np.load(output_path)
+                print("latent_vectors", latent_vectors.shape, flush=True)
+                return latent_vectors
+    raise PreventUpdate
 
-    children_flows = get_children_flow_run_ids(experiment_id)
-    if len(children_flows) > 0:
-        # read the latent vectors from the output dir
-        output_path = f"mlex_store/{children_flows[-1]}/latent_vectors.npy"
-        print(output_path, flush=True)
-        if os.path.exists(output_path):
-            latent_vectors = np.load(output_path)
-            print("latent vector", latent_vectors.shape)
-            return latent_vectors, 0
-    return None, -1
+
+@app.callback(
+    Output("latent_vectors", "data", allow_duplicate=True),
+    Input("job-selector", "value"),
+    prevent_initial_call=True,
+)
+def set_latent_vectors_to_none(experiment_id):  # noqa: E302
+    """
+    This callback is trigged by the selection of a job in the job selector
+    Args:
+        experiment-id:          each run/submit has a unique experiment id
+    Returns:
+        latent_vectors:         data from dimension reduction algos
+    """
+    return None
 
 
 @app.callback(
@@ -521,7 +555,7 @@ def apply_clustering(
         children_flows = get_children_flow_run_ids(experiment_id)
         if len(children_flows) > 0:
             clusters = obj.fit_predict(latent_vectors)
-            output_path = f"mlex_store/{children_flows[0]}"
+            output_path = f"{WRITE_DIR}/feature_vectors/{children_flows[-1]}"
             np.save(f"{output_path}/clusters.npy", clusters)
             unique_clusters = np.unique(clusters)
             options = [
@@ -582,6 +616,20 @@ def update_scatter_plot(
         fig:                updated scatter figure
     """
     if latent_vectors is None or children is None:
+        if "x" in current_figure["data"][0].keys():
+            return go.Figure(
+                go.Scattergl(mode="markers"),
+                layout=go.Layout(
+                    autosize=True,
+                    margin=go.layout.Margin(
+                        l=20,
+                        r=20,
+                        b=20,
+                        t=20,
+                        pad=0,
+                    ),
+                ),
+            )
         raise PreventUpdate
     latent_vectors = np.array(latent_vectors)
     print("latent vector shape:", latent_vectors.shape, flush=True)
@@ -619,6 +667,7 @@ def update_scatter_plot(
 
     fig = go.Figure(scatter_data)
     fig.update_layout(
+        dragmode="lasso",
         margin=go.layout.Margin(l=20, r=20, b=20, t=20, pad=0),
         legend=dict(tracegroupgap=20),
     )
@@ -694,6 +743,7 @@ def update_heatmap(
         # print("upload_file_paths") # if not selected, its an empty list not None
         selected_images = []
 
+        # TODO: Replace prints with logging
         data_project = DataProject.from_dict(data_project_dict)
         if len(data_project.datasets) > 0:
             print("FM file")
@@ -701,19 +751,12 @@ def update_heatmap(
                 selected_indices, export="pillow"
             )
         # Example dataset
-        elif "data/example_shapes/Demoshapes.npz" in selected_example_dataset:
+        elif f"{WRITE_DIR}/example_dataset/Demoshapes.npz" in selected_example_dataset:
             print("Demoshapes.npz")
             selected_images = np.load(selected_example_dataset)["arr_0"][
                 selected_indices
             ]
             print(selected_images.shape)
-        elif (
-            "data/example_latentrepresentation/f_vectors.parquet"
-            in selected_example_dataset
-        ):
-            print("f_vectors.parquet")
-            df = pd.read_parquet(selected_example_dataset)
-            selected_images = df.iloc[selected_indices].values
         selected_images = np.array(selected_images)
 
         print("selected_images shape:", selected_images.shape)
@@ -733,16 +776,8 @@ def update_heatmap(
                 [selected_index], export="pillow"
             )
         # Example dataset
-        elif selected_example_dataset == "data/example_shapes/Demoshapes.npz":
-            clicked_image = np.load("/app/work/" + selected_example_dataset)["arr_0"][
-                selected_index
-            ]
-        elif (
-            selected_example_dataset
-            == "data/example_latentrepresentation/f_vectors.parquet"
-        ):
-            df = pd.read_parquet("/app/work/" + selected_example_dataset)
-            clicked_image = df.iloc[selected_index].values
+        elif selected_example_dataset == f"{WRITE_DIR}/example_dataset/Demoshapes.npz":
+            clicked_image = np.load(selected_example_dataset)["arr_0"][selected_index]
         clicked_image = np.array(clicked_image)
 
         heatmap_data = go.Heatmap(z=clicked_image)
@@ -821,6 +856,10 @@ def update_statistics(selected_data, clusters, assigned_labels, label_names):
         labels_str = ", ".join(
             str(label_int_to_str_map[label]) for label in unique_labels if label >= 0
         )
+    elif selected_data is not None and len(selected_data["points"]) > 0:
+        num_images = len(selected_data["points"])
+        clusters_str = "N/A"
+        labels_str = "N/A"
     else:
         num_images = 0
         clusters_str = "N/A"

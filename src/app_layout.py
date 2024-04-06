@@ -1,7 +1,6 @@
 import os
 
 import dash_bootstrap_components as dbc
-import dash_uploader as du
 import diskcache
 import plotly.graph_objects as go
 from dash import Dash, dcc, html
@@ -14,30 +13,32 @@ import templates
 
 load_dotenv(".env", override=True)
 
-# GLOBAL VARIABLES
 ALGORITHM_DATABASE = {
     "PCA": "PCA",
     "UMAP": "UMAP",
 }
+
 CLUSTER_ALGORITHM_DATABASE = {
     "KMeans": "KMeans",
     "DBSCAN": "DBSCAN",
     "HDBSCAN": "HDBSCAN",
 }
 
-DATA_OPTION = [
-    {
-        "label": "Synthetic Shapes",
-        "value": f"{os.getcwd()}/data/example_shapes/Demoshapes.npz",
-    },
-    {
-        "label": "Latent representations from encoder-decoder model",
-        "value": f"{os.getcwd()}/data/example_latentrepresentation/f_vectors.parquet",
-    },
-]
-READ_DIR = "data"
-UPLOAD_FOLDER_ROOT = "data/upload"
-TILED_API_KEY = os.getenv("TILED_API_KEY", None)
+READ_DIR = os.getenv("READ_DIR")
+WRITE_DIR = os.getenv("WRITE_DIR")
+API_KEY = os.getenv("API_KEY", None)
+if API_KEY == "":
+    API_KEY = None
+
+if os.path.exists(f"{os.getcwd()}/src/example_dataset"):
+    EXAMPLE_DATASETS = [
+        {
+            "label": "Synthetic Shapes",
+            "value": f"{os.getcwd()}/src/example_dataset/Demoshapes.npz",
+        }
+    ]
+else:
+    EXAMPLE_DATASETS = []
 
 # SETUP DASH APP
 cache = diskcache.Cache("./cache")
@@ -52,11 +53,8 @@ app = Dash(
 
 server = app.server
 
-dash_file_explorer = FileManager(
-    READ_DIR, UPLOAD_FOLDER_ROOT, open_explorer=False, api_key=TILED_API_KEY
-)
+dash_file_explorer = FileManager(READ_DIR, open_explorer=False, api_key=API_KEY)
 dash_file_explorer.init_callbacks(app)
-du.configure_upload(app, UPLOAD_FOLDER_ROOT, use_upload_id=False)
 
 # BEGIN DASH CODE
 header = templates.header()
@@ -164,19 +162,13 @@ image_panel = [
         children=[
             dbc.CardHeader(
                 [
-                    dbc.Label("Upload your own zipped dataset", className="mr-2"),
+                    dbc.Label("Select a Dataset", className="mr-2"),
                     dash_file_explorer.file_explorer,
-                    dbc.Label("Or select Data Clinic modal", className="mr-2"),
-                    dcc.Dropdown(
-                        id="feature-vector-model-list",
-                        clearable=False,
-                        style={"margin-bottom": "1rem"},
-                    ),
                     dbc.Label("Or try Example Dataset", className="mr-2"),
                     dcc.Dropdown(
                         id="example-dataset-selection",
-                        options=DATA_OPTION,
-                        clearable=False,
+                        options=EXAMPLE_DATASETS,
+                        clearable=True,
                         style={"margin-bottom": "1rem"},
                     ),
                 ]
@@ -252,12 +244,18 @@ algo_panel = dbc.AccordionItem(
     [
         dbc.CardBody(
             [
-                dbc.Label("Algorithm", className="mr-2"),
+                dbc.Label("Optional: Select Pre-trained Autoencoder", className="mr-2"),
+                dcc.Dropdown(
+                    id="feature-vector-model-list",
+                    clearable=True,
+                    style={"margin-bottom": "1rem"},
+                ),
+                html.Hr(),
+                dbc.Label("Dimension Reduction Algorithm", className="mr-2"),
                 dcc.Dropdown(
                     id="algo-dropdown",
                     options=[
-                        {"label": entry, "value": entry}
-                        for entry in ALGORITHM_DATABASE
+                        {"label": entry, "value": entry} for entry in ALGORITHM_DATABASE
                     ],
                     style={"min-width": "250px"},
                     value="PCA",
@@ -295,6 +293,8 @@ algo_panel = dbc.AccordionItem(
                         "justify-content": "center",
                     },
                 ),
+                html.Hr(),
+                dbc.Alert(id="job-alert", is_open=False, dismissable=True),
                 html.Hr(),
                 html.Div(
                     [
@@ -366,16 +366,9 @@ modal = html.Div(
 )
 
 control_panel = dbc.Accordion(
-        [
-            algo_panel, 
-            cluster_algo_panel
-        ],
-        style={
-            'position': 'sticky',
-            'top': '10%',
-            'width': '100%'
-            }
-    )
+    [algo_panel, cluster_algo_panel],
+    style={"position": "sticky", "top": "10%", "width": "100%"},
+)
 
 
 # metadata
@@ -386,7 +379,7 @@ meta = [
             # Store for user created contents
             dcc.Store(id="image-length", data=0),
             dcc.Store(id="user-upload-data-dir", data=None),
-            dcc.Store(id="dataset-options", data=DATA_OPTION),
+            dcc.Store(id="dataset-options", data=EXAMPLE_DATASETS),
             dcc.Store(id="run-counter", data=0),
             dcc.Store(id="experiment-id", data=None),
             # data_label_schema, latent vectors, clusters
@@ -408,8 +401,12 @@ app.layout = html.Div(
             children=[
                 dbc.Row(
                     [
-                        dbc.Col(control_panel, width=4, style={'display': 'flex', 'margin-top': '1em'}), 
-                        dbc.Col(image_panel, width=8)
+                        dbc.Col(
+                            control_panel,
+                            width=4,
+                            style={"display": "flex", "margin-top": "1em"},
+                        ),
+                        dbc.Col(image_panel, width=8),
                     ]
                 ),
                 dbc.Row(dbc.Col(modal)),
