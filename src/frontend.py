@@ -382,6 +382,7 @@ def submit_dimension_reduction_job(
                 "reservations": RESERVATIONS_GPU,
                 "max_time": MAX_TIME_GPU,
                 "conda_env_name": "pytorch_autoencoders",
+                "python_file_name": "mlex_pytorch_autoencoders/src/predict_model.py",
                 "submission_ssh_key": SUBMISSION_SSH_KEY,
                 "forward_ports": FORWARD_PORTS,
                 "params": auto_params,
