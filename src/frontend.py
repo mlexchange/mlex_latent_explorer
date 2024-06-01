@@ -16,6 +16,7 @@ from file_manager.data_project import DataProject
 from sklearn.cluster import DBSCAN, HDBSCAN, MiniBatchKMeans
 
 from app_layout import app
+from callbacks.live_mode import toggle_controls  # noqa: F401
 from latentxp_utils import (
     dbscan_kwargs,
     generate_scatter_data,
@@ -53,7 +54,7 @@ PARTITIONS_GPU = json.loads(os.getenv("PARTITIONS_CPU", []))
 RESERVATIONS_GPU = json.loads(os.getenv("RESERVATIONS_CPU", []))
 MAX_TIME_GPU = os.getenv("MAX_TIME_CPU", "1:00:00")
 SUBMISSION_SSH_KEY = os.getenv("SUBMISSION_SSH_KEY", "")
-FORWARD_PORTS = json.loads(os.getenv("FORWARD_PORTS", []))
+FORWARD_PORTS = json.loads(os.getenv("FORWARD_PORTS", "[]"))
 
 # Mlex content api
 CONTENT_API_URL = os.getenv("CONTENT_API_URL", "http://localhost:8000/api/v0/models")

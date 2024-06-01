@@ -1,19 +1,44 @@
-from dash import html, dcc
 import dash_bootstrap_components as dbc
+from dash import html
 
+button_howto = dbc.Button(
+    className="fa fa-question-circle-o",
+    style={
+        "font-size": "30px",
+        "margin-right": "1rem",
+        "color": "#00313C",
+        "background-color": "white",
+        "border": "0px",
+    },
+    href="https://mlexchange.als.lbl.gov",
+)
 
 button_github = dbc.Button(
-    "View Code on github",
-    outline=True,
-    color="primary",
+    className="fa fa-github",
     href="https://github.com/mlexchange/mlex_latent_explorer",
-    id="gh-link",
-    style={"text-transform": "none"},
+    style={
+        "font-size": "30px",
+        "margin-right": "1rem",
+        "color": "#00313C",
+        "border": "0px",
+        "background-color": "white",
+    },
+)
+
+button_live = dbc.Button(
+    id="go-live",
+    className="fa fa-play",
+    style={
+        "font-size": "30px",
+        "color": "#00313C",
+        "border": "0px",
+        "background-color": "white",
+    },
 )
 
 
 def header():
-    header= dbc.Navbar(
+    header = dbc.Navbar(
         dbc.Container(
             [
                 dbc.Row(
@@ -21,7 +46,7 @@ def header():
                         dbc.Col(
                             html.Img(
                                 id="logo",
-                                src='assets/mlex.png',
+                                src="assets/mlex.png",
                                 height="60px",
                             ),
                             md="auto",
@@ -31,7 +56,6 @@ def header():
                                 html.Div(
                                     [
                                         html.H3("MLExchange | Latent Space Explorer"),
-                                        #html.P("Image segmentation"),
                                     ],
                                     id="app-title",
                                 )
@@ -50,8 +74,9 @@ def header():
                                 dbc.Collapse(
                                     dbc.Nav(
                                         [
-                                            #dbc.NavItem(button_howto),
-                                            #dbc.NavItem(button_github),
+                                            dbc.NavItem(button_github),
+                                            dbc.NavItem(button_howto),
+                                            dbc.NavItem(button_live),
                                         ],
                                         navbar=True,
                                     ),
@@ -72,7 +97,3 @@ def header():
         sticky="top",
     )
     return header
-
-
-
-

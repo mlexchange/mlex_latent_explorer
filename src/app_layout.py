@@ -43,7 +43,11 @@ else:
 # SETUP DASH APP
 cache = diskcache.Cache("./cache")
 long_callback_manager = DiskcacheLongCallbackManager(cache)
-external_stylesheets = [dbc.themes.BOOTSTRAP, "../assets/segmentation-style.css"]
+external_stylesheets = [
+    dbc.themes.BOOTSTRAP,
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css",
+    "../assets/segmentation-style.css",
+]
 app = Dash(
     __name__,
     external_stylesheets=external_stylesheets,
@@ -58,42 +62,38 @@ dash_file_explorer.init_callbacks(app)
 
 # BEGIN DASH CODE
 header = templates.header()
+
 # right panel: file manager, scatter plot, individual image  plot
-scatter_control_panel = html.Div(
-    [
-        dbc.Card(
-            style={"width": "100%"},
-            children=[
-                dbc.CardHeader("Scatter Plot Control Panel"),
-                dbc.CardBody(
-                    [
-                        dbc.Label("Scatter Colors", className="mr-3"),
-                        dcc.RadioItems(
-                            id="scatter-color",
-                            options=[
-                                {"label": "cluster", "value": "cluster"},
-                                {"label": "label", "value": "label"},
-                            ],
-                            value="cluster",
-                            style={"min-width": "250px"},
-                            className="mb-2",
-                        ),
-                        dbc.Label("Select cluster", className="mr-3"),
-                        dcc.Dropdown(
-                            id="cluster-dropdown",
-                            value=-1,
-                            style={"min-width": "250px"},
-                            className="mb-2",
-                        ),
-                        dbc.Label("Select label", className="mr-3"),
-                        dcc.Dropdown(
-                            id="label-dropdown",
-                            value=-2,
-                            style={"min-width": "250px"},
-                        ),
-                    ]
+scatter_control_panel = dbc.AccordionItem(
+    title="Scatter Plot Control Panel",
+    children=[
+        dbc.CardBody(
+            [
+                dbc.Label("Scatter Colors", className="mr-3"),
+                dcc.RadioItems(
+                    id="scatter-color",
+                    options=[
+                        {"label": "cluster", "value": "cluster"},
+                        {"label": "label", "value": "label"},
+                    ],
+                    value="cluster",
+                    style={"min-width": "250px"},
+                    className="mb-2",
                 ),
-            ],
+                dbc.Label("Select cluster", className="mr-3"),
+                dcc.Dropdown(
+                    id="cluster-dropdown",
+                    value=-1,
+                    style={"min-width": "250px"},
+                    className="mb-2",
+                ),
+                dbc.Label("Select label", className="mr-3"),
+                dcc.Dropdown(
+                    id="label-dropdown",
+                    value=-2,
+                    style={"min-width": "250px"},
+                ),
+            ]
         ),
         dcc.Interval(
             id="interval-component",
@@ -101,59 +101,55 @@ scatter_control_panel = html.Div(
             max_intervals=-1,  # keep triggering indefinitely, None
             n_intervals=0,
         ),
-    ]
+    ],
 )
 
-heatmap_control_panel = html.Div(
-    [
-        dbc.Card(
-            style={"width": "100%"},
-            children=[
-                dbc.CardHeader("Heatmap Control Panel"),
-                dbc.CardBody(
+heatmap_control_panel = dbc.AccordionItem(
+    id="heatmap-controls",
+    title="Heatmap Control Panel",
+    children=[
+        dbc.CardBody(
+            [
+                dbc.Label(
                     [
-                        dbc.Label(
-                            [
-                                "Select a Group of Points using ",
-                                html.Span(
-                                    html.I(DashIconify(icon="lucide:lasso")),
-                                    className="icon",
-                                ),
-                                " or ",
-                                html.Span(
-                                    html.I(DashIconify(icon="lucide:box-select")),
-                                    className="icon",
-                                ),
-                                " Tools :",
-                            ],
-                            className="mb-3",
+                        "Select a Group of Points using ",
+                        html.Span(
+                            html.I(DashIconify(icon="lucide:lasso")),
+                            className="icon",
                         ),
-                        dbc.Label(
-                            id="stats-div",
-                            children=[
-                                "Number of images selected: 0",
-                                html.Br(),
-                                "Clusters represented: N/A",
-                                html.Br(),
-                                "Labels represented: N/A",
-                            ],
+                        " or ",
+                        html.Span(
+                            html.I(DashIconify(icon="lucide:box-select")),
+                            className="icon",
                         ),
-                        dbc.Label("Display Image Options", className="mr-3"),
-                        dcc.RadioItems(
-                            id="mean-std-toggle",
-                            options=[
-                                {"label": "Mean", "value": "mean"},
-                                {"label": "Standard Deviation", "value": "sigma"},
-                            ],
-                            value="mean",
-                            style={"min-width": "250px"},
-                            className="mb-2",
-                        ),
-                    ]
+                        " Tools :",
+                    ],
+                    className="mb-3",
                 ),
-            ],
-        )
-    ]
+                dbc.Label(
+                    id="stats-div",
+                    children=[
+                        "Number of images selected: 0",
+                        html.Br(),
+                        "Clusters represented: N/A",
+                        html.Br(),
+                        "Labels represented: N/A",
+                    ],
+                ),
+                dbc.Label("Display Image Options", className="mr-3"),
+                dcc.RadioItems(
+                    id="mean-std-toggle",
+                    options=[
+                        {"label": "Mean", "value": "mean"},
+                        {"label": "Standard Deviation", "value": "sigma"},
+                    ],
+                    value="mean",
+                    style={"min-width": "250px"},
+                    className="mb-2",
+                ),
+            ]
+        ),
+    ],
 )
 
 image_panel = [
@@ -161,7 +157,8 @@ image_panel = [
         id="image-card",
         children=[
             dbc.CardHeader(
-                [
+                id="data-selection",
+                children=[
                     dbc.Label("Select a Dataset", className="mr-2"),
                     dash_file_explorer.file_explorer,
                     dbc.Label("Or try Example Dataset", className="mr-2"),
@@ -171,7 +168,7 @@ image_panel = [
                         clearable=True,
                         style={"margin-bottom": "1rem"},
                     ),
-                ]
+                ],
             ),
             dbc.CardBody(
                 [
@@ -219,29 +216,15 @@ image_panel = [
                     ),
                 ]
             ),
-            dbc.CardFooter(
-                [
-                    dbc.Row(
-                        [
-                            dbc.Col(
-                                scatter_control_panel,
-                                width=6,
-                            ),
-                            dbc.Col(
-                                heatmap_control_panel,
-                                width=6,
-                            ),
-                        ]
-                    )
-                ]
-            ),
         ],
     )
 ]
 
 # left panel: choose algorithms, submit job, choose scatter plot attributes, and statistics...
 algo_panel = dbc.AccordionItem(
-    [
+    id="dim-red-controls",
+    title="Select Dimension Reduction Algorithms",
+    children=[
         dbc.CardBody(
             [
                 dbc.Label("Optional: Select Pre-trained Autoencoder", className="mr-2"),
@@ -306,11 +289,11 @@ algo_panel = dbc.AccordionItem(
             ]
         ),
     ],
-    title="Select Dimension Reduction Algorithms",
 )
 
 cluster_algo_panel = dbc.AccordionItem(
-    [
+    id="clustering-controls",
+    children=[
         dbc.CardBody(
             [
                 dbc.Label("Algorithm", className="mr-2"),
@@ -366,7 +349,12 @@ modal = html.Div(
 )
 
 control_panel = dbc.Accordion(
-    [algo_panel, cluster_algo_panel],
+    children=[
+        algo_panel,
+        cluster_algo_panel,
+        heatmap_control_panel,
+        scatter_control_panel,
+    ],
     style={"position": "sticky", "top": "10%", "width": "100%"},
 )
 

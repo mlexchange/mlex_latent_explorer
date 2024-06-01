@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 test.py
+**cache**
+mlex_store/*
+*.pkl
 
 # output dir
 results/
