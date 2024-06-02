@@ -48,6 +48,10 @@ RESULT_TILED_API_KEY = os.getenv("RESULT_TILED_API_KEY", None)
 tiled_results = TiledResults(RESULT_TILED_URI, RESULT_TILED_API_KEY)
 tiled_results.prep_result_tiled_containers()
 
+# Websocket server
+WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "127.0.0.1")
+WEBSOCKET_PORT = os.getenv("WEBSOCKET_PORT", 8765)
+
 # SETUP DASH APP
 cache = diskcache.Cache("./cache")
 long_callback_manager = DiskcacheLongCallbackManager(cache)
@@ -410,6 +414,6 @@ app.layout = html.Div(
             ],
             fluid=True,
         ),
-        WebSocket(id="ws-live", url="ws://127.0.0.1:8765"),
+        WebSocket(id="ws-live", url=f"ws:{WEBSOCKET_URL}:{WEBSOCKET_PORT}"),
     ],
 )
