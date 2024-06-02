@@ -1,6 +1,7 @@
 dash==2.9.3
 dash-core-components==2.0.0
 dash-bootstrap-components==1.0.2
+dash-extensions==0.0.52
 dash-html-components==2.0.0
 dash-iconify==0.1.2
 plotly==5.14.1
@@ -14,3 +15,4 @@ numpy
 Pillow
 python-dotenv
 prefect-client==2.14.21
+tiled[client]==0.1.0a118

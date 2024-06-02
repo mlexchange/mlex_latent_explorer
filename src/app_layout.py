@@ -5,11 +5,13 @@ import diskcache
 import plotly.graph_objects as go
 from dash import Dash, dcc, html
 from dash.long_callback import DiskcacheLongCallbackManager
+from dash_extensions import WebSocket
 from dash_iconify import DashIconify
 from dotenv import load_dotenv
 from file_manager.main import FileManager
 
 import templates
+from utils_tiled import TiledResults
 
 load_dotenv(".env", override=True)
 
@@ -39,6 +41,12 @@ if os.path.exists(f"{os.getcwd()}/src/example_dataset"):
     ]
 else:
     EXAMPLE_DATASETS = []
+
+# Tiled Server to store results
+RESULT_TILED_URI = os.getenv("RESULT_TILED_URI", "")
+RESULT_TILED_API_KEY = os.getenv("RESULT_TILED_API_KEY", None)
+tiled_results = TiledResults(RESULT_TILED_URI, RESULT_TILED_API_KEY)
+tiled_results.prep_result_tiled_containers()
 
 # SETUP DASH APP
 cache = diskcache.Cache("./cache")
@@ -402,5 +410,6 @@ app.layout = html.Div(
             ],
             fluid=True,
         ),
+        WebSocket(id="ws-live", url="ws://127.0.0.1:8765"),
     ],
 )

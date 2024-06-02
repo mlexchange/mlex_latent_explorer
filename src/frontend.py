@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 import pytz
 import requests
@@ -15,8 +16,14 @@ from dotenv import load_dotenv
 from file_manager.data_project import DataProject
 from sklearn.cluster import DBSCAN, HDBSCAN, MiniBatchKMeans
 
-from app_layout import app
-from callbacks.live_mode import toggle_controls  # noqa: F401
+from app_layout import API_KEY, app
+from callbacks.live_mode import (  # noqa: F401
+    live_clear_plots,
+    live_update_data_project_dict,
+    set_live_latent_vectors,
+    toggle_controls,
+    update_data_project_dict,
+)
 from latentxp_utils import (
     dbscan_kwargs,
     generate_scatter_data,
@@ -39,6 +46,10 @@ WRITE_DIR = os.getenv("WRITE_DIR", "mlex_store")
 MODEL_DIR = f"{WRITE_DIR}/models"
 READ_DIR_MOUNT = os.getenv("READ_DIR_MOUNT", None)
 WRITE_DIR_MOUNT = os.getenv("WRITE_DIR_MOUNT", None)
+
+# Tiled Server to store results
+RESULT_TILED_URI = os.getenv("RESULT_TILED_URI", "")
+RESULT_TILED_API_KEY = os.getenv("RESULT_TILED_API_KEY", None)
 
 # Prefect
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
@@ -220,8 +231,7 @@ def update_data_n_label_schema(selected_example_dataset, data_project_dict):
 
     # check if user is using user uploaded zip file or example dataset or data clinic file
     # priority level: FileManage > DataClinic > Example Datasets
-
-    data_project = DataProject.from_dict(data_project_dict)
+    data_project = DataProject.from_dict(data_project_dict, api_key=API_KEY)
     options = []
     if len(data_project.datasets) > 0:
         labels = np.full((len(data_project.datasets),), -1)
@@ -297,7 +307,7 @@ def submit_dimension_reduction_job(
         scatter-color:          default scatter-color value
         cluster-dropdown:       default cluster-dropdown value
         heatmap:                empty heatmap figure
-        interval:               set interval component to trigger to find the latent_vectors.npy file (-1)
+        interval:               set interval component to trigger to find the latent_vectors.parquet file (-1)
         job-alert:              alert message
         job-selector-color:     color of the job selector
         job-selector-is_open:   open the job selector
@@ -321,16 +331,19 @@ def submit_dimension_reduction_job(
     print("Dimension reduction algo params: ", input_params, flush=True)
 
     # check if user is using user uploaded zip file or example dataset or data clinic file
-    data_project = DataProject.from_dict(data_project_dict)
+    data_project = DataProject.from_dict(data_project_dict, api_key=API_KEY)
     if len(data_project.datasets) > 0:
         print("FM", flush=True)
-        data_project = DataProject.from_dict(data_project_dict)
+        data_project = DataProject.from_dict(data_project_dict, api_key=API_KEY)
         io_parameters = {
             "data_uris": [dataset.uri for dataset in data_project.datasets],
             "data_tiled_api_key": data_project.api_key,
             "data_type": data_project.data_type,
             "root_uri": data_project.root_uri,
             "output_dir": f"{WRITE_DIR}/feature_vectors",
+            "result_tiled_uri": RESULT_TILED_URI,
+            "result_tiled_api_key": RESULT_TILED_API_KEY,
+            "save_model_path": f"{WRITE_DIR}/models",
         }
 
     else:
@@ -341,6 +354,9 @@ def submit_dimension_reduction_job(
             "data_type": "file",
             "root_uri": None,
             "output_dir": f"{WRITE_DIR}/feature_vectors",
+            "result_tiled_uri": RESULT_TILED_URI,
+            "result_tiled_api_key": RESULT_TILED_API_KEY,
+            "save_model_path": f"{WRITE_DIR}/models",
         }
 
     # Autoencoder
@@ -483,11 +499,9 @@ def read_latent_vectors(n_intervals, experiment_id, current_latent_vectors):
         children_flows = get_children_flow_run_ids(experiment_id)
         if len(children_flows) > 0:
             # read the latent vectors from the output dir
-            output_path = (
-                f"{WRITE_DIR}/feature_vectors/{children_flows[-1]}/latent_vectors.npy"
-            )
+            output_path = f"{WRITE_DIR}/feature_vectors/{children_flows[-1]}/latent_vectors.parquet"
             if os.path.exists(output_path):
-                latent_vectors = np.load(output_path)
+                latent_vectors = pd.read_parquet(output_path).values
                 print("latent_vectors", latent_vectors.shape, flush=True)
                 return latent_vectors
     raise PreventUpdate
@@ -752,7 +766,7 @@ def update_heatmap(
         selected_images = []
 
         # TODO: Replace prints with logging
-        data_project = DataProject.from_dict(data_project_dict)
+        data_project = DataProject.from_dict(data_project_dict, api_key=API_KEY)
         if len(data_project.datasets) > 0:
             print("FM file")
             selected_images, _ = data_project.read_datasets(
@@ -778,7 +792,7 @@ def update_heatmap(
     elif click_data is not None and len(click_data["points"]) > 0:
         selected_index = click_data["points"][0]["customdata"][0]
         # FileManager
-        data_project = DataProject.from_dict(data_project_dict)
+        data_project = DataProject.from_dict(data_project_dict, api_key=API_KEY)
         if len(data_project.datasets) > 0:
             selected_images, _ = data_project.read_datasets(
                 [selected_index], export="pillow"
