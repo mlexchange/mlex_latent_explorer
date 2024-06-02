@@ -89,18 +89,24 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict):
     Output("latent_vectors", "data", allow_duplicate=True),
     Input("ws-live", "message"),
     State("latent_vectors", "data"),
+    State("go-live", "n_clicks"),
     prevent_initial_call=True,
 )
-def set_live_latent_vectors(message, latent_vectors):
-    message = message["data"]
-    message = json.loads(message)
-    flow_id = message["flow_id"]
-    new_latent_vectors = tiled_results.get_latent_vectors(flow_id)
-    if latent_vectors is None:
-        latent_vectors = np.array(new_latent_vectors)
+def set_live_latent_vectors(message, latent_vectors, n_clicks):
+    if n_clicks is not None and n_clicks % 2 == 1:
+        message = message["data"]
+        message = json.loads(message)
+        flow_id = message["flow_id"]
+        new_latent_vectors = tiled_results.get_latent_vectors(flow_id)
+        if latent_vectors is None:
+            latent_vectors = np.array(new_latent_vectors)
+        else:
+            latent_vectors = np.concatenate(
+                [latent_vectors, new_latent_vectors], axis=0
+            )
+        return latent_vectors
     else:
-        latent_vectors = np.concatenate([latent_vectors, new_latent_vectors], axis=0)
-    return latent_vectors
+        raise PreventUpdate
 
 
 @app.callback(
