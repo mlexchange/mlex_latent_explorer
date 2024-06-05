@@ -43,7 +43,7 @@ else:
     EXAMPLE_DATASETS = []
 
 # Tiled Server to store results
-RESULT_TILED_URI = os.getenv("RESULT_TILED_URI", "")
+RESULT_TILED_URI = os.getenv("RESULT_TILED_URI", "http://localhost:8888")
 RESULT_TILED_API_KEY = os.getenv("RESULT_TILED_API_KEY", None)
 tiled_results = TiledResults(RESULT_TILED_URI, RESULT_TILED_API_KEY)
 tiled_results.prep_result_tiled_containers()
