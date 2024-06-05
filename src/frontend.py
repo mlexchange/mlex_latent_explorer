@@ -48,7 +48,7 @@ READ_DIR_MOUNT = os.getenv("READ_DIR_MOUNT", None)
 WRITE_DIR_MOUNT = os.getenv("WRITE_DIR_MOUNT", None)
 
 # Tiled Server to store results
-RESULT_TILED_URI = os.getenv("RESULT_TILED_URI", "")
+RESULT_TILED_URI = os.getenv("RESULT_TILED_URI", "http://localhost:8888")
 RESULT_TILED_API_KEY = os.getenv("RESULT_TILED_API_KEY", None)
 
 # Prefect
