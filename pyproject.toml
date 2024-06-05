@@ -24,6 +24,7 @@ dependencies = [
     "requests==2.26.0",
     "pyarrow==11.0.0",
     "diskcache==5.6.3",
+    "mlex_file_manager@git+https://github.com/mlexchange/mlex_file_manager",
     "Pillow",
     "pandas",
     "numpy",
@@ -35,10 +36,11 @@ dependencies = [
 # These are required for developing the package (running the tests, building
 # the documentation) but not necessarily required for _using_ it.
 dev = [
+    "dash[testing]",
     "flake8",
     "pre-commit",
     "pytest-mock",
-    "tiled[server]",
+    "tiled[all]",
 ]
 
 [project.urls]
