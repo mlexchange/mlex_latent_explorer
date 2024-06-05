@@ -31,7 +31,8 @@ dependencies = [
     "pandas",
     "numpy",
     "python-dotenv",
-    "prefect-client==2.14.21"
+    "prefect-client==2.14.21",
+    "tiled[client]==0.1.0a118",
 ]
 
 [project.optional-dependencies]
@@ -42,7 +43,7 @@ dev = [
     "flake8",
     "pre-commit",
     "pytest-mock",
-    "tiled[all]",
+    "tiled[all]==0.1.0a118",
 ]
 
 simulator = [
