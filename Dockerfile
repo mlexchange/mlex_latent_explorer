@@ -4,7 +4,7 @@ LABEL maintainer="THE MLEXCHANGE TEAM"
 RUN ls
 
 RUN pip3 install --upgrade pip &&\
-    pip3 install -r .
+    pip3 install .
 
 WORKDIR /app/work
 ENV HOME /app/work
