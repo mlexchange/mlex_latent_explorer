@@ -1,7 +1,7 @@
 FROM python:3.9
 LABEL maintainer="THE MLEXCHANGE TEAM"
 
-RUN ls
+COPY pyproject.toml pyproject.toml
 
 RUN pip3 install --upgrade pip &&\
     pip3 install .
