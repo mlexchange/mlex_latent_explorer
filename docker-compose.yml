@@ -25,6 +25,8 @@ services:
       PARTITIONS_GPU: "${PARTITIONS_GPU}"
       RESERVATIONS_GPU: "${RESERVATIONS_GPU}"
       MAX_TIME_GPU: "${MAX_TIME_GPU}"
+      SUBMISSION_SSH_KEY: "${SUBMISSION_SSH_KEY}"
+      FORWARD_PORTS: "${FORWARD_PORTS}"
     volumes:
       - $READ_DIR:/app/work/data
       - $WRITE_DIR:/app/work/mlex_store
