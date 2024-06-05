@@ -28,8 +28,8 @@ flow = {
     "flow_type": "conda",
     "params_list": [
         {
-            "conda_env_name": "mlex_dimension_reduction_umap",
-            "python_file_name": "mlex_dimension_reduction_umap/umap_run.py",
+            "conda_env_name": "mlex_dimension_reduction_pca",
+            "python_file_name": "mlex_dimension_reduction_pca/pca_run.py",
             "params": {
                 "io_parameters": {
                     "uid_retrieve": "",
@@ -43,8 +43,6 @@ flow = {
                     "load_model_path": TRAINED_MODEL_URI,
                 },
                 "model_parameters": {
-                    "min_dist": 0.1,
-                    "n_neighbors": 15,
                     "n_components": 2,
                 },
             },
@@ -83,4 +81,4 @@ if __name__ == "__main__":
             tags=PREFECT_TAGS + ["train"],
         )
 
-        time.sleep(30)
+        time.sleep(10)
