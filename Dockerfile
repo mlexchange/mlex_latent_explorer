@@ -6,7 +6,7 @@ COPY docker/requirements.txt requirements.txt
 
 RUN pip3 install --upgrade pip &&\
     pip3 install -r requirements.txt\
-    pip install git+https://github.com/mlexchange/mlex_file_manager\
+    pip install git+https://github.com/taxe10/mlex_file_manager\
     pip install git+https://github.com/mlexchange/mlex_dash_component_editor
 
 WORKDIR /app/work

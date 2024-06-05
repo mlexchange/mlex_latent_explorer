@@ -11,6 +11,35 @@ To run this demo:
 - clone this repo and then run `docker-compose up` in the main folder.  
 - Go to `http://0.0.0.0:8070/` in a brower.
 
+## Developer Setup
+If you are developing this library, there are a few things to note.
+
+1. Install development dependencies:
+
+```
+pip install .
+pip install ".[dev]"
+```
+
+2. Install pre-commit
+This step will setup the pre-commit package. After this, commits will get run against flake8, black, isort.
+
+```
+pre-commit install
+```
+
+3. (Optional) If you want to check what pre-commit would do before commiting, you can run:
+
+```
+pre-commit run --all-files
+```
+
+4. To run test cases:
+
+```
+python -m pytest
+```
+
 
 ## Copyright
 MLExchange Copyright (c) 2023, The Regents of the University of California,
