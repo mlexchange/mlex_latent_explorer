@@ -49,6 +49,7 @@ dev = [
 simulator = [
     "websocket",
     "pika",
+    "aio_pika",
 ]
 
 [project.urls]
