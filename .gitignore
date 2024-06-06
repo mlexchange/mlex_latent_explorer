@@ -4,6 +4,8 @@ __pycache__/
 *$py.class
 test.py
 **cache**
+mlex_store/*
+*.pkl
 
 # output dir
 results/

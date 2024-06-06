@@ -16,6 +16,7 @@ dependencies = [
     "dash==2.9.3",
     "dash-core-components==2.0.0",
     "dash-bootstrap-components==1.0.2",
+    "dash-extensions==0.0.52",
     "dash-html-components==2.0.0",
     "dash-iconify==0.1.2",
     "plotly==5.14.1",
@@ -30,7 +31,8 @@ dependencies = [
     "pandas",
     "numpy",
     "python-dotenv",
-    "prefect-client==2.14.21"
+    "prefect-client==2.14.21",
+    "tiled[client]==0.1.0a118",
 ]
 
 [project.optional-dependencies]
@@ -41,7 +43,13 @@ dev = [
     "flake8",
     "pre-commit",
     "pytest-mock",
-    "tiled[all]",
+    "tiled[all]==0.1.0a118",
+]
+
+simulator = [
+    "websocket",
+    "pika",
+    "aio_pika",
 ]
 
 [project.urls]
@@ -50,3 +58,8 @@ Issues = "https://github.com/mlexchange/mlex_latent_explorer/issues/"
 
 [tool.isort]
 profile = "black"
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "src"
+]
