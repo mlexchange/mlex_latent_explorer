@@ -70,6 +70,7 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict):
         assert len(metadata["io_parameters"]["data_uris"]) == 1
         data_uri = metadata["io_parameters"]["data_uris"][0]
         data_project_dict["root_uri"] = root_uri
+        data_project_dict["data_type"] = "tiled"
 
         if len(data_project_dict["datasets"]) == 0:
             cum_size = 1
