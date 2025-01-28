@@ -5,9 +5,17 @@ from base64 import b64encode
 import numpy as np
 from dash import ALL, Input, Output, State, callback
 from file_manager.data_project import DataProject
+from mlex_utils.prefect_utils.core import get_children_flow_run_ids
 from PIL import Image
 
-from ..app_layout import DATA_TILED_KEY, NUM_IMGS_OVERVIEW
+from src.app_layout import DATA_TILED_KEY, NUM_IMGS_OVERVIEW, USER
+from src.utils.data_utils import hash_list_of_strings, tiled_results
+from src.utils.plot_utils import (
+    generate_heatmap_plot,
+    generate_scatter_data,
+    plot_empty_heatmap,
+    plot_empty_scatter,
+)
 
 
 def get_empty_image():
@@ -145,3 +153,111 @@ def disable_buttons(
         2 * [current_page == 0],
         2 * [max_num_pages <= current_page + 1],
     )
+
+
+@callback(
+    Output(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "project-name-id",
+            "aio_id": "latent-space-jobs",
+        },
+        "data",
+    ),
+    Input({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
+    prevent_initial_call=True,
+)
+def update_project_name(data_project_dict):
+    data_project = DataProject.from_dict(data_project_dict)
+    data_uris = [dataset.uri for dataset in data_project.datasets]
+    project_name = hash_list_of_strings(data_uris)
+    return project_name
+
+
+@callback(
+    Output("scatter", "figure"),
+    Input("show-feature-vectors", "value"),
+    Input(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "train-dropdown",
+            "aio_id": "latent-space-jobs",
+        },
+        "value",
+    ),
+    State(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "project-name-id",
+            "aio_id": "latent-space-jobs",
+        },
+        "data",
+    ),
+)
+def show_feature_vectors(
+    show_feature_vectors,
+    job_id,
+    project_name,
+):
+    if show_feature_vectors is False:
+        return plot_empty_scatter()
+
+    child_job_id = get_children_flow_run_ids(job_id)[0]
+    expected_result_uri = f"{USER}/{project_name}/{child_job_id}"
+    latent_vectors = (
+        tiled_results.get_data_by_trimmed_uri(expected_result_uri).read().to_numpy()
+    )
+    metadata = tiled_results.get_data_by_trimmed_uri(expected_result_uri).metadata
+
+    scatter_data = generate_scatter_data(
+        latent_vectors, metadata["model_parameters"]["n_components"]
+    )
+    return scatter_data
+
+
+@callback(
+    Output("heatmap", "figure", allow_duplicate=True),
+    Input("scatter", "clickData"),
+    Input("scatter", "selectedData"),
+    Input("mean-std-toggle", "value"),
+    State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
+    prevent_initial_call=True,
+)
+def update_heatmap(
+    click_data,
+    selected_data,
+    display_option,
+    data_project_dict,
+):
+    """
+    This callback update the heatmap
+    Args:
+        click_data:         clicked data on scatter figure
+        selected_data:      lasso or rect selected data points on scatter figure
+        display_option:     option to display mean or std
+        data_project_dict:  data project dictionary
+    Returns:
+        fig:                updated heatmap
+    """
+    # user select a group of points
+    if selected_data is not None and len(selected_data["points"]) > 0:
+        selected_indices = [point["customdata"][0] for point in selected_data["points"]]
+
+    # user click on a single point
+    elif click_data is not None and len(click_data["points"]) > 0:
+        selected_indices = [click_data["points"][0]["customdata"][0]]
+
+    else:
+        return plot_empty_heatmap()
+
+    data_project = DataProject.from_dict(data_project_dict, api_key=DATA_TILED_KEY)
+    selected_images, _ = data_project.read_datasets(selected_indices, export="pillow")
+
+    selected_images = np.array(selected_images)
+
+    if display_option == "mean":
+        plot_data = np.mean(selected_images, axis=0)
+    else:
+        plot_data = np.std(selected_images, axis=0)
+
+    return generate_heatmap_plot(plot_data)
