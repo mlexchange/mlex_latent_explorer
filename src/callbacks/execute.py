@@ -40,7 +40,7 @@ FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
     Input(
         {
             "component": "DbcJobManagerAIO",
-            "subcomponent": "train-button",
+            "subcomponent": "run-button",
             "aio_id": MATCH,
         },
         "n_clicks",
@@ -175,7 +175,7 @@ def run_train(
     Input(
         {
             "component": "DbcJobManagerAIO",
-            "subcomponent": "train-dropdown",
+            "subcomponent": "run-dropdown",
             "aio_id": "latent-space-jobs",
         },
         "value",

@@ -70,7 +70,11 @@ app = Dash(
 
 server = app.server
 
-dash_file_explorer = FileManager(READ_DIR, open_explorer=False, api_key=DATA_TILED_KEY)
+dash_file_explorer = FileManager(
+    READ_DIR,
+    open_explorer=False,
+    api_key=DATA_TILED_KEY,
+)
 dash_file_explorer.init_callbacks(app)
 file_explorer = dash_file_explorer.file_explorer
 
@@ -84,7 +88,7 @@ clustering_models = Models(
 
 # SETUP MLEx COMPONENTS
 mlex_components = MLExComponents("dbc")
-job_manager = mlex_components.get_job_manager(
+job_manager = mlex_components.get_job_manager_minimal(
     model_list=dim_reduction_models.modelname_list,
     mode=MODE,
     aio_id="latent-space-jobs",

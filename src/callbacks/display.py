@@ -180,7 +180,7 @@ def update_project_name(data_project_dict):
     Input(
         {
             "component": "DbcJobManagerAIO",
-            "subcomponent": "train-dropdown",
+            "subcomponent": "run-dropdown",
             "aio_id": "latent-space-jobs",
         },
         "value",
@@ -216,6 +216,16 @@ def show_feature_vectors(
 
 
 @callback(
+    Output("scatter", "clickData"),
+    Input("show-feature-vectors", "value"),
+    prevent_initial_call=True,
+)
+def clear_click_data(show_feature_vectors):
+    if show_feature_vectors is False:
+        return None
+
+
+@callback(
     Output("heatmap", "figure", allow_duplicate=True),
     Input("scatter", "clickData"),
     Input("scatter", "selectedData"),
@@ -232,12 +242,12 @@ def update_heatmap(
     """
     This callback update the heatmap
     Args:
-        click_data:         clicked data on scatter figure
-        selected_data:      lasso or rect selected data points on scatter figure
-        display_option:     option to display mean or std
-        data_project_dict:  data project dictionary
+        click_data:             clicked data on scatter figure
+        selected_data:          lasso or rect selected data points on scatter figure
+        display_option:         option to display mean or std
+        data_project_dict:      data project dictionary
     Returns:
-        fig:                updated heatmap
+        fig:                    updated heatmap
     """
     # user select a group of points
     if selected_data is not None and len(selected_data["points"]) > 0:
