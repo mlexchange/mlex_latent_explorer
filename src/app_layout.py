@@ -1,3 +1,4 @@
+import json
 import os
 
 import dash_bootstrap_components as dbc
@@ -34,7 +35,9 @@ READ_DIR = os.getenv("READ_DIR")
 WRITE_DIR = os.getenv("WRITE_DIR")
 DATA_TILED_KEY = os.getenv("TILED_KEY", None)
 MODE = os.getenv("MODE", "dev")
-PREFECT_TAGS = os.getenv("PREFECT_TAGS", ["latent-space-explorer"])
+PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
+USER = os.getenv("USER")
+NUM_IMGS_OVERVIEW = 6
 
 if os.path.exists(f"{os.getcwd()}/src/example_dataset"):
     EXAMPLE_DATASETS = [
@@ -45,12 +48,6 @@ if os.path.exists(f"{os.getcwd()}/src/example_dataset"):
     ]
 else:
     EXAMPLE_DATASETS = []
-
-# Tiled Server to store results
-RESULT_TILED_URI = os.getenv("RESULT_TILED_URI", "")
-RESULT_TILED_API_KEY = os.getenv("RESULT_TILED_API_KEY", None)
-# tiled_results = TiledResults(RESULT_TILED_URI, RESULT_TILED_API_KEY)
-# tiled_results.prep_result_tiled_containers()
 
 # Websocket server
 WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "127.0.0.1")
@@ -78,14 +75,19 @@ dash_file_explorer.init_callbacks(app)
 file_explorer = dash_file_explorer.file_explorer
 
 # GET MODELS
-models = Models(modelfile_path="./src/assets/default_models.json")
+dim_reduction_models = Models(
+    modelfile_path="./src/assets/default_models.json", model_type="dimension_reduction"
+)
+clustering_models = Models(
+    modelfile_path="./src/assets/default_models.json", model_type="clustering"
+)
 
 # SETUP MLEx COMPONENTS
 mlex_components = MLExComponents("dbc")
 job_manager = mlex_components.get_job_manager(
-    model_list=models.modelname_list,
+    model_list=dim_reduction_models.modelname_list,
     mode=MODE,
-    aio_id="data-clinic-jobs",
+    aio_id="latent-space-jobs",
     prefect_tags=PREFECT_TAGS,
 )
 
@@ -139,7 +141,11 @@ app.layout = html.Div(
                 dbc.Row(
                     [
                         dbc.Col(
-                            sidebar(file_explorer, job_manager),
+                            sidebar(
+                                file_explorer,
+                                job_manager,
+                                clustering_models.modelname_list,
+                            ),
                             style={"flex": "0 0 500px"},
                         ),
                         dbc.Col(main_display()),

@@ -1,7 +1,7 @@
 import dash_bootstrap_components as dbc
 from dash import dcc, html
 
-from ..utils.plot_utils import draw_rows, plot_heatmap, plot_scatter
+from ..utils.plot_utils import draw_rows, plot_empty_heatmap, plot_empty_scatter
 
 NUM_IMGS_OVERVIEW = 6
 
@@ -67,14 +67,14 @@ def main_display():
                                 dbc.Col(
                                     dcc.Graph(
                                         id="scatter",
-                                        figure=plot_scatter(),
+                                        figure=plot_empty_scatter(),
                                     ),
                                     width=6,
                                 ),
                                 dbc.Col(
                                     dcc.Graph(
                                         id="heatmap",
-                                        figure=plot_heatmap(),
+                                        figure=plot_empty_heatmap(),
                                     ),
                                     width=6,
                                 ),
