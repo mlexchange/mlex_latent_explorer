@@ -93,18 +93,15 @@ def get_heatmap_control_panel():
     return heatmap_control_panel
 
 
-def get_clustering_control_panel():
+def get_clustering_control_panel(model_list):
     cluster_algo_panel = [
         ControlItem(
             "Algorithm",
             "cluster-algo-dropdown-title",
             dbc.Select(
                 id="cluster-algo-dropdown",
-                options=[
-                    {"label": entry, "value": entry}
-                    for entry in []  # CLUSTER_ALGORITHM_DATABASE
-                ],
-                value="DBSCAN",
+                options=model_list,
+                value=model_list[0],
             ),
         ),
         html.Div(id="additional-cluster-params"),
@@ -115,7 +112,7 @@ def get_clustering_control_panel():
                     "Cluster",
                     color="primary",
                     id="run-cluster-algo",
-                    style={"width": "100%"},
+                    style={"width": "95%"},
                 ),
             ],
             className="row",
@@ -129,12 +126,13 @@ def get_clustering_control_panel():
     return cluster_algo_panel
 
 
-def sidebar(file_explorer, job_manager):
+def sidebar(file_explorer, job_manager, clustering_models):
     """
     Creates the dash components in the left sidebar of the app
     Args:
         file_explorer:      Dash file explorer
         job_manager:        Job manager object
+        clustering_models:  Clustering models
     """
     sidebar = [
         dbc.Accordion(
@@ -196,9 +194,12 @@ def sidebar(file_explorer, job_manager):
                                 disabled=True,
                             ),
                         ),
-                    ]
-                    + get_clustering_control_panel(),
+                    ],
                     title="Dimension Reduction",
+                ),
+                dbc.AccordionItem(
+                    children=get_clustering_control_panel(clustering_models),
+                    title="Clustering",
                 ),
                 dbc.AccordionItem(
                     children=get_heatmap_control_panel() + get_scatter_control_panel(),

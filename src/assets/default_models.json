@@ -3,9 +3,11 @@
         {
         "model_name": "umap_v1.0.0",
         "version": "1.0.0",
-        "type": "unsupervised",
+        "type": "dimension_reduction",
         "owner": "mlexchange team",
-        "uri": "ghcr.io/mlexchange/mlex_dimension_reduction_umap:main",
+        "image_name": "ghcr.io/mlexchange/mlex_dimension_reduction_umap",
+        "image_tag": "main",
+        "conda_env": "mlex_dimension_reduction_umap",
         "application": [
             "latent_space_explorer"
         ],
@@ -127,17 +129,17 @@
                 "param_key": "n_neighbors"
             }
         ],
-        "cmd": [
-            "python umap_run.py"
-        ],
+        "python_file_name": "mlex_dimension_reduction_umap/umap_run.py",
         "public": false
         },
         {
         "model_name": "pca_v1.0.0",
         "version": "1.0.0",
-        "type": "unsupervised",
+        "type": "dimension_reduction",
         "owner": "mlexchange team",
-        "uri": "ghcr.io/mlexchange/mlex_dimension_reduction_pca:main",
+        "image_name": "ghcr.io/mlexchange/mlex_dimension_reduction_pca",
+        "image_tag": "main",
+        "conda_env": "mlex_dimension_reduction_pca",
         "application": [
             "latent_space_explorer"
         ],
@@ -161,9 +163,85 @@
                 "param_key": "n_components"
             }
         ],
-        "cmd": [
-            "python pca_run.py"
+        "python_file_name": "mlex_dimension_reduction_pca/pca_run.py",
+        "public": false
+        },
+        {
+        "model_name": "kmeans_v1.0.0",
+        "version": "1.0.0",
+        "type": "clustering",
+        "owner": "mlexchange team",
+        "image_name": "ghcr.io/mlexchange/mlex_clustering",
+        "image_tag": "main",
+        "conda_env": "mlex_clustering",
+        "application": [
+            "latent_space_explorer"
         ],
+        "description": "Clustering with KMeans",
+        "gui_parameters": [
+            {
+                "type": "int",
+                "name": "ncluster-dropdown-menu",
+                "title": "Number of clusters",
+                "value": 8,
+                "param_key": "n_clusters"
+            }
+        ],
+        "python_file_name": "mlex_clustering/clustering.py",
+        "public": false
+        },
+        {
+        "model_name": "dbscan_v1.0.0",
+        "version": "1.0.0",
+        "type": "clustering",
+        "owner": "mlexchange team",
+        "image_name": "ghcr.io/mlexchange/mlex_clustering",
+        "image_tag": "main",
+        "application": [
+            "latent_space_explorer"
+        ],
+        "description": "Clustering with DBSCAN",
+        "gui_parameters": [
+            {
+                "type": "float",
+                "name": "eps",
+                "title": "Neighborhood of a point",
+                "value": 0.5,
+                "param_key": "eps"
+            },
+            {
+                "type": "int",
+                "name": "minsample",
+                "title": "Minimum number of points",
+                "value": 5,
+                "param_key": "min_samples"
+            }
+        ],
+        "python_file_name": "mlex_clustering/clustering.py",
+        "public": false
+        },
+        {
+        "model_name": "hdbscan_v1.0.0",
+        "version": "1.0.0",
+        "type": "clustering",
+        "owner": "mlexchange team",
+        "image_name": "ghcr.io/mlexchange/mlex_clustering",
+        "image_tag": "main",
+        "conda_env": "mlex_clustering",
+        "application": [
+            "latent_space_explorer"
+        ],
+        "description": "Clustering with HDBSCAN",
+        "gui_parameters": [
+            {
+                "type": "int",
+                "name": "mincluster-size",
+                "title": "Minimum cluster size",
+                "value": 5,
+                "param_key": "min_cluster_size"
+            }
+        ],
+        "python_file_name": "mlex_clustering/clustering.py",
         "public": false
         }
     ]
