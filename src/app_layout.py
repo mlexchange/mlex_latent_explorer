@@ -92,7 +92,19 @@ job_manager = mlex_components.get_job_manager_minimal(
     model_list=dim_reduction_models.modelname_list,
     mode=MODE,
     aio_id="latent-space-jobs",
-    prefect_tags=PREFECT_TAGS,
+    prefect_tags=PREFECT_TAGS + ["latent-space"],
+)
+
+clustering_job_manager = mlex_components.get_job_manager_minimal(
+    model_list=clustering_models.modelname_list,
+    mode=MODE,
+    aio_id="clustering-jobs",
+    prefect_tags=PREFECT_TAGS + ["clustering"],
+    dependency_id={
+        "component": "DbcJobManagerAIO",
+        "subcomponent": "run-dropdown",
+        "aio_id": "latent-space-jobs",
+    },
 )
 
 # BEGIN DASH CODE
@@ -148,7 +160,7 @@ app.layout = html.Div(
                             sidebar(
                                 file_explorer,
                                 job_manager,
-                                clustering_models.modelname_list,
+                                clustering_job_manager,
                             ),
                             style={"flex": "0 0 500px"},
                         ),

@@ -2,12 +2,12 @@ import json
 import os
 from uuid import uuid4
 
-from dash import MATCH, Input, Output, html
+from dash import Input, Output, html
 from dotenv import load_dotenv
 
 from src.app_layout import app, clustering_models, dim_reduction_models, mlex_components
 from src.callbacks.display import update_data_overview  # noqa: F401
-from src.callbacks.execute import run_train  # noqa: F401
+from src.callbacks.execute import run_clustering, run_latent_space  # noqa: F401
 
 load_dotenv(".env")
 
@@ -31,7 +31,7 @@ HOST = os.getenv("HOST", "127.0.0.1")
         {
             "component": "DbcJobManagerAIO",
             "subcomponent": "model-parameters",
-            "aio_id": MATCH,
+            "aio_id": "latent-space-jobs",
         },
         "children",
     ),
@@ -39,7 +39,7 @@ HOST = os.getenv("HOST", "127.0.0.1")
         {
             "component": "DbcJobManagerAIO",
             "subcomponent": "model-list",
-            "aio_id": MATCH,
+            "aio_id": "latent-space-jobs",
         },
         "value",
     ),
@@ -56,8 +56,22 @@ def update_dim_reduction_model_parameters(model_name):
 
 
 @app.callback(
-    Output("additional-cluster-params", "children"),
-    Input("cluster-algo-dropdown", "value"),
+    Output(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "model-parameters",
+            "aio_id": "clustering-jobs",
+        },
+        "children",
+    ),
+    Input(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "model-list",
+            "aio_id": "clustering-jobs",
+        },
+        "value",
+    ),
 )
 def update_clustering_model_parameters(model_name):
     model = clustering_models[model_name]

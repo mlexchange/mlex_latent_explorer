@@ -2,7 +2,7 @@ import json
 import os
 from urllib.parse import urljoin
 
-# I/O parameters for training
+# I/O parameters for job execution
 READ_DIR_MOUNT = os.getenv("READ_DIR_MOUNT", None)
 WRITE_DIR_MOUNT = os.getenv("WRITE_DIR_MOUNT", None)
 WRITE_DIR = os.getenv("WRITE_DIR", "")
@@ -34,7 +34,7 @@ def parse_tiled_url(url, user, project_name, tiled_base_path="/api/v1/metadata")
     return url
 
 
-def parse_train_job_params(
+def parse_job_params(
     data_project,
     model_parameters,
     user,
@@ -46,7 +46,7 @@ def parse_train_job_params(
     conda_env=None,
 ):
     """
-    Parse training job parameters
+    Parse job parameters
     """
     # TODO: Use model_name to define the conda_env/algorithm to be executed
     data_uris = [dataset.uri for dataset in data_project.datasets]
@@ -66,7 +66,7 @@ def parse_train_job_params(
     }
 
     if flow_type == "podman":
-        train_params = {
+        job_params = {
             "flow_type": "podman",
             "params_list": [
                 {
@@ -86,7 +86,7 @@ def parse_train_job_params(
         }
 
     elif flow_type == "conda":
-        train_params = {
+        job_params = {
             "flow_type": "conda",
             "params_list": [
                 {
@@ -101,7 +101,7 @@ def parse_train_job_params(
         }
 
     else:
-        train_params = {
+        job_params = {
             "flow_type": "slurm",
             "params_list": [
                 {
@@ -121,7 +121,7 @@ def parse_train_job_params(
             ],
         }
 
-    return train_params
+    return job_params
 
 
 def parse_model_params(model_parameters_html, log, percentiles, mask):

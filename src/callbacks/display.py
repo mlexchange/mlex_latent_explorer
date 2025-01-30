@@ -3,7 +3,8 @@ import math
 from base64 import b64encode
 
 import numpy as np
-from dash import ALL, Input, Output, State, callback
+from dash import ALL, Input, Output, State, callback, no_update
+from dash.exceptions import PreventUpdate
 from file_manager.data_project import DataProject
 from mlex_utils.prefect_utils.core import get_children_flow_run_ids
 from PIL import Image
@@ -164,6 +165,14 @@ def disable_buttons(
         },
         "data",
     ),
+    Output(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "project-name-id",
+            "aio_id": "clustering-jobs",
+        },
+        "data",
+    ),
     Input({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
     prevent_initial_call=True,
 )
@@ -171,7 +180,7 @@ def update_project_name(data_project_dict):
     data_project = DataProject.from_dict(data_project_dict)
     data_uris = [dataset.uri for dataset in data_project.datasets]
     project_name = hash_list_of_strings(data_uris)
-    return project_name
+    return project_name, project_name
 
 
 @callback(
@@ -193,12 +202,16 @@ def update_project_name(data_project_dict):
         },
         "data",
     ),
+    State("show-clusters", "value"),
 )
 def show_feature_vectors(
     show_feature_vectors,
     job_id,
     project_name,
+    show_clusters,
 ):
+    if show_clusters:
+        return no_update
     if show_feature_vectors is False:
         return plot_empty_scatter()
 
@@ -271,3 +284,75 @@ def update_heatmap(
         plot_data = np.std(selected_images, axis=0)
 
     return generate_heatmap_plot(plot_data)
+
+
+@callback(
+    Output("scatter", "figure", allow_duplicate=True),
+    Output("show-feature-vectors", "disabled", allow_duplicate=True),
+    Output("show-feature-vectors", "value", allow_duplicate=True),
+    Input("show-clusters", "value"),
+    State(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "run-dropdown",
+            "aio_id": "clustering-jobs",
+        },
+        "value",
+    ),
+    State(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "run-dropdown",
+            "aio_id": "latent-space-jobs",
+        },
+        "value",
+    ),
+    State(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "project-name-id",
+            "aio_id": "latent-space-jobs",
+        },
+        "data",
+    ),
+    prevent_initial_call=True,
+)
+def show_clusters(
+    show_clusters, clustering_job_id, dimension_reduction_job_id, project_name
+):
+    """
+    Update the 'scatter' figure. If the data dimension or job IDs have changed,
+    we must rebuild the figure. Otherwise, we can just do a partial update (patch).
+    """
+
+    if clustering_job_id is None:
+        raise PreventUpdate
+
+    if not show_clusters:
+        return plot_empty_scatter(), False, False
+
+    # Retrieve latent vectors
+    dim_red_child_id = get_children_flow_run_ids(dimension_reduction_job_id)[0]
+    dim_red_uri = f"{USER}/{project_name}/{dim_red_child_id}"
+    dim_red_data = tiled_results.get_data_by_trimmed_uri(dim_red_uri)
+    latent_vectors = dim_red_data.read().to_numpy()
+    metadata = dim_red_data.metadata
+
+    # Retrieve clustering results
+    cluster_child_id = get_children_flow_run_ids(clustering_job_id)[0]
+    cluster_uri = f"{USER}/{project_name}/{cluster_child_id}"
+    cluster_df = tiled_results.get_data_by_trimmed_uri(cluster_uri).read()
+    clusters = cluster_df["cluster_label"].tolist()
+
+    cluster_names = {label: label for label in np.unique(clusters).astype(int)}
+
+    # Build a brand-new scatter figure
+    scatter_figure = generate_scatter_data(
+        latent_vectors,
+        metadata["model_parameters"]["n_components"],
+        clusters=clusters,
+        color_by="cluster",
+        cluster_names=cluster_names,
+    )
+
+    return scatter_figure, True, True

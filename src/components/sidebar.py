@@ -93,50 +93,18 @@ def get_heatmap_control_panel():
     return heatmap_control_panel
 
 
-def get_clustering_control_panel(model_list):
-    cluster_algo_panel = [
-        ControlItem(
-            "Algorithm",
-            "cluster-algo-dropdown-title",
-            dbc.Select(
-                id="cluster-algo-dropdown",
-                options=model_list,
-                value=model_list[0],
-            ),
-        ),
-        html.Div(id="additional-cluster-params"),
-        html.P(),
-        html.Div(
-            [
-                dbc.Button(
-                    "Cluster",
-                    color="primary",
-                    id="run-cluster-algo",
-                    style={"width": "95%"},
-                ),
-            ],
-            className="row",
-            style={
-                "align-items": "center",
-                "justify-content": "center",
-            },
-        ),
-        html.Div(id="invisible-submit-div"),
-    ]
-    return cluster_algo_panel
-
-
-def sidebar(file_explorer, job_manager, clustering_models):
+def sidebar(file_explorer, job_manager, clustering_job_manager):
     """
     Creates the dash components in the left sidebar of the app
     Args:
-        file_explorer:      Dash file explorer
-        job_manager:        Job manager object
-        clustering_models:  Clustering models
+        file_explorer:          Dash file explorer
+        job_manager:            Job manager object
+        clustering_job_manager: Job manager object for clustering
     """
     sidebar = [
         dbc.Accordion(
             id="sidebar",
+            always_open=True,
             children=[
                 dbc.AccordionItem(
                     title="Data selection",
@@ -198,7 +166,19 @@ def sidebar(file_explorer, job_manager, clustering_models):
                     title="Dimension Reduction",
                 ),
                 dbc.AccordionItem(
-                    children=get_clustering_control_panel(clustering_models),
+                    children=[
+                        clustering_job_manager,
+                        ControlItem(
+                            "",
+                            "empty-title-clusters",
+                            dbc.Switch(
+                                id="show-clusters",
+                                value=False,
+                                label="Show Clusters",
+                                disabled=True,
+                            ),
+                        ),
+                    ],
                     title="Clustering",
                 ),
                 dbc.AccordionItem(

@@ -187,7 +187,7 @@
                 "param_key": "n_clusters"
             }
         ],
-        "python_file_name": "mlex_clustering/clustering.py",
+        "python_file_name": "mlex_clustering/clustering_kmeans.py",
         "public": false
         },
         {
@@ -197,6 +197,7 @@
         "owner": "mlexchange team",
         "image_name": "ghcr.io/mlexchange/mlex_clustering",
         "image_tag": "main",
+        "conda_env": "mlex_clustering",
         "application": [
             "latent_space_explorer"
         ],
@@ -217,7 +218,7 @@
                 "param_key": "min_samples"
             }
         ],
-        "python_file_name": "mlex_clustering/clustering.py",
+        "python_file_name": "mlex_clustering/clustering_dbscan.py",
         "public": false
         },
         {
@@ -241,7 +242,7 @@
                 "param_key": "min_cluster_size"
             }
         ],
-        "python_file_name": "mlex_clustering/clustering.py",
+        "python_file_name": "mlex_clustering/clustering_hdbscan.py",
         "public": false
         }
     ]
