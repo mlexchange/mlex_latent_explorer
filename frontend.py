@@ -27,7 +27,6 @@ from src.callbacks.execute import (  # noqa: F401
     run_latent_space,
 )
 from src.callbacks.live_mode import (  # noqa: F401
-    live_clear_plots,
     live_update_data_project_dict,
     set_live_latent_vectors,
     toggle_controls,

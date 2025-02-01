@@ -66,10 +66,10 @@ def main_display():
             ),
             dbc.Card(
                 id="image-card",
+                style={"height": "67vh"},
                 children=[
                     dbc.CardHeader("Latent Space Analysis"),
                     dbc.CardBody(
-                        id="image-card-body",
                         children=[
                             dbc.Row(
                                 [
@@ -145,7 +145,6 @@ def main_display():
                                 ),
                             ),
                         ],
-                        style={"height": "62vh"},
                     ),
                 ],
             ),

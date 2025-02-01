@@ -1,7 +1,6 @@
 import json
 
 import numpy as np
-import plotly.graph_objects as go
 from dash import Input, Output, State, callback
 from dash.exceptions import PreventUpdate
 
@@ -14,7 +13,6 @@ from src.utils.data_utils import tiled_results
     Output("sidebar", "style"),
     Output("data-overview-card", "style"),
     Output("image-card", "style"),
-    Output("image-card-body", "style"),
     Output("go-live", "style"),
     Input("go-live", "n_clicks"),
     prevent_initial_call=True,
@@ -30,7 +28,6 @@ def toggle_controls(n_clicks):
             {"display": "none"},
             {"display": "none"},
             {"width": "98vw", "height": "88vh"},
-            {"height": "100%"},
             {
                 "display": "flex",
                 "font-size": "40px",
@@ -45,9 +42,8 @@ def toggle_controls(n_clicks):
             False,
             False,
             {"overflow-y": "scroll", "height": "90vh"},
-            {"display": "block"},
-            {"display": "block"},
-            {"height": "62vh"},
+            {},
+            {"height": "67vh"},
             {
                 "display": "flex",
                 "font-size": "40px",
@@ -140,21 +136,3 @@ def set_live_latent_vectors(message, latent_vectors, n_clicks):
         return latent_vectors
     else:
         raise PreventUpdate
-
-
-@callback(
-    Output("latent_vectors", "data", allow_duplicate=True),
-    Output("heatmap", "figure", allow_duplicate=True),
-    Input("go-live", "n_clicks"),
-    prevent_initial_call=True,
-)
-def live_clear_plots(n_clicks):
-    if n_clicks is None:
-        raise PreventUpdate
-    return None, go.Figure(
-        data=go.Heatmap(),
-        layout=dict(
-            autosize=True,
-            margin=go.layout.Margin(l=20, r=20, b=20, t=20, pad=0),
-        ),
-    )
