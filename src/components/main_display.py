@@ -131,11 +131,7 @@ def main_display():
                             dbc.Row(
                                 dbc.Label(
                                     id="stats-div",
-                                    children=[
-                                        "Number of images selected: 0",
-                                        html.Br(),
-                                        "Clusters represented: N/A",
-                                    ],
+                                    children="Number of images selected: 0",
                                 ),
                             ),
                         ],

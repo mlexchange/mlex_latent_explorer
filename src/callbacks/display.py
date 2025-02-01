@@ -240,6 +240,7 @@ def clear_click_data(show_feature_vectors):
 
 @callback(
     Output("heatmap", "figure", allow_duplicate=True),
+    Output("stats-div", "children", allow_duplicate=True),
     Input("scatter", "clickData"),
     Input("scatter", "selectedData"),
     Input("mean-std-toggle", "value"),
@@ -271,7 +272,10 @@ def update_heatmap(
         selected_indices = [click_data["points"][0]["customdata"][0]]
 
     else:
-        return plot_empty_heatmap()
+        return (
+            plot_empty_heatmap(),
+            "Number of images selected: 0",
+        )
 
     data_project = DataProject.from_dict(data_project_dict, api_key=DATA_TILED_KEY)
     selected_images, _ = data_project.read_datasets(selected_indices, export="pillow")
@@ -283,7 +287,10 @@ def update_heatmap(
     else:
         plot_data = np.std(selected_images, axis=0)
 
-    return generate_heatmap_plot(plot_data)
+    return (
+        generate_heatmap_plot(plot_data),
+        f"Number of images selected: {selected_images.shape[0]}",
+    )
 
 
 @callback(
