@@ -37,7 +37,7 @@ def toggle_controls(n_clicks):
         )
     else:
         return (
-            {"display": "block"},
+            {"overflow-y": "scroll", "height": "90vh"},
             {"display": "block"},
             {"display": "block"},
             {"height": "62vh"},
