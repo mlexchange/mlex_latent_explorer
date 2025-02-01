@@ -1,5 +1,6 @@
 import dash_bootstrap_components as dbc
 from dash import dcc, html
+from dash_iconify import DashIconify
 
 from ..utils.plot_utils import draw_rows, plot_empty_heatmap, plot_empty_scatter
 
@@ -31,7 +32,7 @@ def main_display():
                                 ),
                                 html.Div(
                                     draw_rows(1, NUM_IMGS_OVERVIEW),
-                                    style={"width": "84%"},
+                                    style={"width": "84%", "height": "12vh"},
                                 ),
                                 dbc.Button(
                                     className="fa fa-chevron-right",
@@ -53,7 +54,7 @@ def main_display():
                             justify="center",
                             style={"margin-top": "0%"},
                         ),
-                        style={"height": "20vh"},
+                        style={"height": "15vh"},
                     ),
                 ]
             ),
@@ -62,26 +63,83 @@ def main_display():
                 children=[
                     dbc.CardHeader("Latent Space Analysis"),
                     dbc.CardBody(
-                        dbc.Row(
-                            [
-                                dbc.Col(
-                                    dcc.Graph(
-                                        id="scatter",
-                                        figure=plot_empty_scatter(),
+                        [
+                            dbc.Row(
+                                [
+                                    dbc.Col(
+                                        dbc.Label(
+                                            [
+                                                "Select a Group of Points using ",
+                                                html.Span(
+                                                    html.I(
+                                                        DashIconify(icon="lucide:lasso")
+                                                    ),
+                                                    className="icon",
+                                                ),
+                                                " or ",
+                                                html.Span(
+                                                    html.I(
+                                                        DashIconify(
+                                                            icon="lucide:box-select"
+                                                        )
+                                                    ),
+                                                    className="icon",
+                                                ),
+                                                " tools",
+                                            ],
+                                        ),
                                     ),
-                                    width=6,
-                                ),
-                                dbc.Col(
-                                    dcc.Graph(
-                                        id="heatmap",
-                                        figure=plot_empty_heatmap(),
+                                    dbc.Col(
+                                        dbc.RadioItems(
+                                            id="mean-std-toggle",
+                                            className="btn-group",
+                                            inputClassName="btn-check",
+                                            labelClassName="btn btn-outline-primary",
+                                            labelCheckedClassName="active",
+                                            options=[
+                                                {"label": "Mean", "value": "mean"},
+                                                {
+                                                    "label": "Standard Deviation",
+                                                    "value": "sigma",
+                                                },
+                                            ],
+                                            value="mean",
+                                            label_style={"width": "180px"},
+                                        ),
                                     ),
-                                    width=6,
+                                ],
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(
+                                        dcc.Graph(
+                                            id="scatter",
+                                            figure=plot_empty_scatter(),
+                                        ),
+                                        width=6,
+                                    ),
+                                    dbc.Col(
+                                        dcc.Graph(
+                                            id="heatmap",
+                                            figure=plot_empty_heatmap(),
+                                        ),
+                                        width=6,
+                                    ),
+                                ],
+                                className="g-0",
+                            ),
+                            dbc.Row(
+                                dbc.Label(
+                                    id="stats-div",
+                                    children=[
+                                        "Number of images selected: 0",
+                                        html.Br(),
+                                        "Clusters represented: N/A",
+                                    ],
                                 ),
-                            ],
-                            className="g-0",
-                        ),
-                        style={"height": "55vh"},
+                            ),
+                        ],
+                        style={"height": "62vh"},
                     ),
                 ],
             ),

@@ -1,96 +1,10 @@
 import dash_bootstrap_components as dbc
 from dash import dcc, html
-from dash_iconify import DashIconify
 from mlex_utils.dash_utils.components_bootstrap.component_utils import (
     DbcControlItem as ControlItem,
 )
 
 from ..utils.mask_utils import get_mask_options
-
-
-def get_scatter_control_panel():
-    """
-    Creates the scatter control panel
-    """
-    scatter_control_panel = [
-        ControlItem(
-            "Scatter Colors",
-            "scatter-color-title",
-            dbc.Select(
-                id="scatter-color",
-                options=[
-                    {"label": "Cluster", "value": "cluster"},
-                    {"label": "Label", "value": "label"},
-                ],
-                value="cluster",
-            ),
-        ),
-        html.P(),
-        ControlItem(
-            "Select cluster",
-            "cluster-dropdown-title",
-            dbc.Select(
-                id="cluster-dropdown",
-                value=-1,
-            ),
-        ),
-        dcc.Interval(
-            id="interval-component",
-            interval=3000,  # in milliseconds
-            max_intervals=-1,  # keep triggering indefinitely, None
-            n_intervals=0,
-        ),
-    ]
-    return scatter_control_panel
-
-
-def get_heatmap_control_panel():
-    """
-    Creates the heatmap control panel
-    """
-    heatmap_control_panel = [
-        dbc.Label(
-            [
-                "Select a Group of Points using ",
-                html.Span(
-                    html.I(DashIconify(icon="lucide:lasso")),
-                    className="icon",
-                ),
-                " or ",
-                html.Span(
-                    html.I(DashIconify(icon="lucide:box-select")),
-                    className="icon",
-                ),
-                " tools",
-            ],
-            className="mb-3",
-        ),
-        dbc.Label(
-            id="stats-div",
-            children=[
-                "Number of images selected: 0",
-                html.Br(),
-                "Clusters represented: N/A",
-                html.Br(),
-                "Labels represented: N/A",
-            ],
-        ),
-        ControlItem(
-            "Display Image Options",
-            "display-image-options-title",
-            dbc.Select(
-                id="mean-std-toggle",
-                options=[
-                    {"label": "Mean", "value": "mean"},
-                    {"label": "Standard Deviation", "value": "sigma"},
-                ],
-                value="mean",
-                className="mb-2",
-            ),
-        ),
-        html.P(),
-    ]
-    return heatmap_control_panel
 
 
 def sidebar(file_explorer, job_manager, clustering_job_manager):
@@ -180,10 +94,6 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                         ),
                     ],
                     title="Clustering",
-                ),
-                dbc.AccordionItem(
-                    children=get_heatmap_control_panel() + get_scatter_control_panel(),
-                    title="Plot Control Panel",
                 ),
             ],
             style={"overflow-y": "scroll", "height": "90vh"},

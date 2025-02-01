@@ -356,7 +356,7 @@ def parse_contents(index):
     img_card = html.Img(
         id={"type": "thumbnail-src", "index": index},
         style={
-            "height": "16vh",
+            "height": "12vh",
             "margin": "auto",
             "display": "block",
         },
