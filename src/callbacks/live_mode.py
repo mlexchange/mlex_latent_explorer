@@ -2,31 +2,57 @@ import json
 
 import numpy as np
 import plotly.graph_objects as go
-from dash import Input, Output, State
+from dash import Input, Output, State, callback
 from dash.exceptions import PreventUpdate
 
-from app_layout import app, tiled_results
+from src.utils.data_utils import tiled_results
 
 
-@app.callback(
-    Output("data-selection", "style"),
-    Output("dim-red-controls", "style"),
-    Output("clustering-controls", "style"),
-    Output("heatmap-controls", "style"),
+@callback(
+    Output("sidebar", "style"),
+    Output("data-overview-card", "style"),
+    Output("image-card", "style"),
+    Output("image-card-body", "style"),
+    Output("go-live", "style"),
     Input("go-live", "n_clicks"),
 )
 def toggle_controls(n_clicks):
-    # accordionitems share borders, hence we add border-top for heatmap to avoid losing the top
-    # border when hiding the top items
+    """
+    Toggle the visibility of the sidebar, data overview card, image card, and go-live button
+    """
     if n_clicks is not None and n_clicks % 2 == 1:
-        return [{"display": "none"}] * 3 + [
-            {"border-top": "1px solid rgb(223,223,223)"}
-        ]
+        return (
+            {"display": "none"},
+            {"display": "none"},
+            {"width": "98vw", "height": "88vh"},
+            {"height": "100%"},
+            {
+                "display": "flex",
+                "font-size": "40px",
+                "padding": "5px",
+                "color": "white",
+                "background-color": "#00313C",
+                "border": "0px",
+            },
+        )
     else:
-        return [{"display": "block"}] * 3 + [{"display": "block"}]
+        return (
+            {"display": "block"},
+            {"display": "block"},
+            {"display": "block"},
+            {"height": "62vh"},
+            {
+                "display": "flex",
+                "font-size": "40px",
+                "padding": "5px",
+                "color": "#00313C",
+                "background-color": "white",
+                "border": "0px",
+            },
+        )
 
 
-@app.callback(
+@callback(
     Output(
         {"base_id": "file-manager", "name": "data-project-dict"},
         "data",
@@ -47,7 +73,7 @@ def update_data_project_dict(n_clicks):
         raise PreventUpdate
 
 
-@app.callback(
+@callback(
     Output(
         {"base_id": "file-manager", "name": "data-project-dict"},
         "data",
@@ -85,7 +111,7 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict):
     return data_project_dict
 
 
-@app.callback(
+@callback(
     Output("latent_vectors", "data", allow_duplicate=True),
     Input("ws-live", "message"),
     State("latent_vectors", "data"),
@@ -109,7 +135,7 @@ def set_live_latent_vectors(message, latent_vectors, n_clicks):
         raise PreventUpdate
 
 
-@app.callback(
+@callback(
     Output("latent_vectors", "data", allow_duplicate=True),
     Output("heatmap", "figure", allow_duplicate=True),
     Input("go-live", "n_clicks"),

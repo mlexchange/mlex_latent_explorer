@@ -6,8 +6,33 @@ from dash import Input, Output, html
 from dotenv import load_dotenv
 
 from src.app_layout import app, clustering_models, dim_reduction_models, mlex_components
-from src.callbacks.display import update_data_overview  # noqa: F401
-from src.callbacks.execute import run_clustering, run_latent_space  # noqa: F401
+from src.callbacks.display import (  # noqa: F401
+    clear_click_data,
+    disable_buttons,
+    go_to_first_page,
+    go_to_last_page,
+    go_to_next_page,
+    go_to_prev_page,
+    show_clusters,
+    show_feature_vectors,
+    update_data_overview,
+    update_heatmap,
+    update_project_name,
+)
+from src.callbacks.execute import (  # noqa: F401
+    allow_run_clustering,
+    allow_show_clusters,
+    allow_show_feature_vectors,
+    run_clustering,
+    run_latent_space,
+)
+from src.callbacks.live_mode import (  # noqa: F401
+    live_clear_plots,
+    live_update_data_project_dict,
+    set_live_latent_vectors,
+    toggle_controls,
+    update_data_project_dict,
+)
 
 load_dotenv(".env")
 

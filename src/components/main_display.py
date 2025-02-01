@@ -1,16 +1,22 @@
+import os
+
 import dash_bootstrap_components as dbc
 from dash import dcc, html
+from dash_extensions import WebSocket
 from dash_iconify import DashIconify
 
 from ..utils.plot_utils import draw_rows, plot_empty_heatmap, plot_empty_scatter
 
 NUM_IMGS_OVERVIEW = 6
+WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "localhost")
+WEBSOCKET_PORT = os.getenv("WEBSOCKET_PORT", 5000)
 
 
 def main_display():
     main_display = html.Div(
         [
             dbc.Card(
+                id="data-overview-card",
                 children=[
                     dbc.CardHeader("Data Overview"),
                     dbc.CardBody(
@@ -56,14 +62,15 @@ def main_display():
                         ),
                         style={"height": "15vh"},
                     ),
-                ]
+                ],
             ),
             dbc.Card(
                 id="image-card",
                 children=[
                     dbc.CardHeader("Latent Space Analysis"),
                     dbc.CardBody(
-                        [
+                        id="image-card-body",
+                        children=[
                             dbc.Row(
                                 [
                                     dbc.Col(
@@ -115,6 +122,7 @@ def main_display():
                                         dcc.Graph(
                                             id="scatter",
                                             figure=plot_empty_scatter(),
+                                            style={"height": "95%"},
                                         ),
                                         width=6,
                                     ),
@@ -122,11 +130,13 @@ def main_display():
                                         dcc.Graph(
                                             id="heatmap",
                                             figure=plot_empty_heatmap(),
+                                            style={"height": "95%"},
                                         ),
                                         width=6,
                                     ),
                                 ],
                                 className="g-0",
+                                style={"height": "90%"},
                             ),
                             dbc.Row(
                                 dbc.Label(
@@ -139,6 +149,7 @@ def main_display():
                     ),
                 ],
             ),
+            WebSocket(id="ws-live", url=f"ws:{WEBSOCKET_URL}:{WEBSOCKET_PORT}"),
         ],
     )
     return main_display

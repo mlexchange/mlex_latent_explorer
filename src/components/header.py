@@ -1,5 +1,6 @@
 import dash_bootstrap_components as dbc
 from dash import html
+from dash_iconify import DashIconify
 
 
 def header(app_title, github_url):
@@ -47,27 +48,51 @@ def header(app_title, github_url):
                                         [
                                             dbc.NavItem(
                                                 dbc.Button(
-                                                    className="fa fa-github",
+                                                    DashIconify(icon="lucide:github"),
                                                     style={
-                                                        "font-size": "30px",
+                                                        "display": "flex",
+                                                        "font-size": "40px",
+                                                        "padding": "5px",
                                                         "margin-right": "1rem",
                                                         "color": "#00313C",
-                                                        "border": "0px",
                                                         "background-color": "white",
+                                                        "border": "0px",
                                                     },
                                                     href=github_url,
                                                 )
                                             ),
                                             dbc.NavItem(
                                                 dbc.Button(
-                                                    className="fa fa-question-circle-o",
+                                                    DashIconify(
+                                                        icon="lucide:circle-help"
+                                                    ),
                                                     style={
-                                                        "font-size": "30px",
+                                                        "display": "flex",
+                                                        "font-size": "40px",
+                                                        "padding": "5px",
+                                                        "margin-right": "1rem",
                                                         "color": "#00313C",
                                                         "background-color": "white",
                                                         "border": "0px",
                                                     },
                                                     href="https://mlexchange.als.lbl.gov",
+                                                )
+                                            ),
+                                            dbc.NavItem(
+                                                dbc.Button(
+                                                    DashIconify(
+                                                        icon="lucide:circle-play",
+                                                        style={"padding": "0px"},
+                                                    ),
+                                                    id="go-live",
+                                                    style={
+                                                        "display": "flex",
+                                                        "font-size": "40px",
+                                                        "padding": "5px",
+                                                        "color": "#00313C",
+                                                        "background-color": "white",
+                                                        "border": "0px",
+                                                    },
                                                 )
                                             ),
                                         ],
