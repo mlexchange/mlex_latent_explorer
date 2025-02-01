@@ -9,12 +9,15 @@ from src.utils.data_utils import tiled_results
 
 
 @callback(
+    Output("show-clusters", "value", allow_duplicate=True),
+    Output("show-feature-vectors", "value", allow_duplicate=True),
     Output("sidebar", "style"),
     Output("data-overview-card", "style"),
     Output("image-card", "style"),
     Output("image-card-body", "style"),
     Output("go-live", "style"),
     Input("go-live", "n_clicks"),
+    prevent_initial_call=True,
 )
 def toggle_controls(n_clicks):
     """
@@ -22,6 +25,8 @@ def toggle_controls(n_clicks):
     """
     if n_clicks is not None and n_clicks % 2 == 1:
         return (
+            False,
+            False,
             {"display": "none"},
             {"display": "none"},
             {"width": "98vw", "height": "88vh"},
@@ -37,6 +42,8 @@ def toggle_controls(n_clicks):
         )
     else:
         return (
+            False,
+            False,
             {"overflow-y": "scroll", "height": "90vh"},
             {"display": "block"},
             {"display": "block"},

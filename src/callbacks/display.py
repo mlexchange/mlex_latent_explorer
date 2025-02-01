@@ -298,6 +298,7 @@ def update_heatmap(
     Output("show-feature-vectors", "disabled", allow_duplicate=True),
     Output("show-feature-vectors", "value", allow_duplicate=True),
     Input("show-clusters", "value"),
+    # Input("go-live", "n_clicks"),
     State(
         {
             "component": "DbcJobManagerAIO",
@@ -335,7 +336,7 @@ def show_clusters(
     if clustering_job_id is None:
         raise PreventUpdate
 
-    if not show_clusters:
+    if not show_clusters:  # or button_clicked == "go-live":
         return plot_empty_scatter(), False, False
 
     # Retrieve latent vectors
