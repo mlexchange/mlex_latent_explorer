@@ -1,10 +1,11 @@
 import json
 
-import numpy as np
 from dash import Input, Output, State, callback
 from dash.exceptions import PreventUpdate
 
+from src.app_layout import USER
 from src.utils.data_utils import tiled_results
+from src.utils.plot_utils import generate_scatter_data
 
 
 @callback(
@@ -94,7 +95,12 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict):
     if n_clicks is not None and n_clicks % 2 == 1:
         message = json.loads(message["data"])
         flow_id = message["flow_id"]
-        metadata = tiled_results.get_metadata(flow_id)
+        project_name = message["project_name"]
+
+        dim_red_uri = f"{USER}/{project_name}/{flow_id}"
+        dim_red_data = tiled_results.get_data_by_trimmed_uri(dim_red_uri)
+        metadata = dim_red_data.metadata
+
         root_uri = metadata["io_parameters"]["root_uri"]
         assert len(metadata["io_parameters"]["data_uris"]) == 1
         data_uri = metadata["io_parameters"]["data_uris"][0]
@@ -115,24 +121,33 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict):
 
 
 @callback(
-    Output("latent_vectors", "data", allow_duplicate=True),
+    Output("scatter", "figure", allow_duplicate=True),
     Input("ws-live", "message"),
-    State("latent_vectors", "data"),
     State("go-live", "n_clicks"),
+    State("scatter", "figure"),
     prevent_initial_call=True,
 )
-def set_live_latent_vectors(message, latent_vectors, n_clicks):
-    if n_clicks is not None and n_clicks % 2 == 1:
-        message = message["data"]
-        message = json.loads(message)
-        flow_id = message["flow_id"]
-        new_latent_vectors = tiled_results.get_latent_vectors(flow_id)
-        if latent_vectors is None:
-            latent_vectors = np.array(new_latent_vectors)
-        else:
-            latent_vectors = np.concatenate(
-                [latent_vectors, new_latent_vectors], axis=0
-            )
-        return latent_vectors
+def set_live_latent_vectors(message, n_clicks, current_figure):
+    # Parse the incoming message
+    message = json.loads(message["data"])
+    flow_id = message["flow_id"]
+    project_name = message["project_name"]
+
+    # Retrieve data from wherever
+    dim_red_uri = f"{USER}/{project_name}/{flow_id}"
+    dim_red_data = tiled_results.get_data_by_trimmed_uri(dim_red_uri)
+    latent_vectors = dim_red_data.read().to_numpy()
+    metadata = dim_red_data.metadata
+    num_latent_vectors = latent_vectors.shape[0]
+
+    if "customdata" not in current_figure["data"][0]:
+        # Generate new scatter data
+        return generate_scatter_data(
+            latent_vectors, metadata["model_parameters"]["n_components"]
+        )
+
     else:
-        raise PreventUpdate
+        current_figure["data"][0]["customdata"].append([num_latent_vectors - 1])
+        current_figure["data"][0]["x"].append(int(latent_vectors[:, 0]))
+        current_figure["data"][0]["y"].append(int(latent_vectors[:, 1]))
+        return current_figure

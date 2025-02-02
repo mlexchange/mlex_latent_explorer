@@ -34,6 +34,7 @@ def get_empty_image():
     Input("min-max-percentile", "value"),
     Input("current-page", "data"),
     State({"base_id": "file-manager", "name": "total-num-data-points"}, "data"),
+    State("go-live", "n_clicks"),
 )
 def update_data_overview(
     data_project_dict,
@@ -41,7 +42,10 @@ def update_data_overview(
     percentiles,
     current_page,
     num_imgs,
+    go_live,
 ):
+    if go_live is not None and go_live % 2 == 1:
+        raise PreventUpdate
     imgs = []
     if data_project_dict != {}:
         data_project = DataProject.from_dict(data_project_dict, api_key=DATA_TILED_KEY)
@@ -174,9 +178,12 @@ def disable_buttons(
         "data",
     ),
     Input({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
+    State("go-live", "n_clicks"),
     prevent_initial_call=True,
 )
-def update_project_name(data_project_dict):
+def update_project_name(data_project_dict, go_live):
+    if go_live is not None and go_live % 2 == 1:
+        raise PreventUpdate
     data_project = DataProject.from_dict(data_project_dict)
     data_uris = [dataset.uri for dataset in data_project.datasets]
     project_name = hash_list_of_strings(data_uris)
@@ -239,7 +246,7 @@ def clear_click_data(show_feature_vectors):
 
 
 @callback(
-    Output("heatmap", "figure", allow_duplicate=True),
+    Output("heatmap", "figure"),
     Output("stats-div", "children", allow_duplicate=True),
     Input("scatter", "clickData"),
     Input("scatter", "selectedData"),
@@ -265,11 +272,11 @@ def update_heatmap(
     """
     # user select a group of points
     if selected_data is not None and len(selected_data["points"]) > 0:
-        selected_indices = [point["customdata"][0] for point in selected_data["points"]]
+        selected_indices = [point["pointIndex"] for point in selected_data["points"]]
 
     # user click on a single point
     elif click_data is not None and len(click_data["points"]) > 0:
-        selected_indices = [click_data["points"][0]["customdata"][0]]
+        selected_indices = [click_data["points"][0]["pointIndex"]]
 
     else:
         return (
