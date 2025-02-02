@@ -18,10 +18,11 @@ requires-python = ">=3.11"
 dependencies = [
     "dash==2.9.3",
     "dash-core-components==2.0.0",
-    "dash-bootstrap-components>=1.0.2",
+    "dash-bootstrap-components>=1.1.0",
     "dash-extensions==0.0.71",
     "dash-iconify==0.1.2",
-    "dask==2024.3.0",
+    "dask>=2024.3.0",
+    "dask-expr==1.0.10",
     "flask==3.0.0",
     "Flask-Caching",
     "kaleido",
@@ -31,7 +32,7 @@ dependencies = [
     "numpy<2.0.0",
     "pandas",
     "Pillow",
-    "plotly>=5.21.0",
+    "plotly>=5.21.0,<6.0.0",
     "plotly-express",
     "pyFAI==2023.9.0",
     "python-dotenv",
@@ -52,5 +53,5 @@ dev = [
 
 simulator = [
     "websocket",
-    "pika",
+    "aio-pika"
 ]
