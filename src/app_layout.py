@@ -1,49 +1,41 @@
+import json
 import os
 
 import dash_bootstrap_components as dbc
 import diskcache
-import plotly.graph_objects as go
 from dash import Dash, dcc, html
 from dash.long_callback import DiskcacheLongCallbackManager
-from dash_iconify import DashIconify
 from dotenv import load_dotenv
 from file_manager.main import FileManager
+from mlex_utils.dash_utils.mlex_components import MLExComponents
 
-import templates
+from src.components.header import header
+from src.components.main_display import main_display
+from src.components.sidebar import sidebar
+from src.utils.model_utils import Models
 
-load_dotenv(".env", override=True)
-
-ALGORITHM_DATABASE = {
-    "PCA": "PCA",
-    "UMAP": "UMAP",
-}
-
-CLUSTER_ALGORITHM_DATABASE = {
-    "KMeans": "KMeans",
-    "DBSCAN": "DBSCAN",
-    "HDBSCAN": "HDBSCAN",
-}
+load_dotenv(".env")
 
 READ_DIR = os.getenv("READ_DIR")
 WRITE_DIR = os.getenv("WRITE_DIR")
-API_KEY = os.getenv("API_KEY", None)
-if API_KEY == "":
-    API_KEY = None
+DATA_TILED_KEY = os.getenv("DATA_TILED_KEY", None)
+MODE = os.getenv("MODE", "dev")
+PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
+USER = os.getenv("USER")
+NUM_IMGS_OVERVIEW = 6
 
-if os.path.exists(f"{os.getcwd()}/src/example_dataset"):
-    EXAMPLE_DATASETS = [
-        {
-            "label": "Synthetic Shapes",
-            "value": f"{os.getcwd()}/src/example_dataset/Demoshapes.npz",
-        }
-    ]
-else:
-    EXAMPLE_DATASETS = []
+# Websocket
+WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "127.0.0.1")
+WEBSOCKET_PORT = os.getenv("WEBSOCKET_PORT", 8765)
 
 # SETUP DASH APP
 cache = diskcache.Cache("./cache")
 long_callback_manager = DiskcacheLongCallbackManager(cache)
-external_stylesheets = [dbc.themes.BOOTSTRAP, "../assets/segmentation-style.css"]
+external_stylesheets = [
+    dbc.themes.BOOTSTRAP,
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css",
+    "../assets/segmentation-style.css",
+]
 app = Dash(
     __name__,
     external_stylesheets=external_stylesheets,
@@ -53,303 +45,44 @@ app = Dash(
 
 server = app.server
 
-dash_file_explorer = FileManager(READ_DIR, open_explorer=False, api_key=API_KEY)
+dash_file_explorer = FileManager(
+    READ_DIR,
+    open_explorer=False,
+    api_key=DATA_TILED_KEY,
+)
 dash_file_explorer.init_callbacks(app)
+file_explorer = dash_file_explorer.file_explorer
+
+# GET MODELS
+dim_reduction_models = Models(
+    modelfile_path="./src/assets/default_models.json", model_type="dimension_reduction"
+)
+clustering_models = Models(
+    modelfile_path="./src/assets/default_models.json", model_type="clustering"
+)
+
+# SETUP MLEx COMPONENTS
+mlex_components = MLExComponents("dbc")
+job_manager = mlex_components.get_job_manager_minimal(
+    model_list=dim_reduction_models.modelname_list,
+    mode=MODE,
+    aio_id="latent-space-jobs",
+    prefect_tags=PREFECT_TAGS + ["latent-space"],
+)
+
+clustering_job_manager = mlex_components.get_job_manager_minimal(
+    model_list=clustering_models.modelname_list,
+    mode=MODE,
+    aio_id="clustering-jobs",
+    prefect_tags=PREFECT_TAGS + ["clustering"],
+    dependency_id={
+        "component": "DbcJobManagerAIO",
+        "subcomponent": "run-dropdown",
+        "aio_id": "latent-space-jobs",
+    },
+)
 
 # BEGIN DASH CODE
-header = templates.header()
-# right panel: file manager, scatter plot, individual image  plot
-scatter_control_panel = html.Div(
-    [
-        dbc.Card(
-            style={"width": "100%"},
-            children=[
-                dbc.CardHeader("Scatter Plot Control Panel"),
-                dbc.CardBody(
-                    [
-                        dbc.Label("Scatter Colors", className="mr-3"),
-                        dcc.RadioItems(
-                            id="scatter-color",
-                            options=[
-                                {"label": "cluster", "value": "cluster"},
-                                {"label": "label", "value": "label"},
-                            ],
-                            value="cluster",
-                            style={"min-width": "250px"},
-                            className="mb-2",
-                        ),
-                        dbc.Label("Select cluster", className="mr-3"),
-                        dcc.Dropdown(
-                            id="cluster-dropdown",
-                            value=-1,
-                            style={"min-width": "250px"},
-                            className="mb-2",
-                        ),
-                        dbc.Label("Select label", className="mr-3"),
-                        dcc.Dropdown(
-                            id="label-dropdown",
-                            value=-2,
-                            style={"min-width": "250px"},
-                        ),
-                    ]
-                ),
-            ],
-        ),
-        dcc.Interval(
-            id="interval-component",
-            interval=3000,  # in milliseconds
-            max_intervals=-1,  # keep triggering indefinitely, None
-            n_intervals=0,
-        ),
-    ]
-)
-
-heatmap_control_panel = html.Div(
-    [
-        dbc.Card(
-            style={"width": "100%"},
-            children=[
-                dbc.CardHeader("Heatmap Control Panel"),
-                dbc.CardBody(
-                    [
-                        dbc.Label(
-                            [
-                                "Select a Group of Points using ",
-                                html.Span(
-                                    html.I(DashIconify(icon="lucide:lasso")),
-                                    className="icon",
-                                ),
-                                " or ",
-                                html.Span(
-                                    html.I(DashIconify(icon="lucide:box-select")),
-                                    className="icon",
-                                ),
-                                " Tools :",
-                            ],
-                            className="mb-3",
-                        ),
-                        dbc.Label(
-                            id="stats-div",
-                            children=[
-                                "Number of images selected: 0",
-                                html.Br(),
-                                "Clusters represented: N/A",
-                                html.Br(),
-                                "Labels represented: N/A",
-                            ],
-                        ),
-                        dbc.Label("Display Image Options", className="mr-3"),
-                        dcc.RadioItems(
-                            id="mean-std-toggle",
-                            options=[
-                                {"label": "Mean", "value": "mean"},
-                                {"label": "Standard Deviation", "value": "sigma"},
-                            ],
-                            value="mean",
-                            style={"min-width": "250px"},
-                            className="mb-2",
-                        ),
-                    ]
-                ),
-            ],
-        )
-    ]
-)
-
-image_panel = [
-    dbc.Card(
-        id="image-card",
-        children=[
-            dbc.CardHeader(
-                [
-                    dbc.Label("Select a Dataset", className="mr-2"),
-                    dash_file_explorer.file_explorer,
-                    dbc.Label("Or try Example Dataset", className="mr-2"),
-                    dcc.Dropdown(
-                        id="example-dataset-selection",
-                        options=EXAMPLE_DATASETS,
-                        clearable=True,
-                        style={"margin-bottom": "1rem"},
-                    ),
-                ]
-            ),
-            dbc.CardBody(
-                [
-                    dbc.Row(
-                        [
-                            dbc.Col(
-                                dcc.Graph(
-                                    id="scatter",
-                                    figure=go.Figure(
-                                        go.Scattergl(mode="markers"),
-                                        layout=go.Layout(
-                                            autosize=True,
-                                            margin=go.layout.Margin(
-                                                l=20,
-                                                r=20,
-                                                b=20,
-                                                t=20,
-                                                pad=0,
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                                width=6,
-                            ),
-                            dbc.Col(
-                                dcc.Graph(
-                                    id="heatmap",
-                                    figure=go.Figure(
-                                        go.Heatmap(),
-                                        layout=go.Layout(
-                                            autosize=True,
-                                            margin=go.layout.Margin(
-                                                l=20,
-                                                r=20,
-                                                b=20,
-                                                t=20,
-                                                pad=0,
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                                width=6,
-                            ),
-                        ]
-                    ),
-                ]
-            ),
-            dbc.CardFooter(
-                [
-                    dbc.Row(
-                        [
-                            dbc.Col(
-                                scatter_control_panel,
-                                width=6,
-                            ),
-                            dbc.Col(
-                                heatmap_control_panel,
-                                width=6,
-                            ),
-                        ]
-                    )
-                ]
-            ),
-        ],
-    )
-]
-
-# left panel: choose algorithms, submit job, choose scatter plot attributes, and statistics...
-algo_panel = dbc.AccordionItem(
-    [
-        dbc.CardBody(
-            [
-                dbc.Label("Optional: Select Pre-trained Autoencoder", className="mr-2"),
-                dcc.Dropdown(
-                    id="feature-vector-model-list",
-                    clearable=True,
-                    style={"margin-bottom": "1rem"},
-                ),
-                html.Hr(),
-                dbc.Label("Dimension Reduction Algorithm", className="mr-2"),
-                dcc.Dropdown(
-                    id="algo-dropdown",
-                    options=[
-                        {"label": entry, "value": entry} for entry in ALGORITHM_DATABASE
-                    ],
-                    style={"min-width": "250px"},
-                    value="PCA",
-                ),
-                html.Div(id="additional-model-params"),
-                html.Hr(),
-                html.Div(
-                    [
-                        dbc.Label("Name your job", className="mr-2"),
-                        dcc.Input(
-                            id="job-name",
-                            placeholder="test0",
-                            style={
-                                "width": "100%",
-                                "margin-bottom": "1rem",
-                            },
-                        ),
-                    ]
-                ),
-                html.Div(
-                    [
-                        dbc.Button(
-                            "Submit",
-                            color="secondary",
-                            id="run-algo",
-                            outline=True,
-                            size="lg",
-                            className="m-1",
-                            style={"width": "50%"},
-                        ),
-                    ],
-                    className="row",
-                    style={
-                        "align-items": "center",
-                        "justify-content": "center",
-                    },
-                ),
-                html.Hr(),
-                dbc.Alert(id="job-alert", is_open=False, dismissable=True),
-                html.Hr(),
-                html.Div(
-                    [
-                        dbc.Label("Select a job..."),
-                        dcc.Dropdown(id="job-selector"),
-                    ]
-                ),
-                html.Div(id="invisible-apply-div"),
-            ]
-        ),
-    ],
-    title="Select Dimension Reduction Algorithms",
-)
-
-cluster_algo_panel = dbc.AccordionItem(
-    [
-        dbc.CardBody(
-            [
-                dbc.Label("Algorithm", className="mr-2"),
-                dcc.Dropdown(
-                    id="cluster-algo-dropdown",
-                    options=[
-                        {"label": entry, "value": entry}
-                        for entry in CLUSTER_ALGORITHM_DATABASE
-                    ],
-                    style={"min-width": "250px"},
-                    value="DBSCAN",
-                ),
-                html.Div(id="additional-cluster-params"),
-                html.Hr(),
-                html.Div(
-                    [
-                        dbc.Button(
-                            "Apply",
-                            color="secondary",
-                            id="run-cluster-algo",
-                            outline=True,
-                            size="lg",
-                            className="m-1",
-                            style={"width": "50%"},
-                        ),
-                    ],
-                    className="row",
-                    style={
-                        "align-items": "center",
-                        "justify-content": "center",
-                    },
-                ),
-                html.Div(id="invisible-submit-div"),
-            ]
-        ),
-    ],
-    title="Select Clustering Algorithms",
-)
-
 
 # add alert pop up window
 modal = html.Div(
@@ -365,12 +98,6 @@ modal = html.Div(
     ]
 )
 
-control_panel = dbc.Accordion(
-    [algo_panel, cluster_algo_panel],
-    style={"position": "sticky", "top": "10%", "width": "100%"},
-)
-
-
 # metadata
 meta = [
     html.Div(
@@ -379,7 +106,6 @@ meta = [
             # Store for user created contents
             dcc.Store(id="image-length", data=0),
             dcc.Store(id="user-upload-data-dir", data=None),
-            dcc.Store(id="dataset-options", data=EXAMPLE_DATASETS),
             dcc.Store(id="run-counter", data=0),
             dcc.Store(id="experiment-id", data=None),
             # data_label_schema, latent vectors, clusters
@@ -396,17 +122,23 @@ meta = [
 # DEFINE LAYOUT
 app.layout = html.Div(
     [
-        header,
+        header(
+            "MLExchange | Latent Space Explorer",
+            "https://github.com/mlexchange/mlex_latent_explorer",
+        ),
         dbc.Container(
             children=[
                 dbc.Row(
                     [
                         dbc.Col(
-                            control_panel,
-                            width=4,
-                            style={"display": "flex", "margin-top": "1em"},
+                            sidebar(
+                                file_explorer,
+                                job_manager,
+                                clustering_job_manager,
+                            ),
+                            style={"flex": "0 0 500px"},
                         ),
-                        dbc.Col(image_panel, width=8),
+                        dbc.Col(main_display()),
                     ]
                 ),
                 dbc.Row(dbc.Col(modal)),
