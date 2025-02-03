@@ -1,14 +1,11 @@
-FROM python:3.9
-LABEL maintainer="THE MLEXCHANGE TEAM"
-
-COPY pyproject.toml pyproject.toml
-
-RUN pip3 install --upgrade pip &&\
-    pip3 install .
+FROM python:3.11
 
 WORKDIR /app/work
-ENV HOME /app/work
-COPY src src
 
-CMD ["bash"]
-CMD python3 src/frontend.py
+COPY . /app/work
+RUN pip install --upgrade pip
+RUN pip install .
+
+ENV HOME /app/work
+
+CMD ["gunicorn", "-c", "gunicorn_config.py", "--reload", "src.app_layout:server"]

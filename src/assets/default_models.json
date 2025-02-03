@@ -1,0 +1,249 @@
+{
+    "contents": [
+        {
+        "model_name": "umap_v1.0.0",
+        "version": "1.0.0",
+        "type": "dimension_reduction",
+        "owner": "mlexchange team",
+        "image_name": "ghcr.io/mlexchange/mlex_dimension_reduction_umap",
+        "image_tag": "main",
+        "conda_env": "mlex_dimension_reduction_umap",
+        "application": [
+            "latent_space_explorer"
+        ],
+        "description": "Dimension reduction with UMAP",
+        "gui_parameters": [
+            {
+                "type": "dropdown",
+                "name": "ncomp-dropdown-menu-2",
+                "title": "Number of Components",
+                "value": 2,
+                "options": [
+                    {
+                        "label": "2",
+                        "value": 2
+                    },
+                    {
+                        "label": "3",
+                        "value": 3
+                    }
+                ],
+                "param_key": "n_components"
+            },
+            {
+                "type": "dropdown",
+                "name": "mindist-dropdown-menu",
+                "title": "Min distance between points",
+                "value": 0.1,
+                "options": [
+                    {
+                        "label": 0.1,
+                        "value": 0.1
+                    },
+                    {
+                        "label": 0.2,
+                        "value": 0.2
+                    },
+                    {
+                        "label": 0.3,
+                        "value": 0.3
+                    },
+                    {
+                        "label": 0.4,
+                        "value": 0.4
+                    },
+                    {
+                        "label": 0.5,
+                        "value": 0.5
+                    },
+                    {
+                        "label": 0.6,
+                        "value": 0.6
+                    },
+                    {
+                        "label": 0.7,
+                        "value": 0.7
+                    },
+                    {
+                        "label": 0.8,
+                        "value": 0.8
+                    },
+                    {
+                        "label": 0.9,
+                        "value": 0.9
+                    },
+                    {
+                        "label": 1.0,
+                        "value": 1.0
+                    }
+                ],
+                "param_key": "min_dist"
+              },
+              {
+                "type": "dropdown",
+                "name": "nneighbor-dropdown-menu",
+                "title": "Number of Nearest Neighbors",
+                "value": 15,
+                "options": [
+                    {
+                        "label": 5,
+                        "value": 5
+                    },
+                    {
+                        "label": 10,
+                        "value": 10
+                    },
+                    {
+                        "label": 15,
+                        "value": 15
+                    },
+                    {
+                        "label": 20,
+                        "value": 20
+                    },
+                    {
+                        "label": 25,
+                        "value": 25
+                    },
+                    {
+                        "label": 30,
+                        "value": 30
+                    },
+                    {
+                        "label": 35,
+                        "value": 35
+                    },
+                    {
+                        "label": 40,
+                        "value": 40
+                    },
+                    {
+                        "label": 45,
+                        "value": 45
+                    },
+                    {
+                        "label": 50,
+                        "value": 50
+                    }
+                ],
+                "param_key": "n_neighbors"
+            }
+        ],
+        "python_file_name": "mlex_dimension_reduction_umap/src/umap_run.py",
+        "public": false
+        },
+        {
+        "model_name": "pca_v1.0.0",
+        "version": "1.0.0",
+        "type": "dimension_reduction",
+        "owner": "mlexchange team",
+        "image_name": "ghcr.io/mlexchange/mlex_dimension_reduction_pca",
+        "image_tag": "main",
+        "conda_env": "mlex_dimension_reduction_pca",
+        "application": [
+            "latent_space_explorer"
+        ],
+        "description": "Dimension reduction with PCA",
+        "gui_parameters": [
+            {
+                "type": "dropdown",
+                "name": "ncomp-dropdown-menu",
+                "title": "Number of Components",
+                "value": 2,
+                "options": [
+                    {
+                        "label": "2",
+                        "value": 2
+                    },
+                    {
+                        "label": "3",
+                        "value": 3
+                    }
+                ],
+                "param_key": "n_components"
+            }
+        ],
+        "python_file_name": "mlex_dimension_reduction_pca/src/pca_run.py",
+        "public": false
+        },
+        {
+        "model_name": "kmeans_v1.0.0",
+        "version": "1.0.0",
+        "type": "clustering",
+        "owner": "mlexchange team",
+        "image_name": "ghcr.io/mlexchange/mlex_clustering",
+        "image_tag": "main",
+        "conda_env": "mlex_clustering",
+        "application": [
+            "latent_space_explorer"
+        ],
+        "description": "Clustering with KMeans",
+        "gui_parameters": [
+            {
+                "type": "int",
+                "name": "ncluster-dropdown-menu",
+                "title": "Number of clusters",
+                "value": 8,
+                "param_key": "n_clusters"
+            }
+        ],
+        "python_file_name": "mlex_clustering/src/clustering_kmeans.py",
+        "public": false
+        },
+        {
+        "model_name": "dbscan_v1.0.0",
+        "version": "1.0.0",
+        "type": "clustering",
+        "owner": "mlexchange team",
+        "image_name": "ghcr.io/mlexchange/mlex_clustering",
+        "image_tag": "main",
+        "conda_env": "mlex_clustering",
+        "application": [
+            "latent_space_explorer"
+        ],
+        "description": "Clustering with DBSCAN",
+        "gui_parameters": [
+            {
+                "type": "float",
+                "name": "eps",
+                "title": "Neighborhood of a point",
+                "value": 0.5,
+                "param_key": "eps"
+            },
+            {
+                "type": "int",
+                "name": "minsample",
+                "title": "Minimum number of points",
+                "value": 5,
+                "param_key": "min_samples"
+            }
+        ],
+        "python_file_name": "mlex_clustering/src/clustering_dbscan.py",
+        "public": false
+        },
+        {
+        "model_name": "hdbscan_v1.0.0",
+        "version": "1.0.0",
+        "type": "clustering",
+        "owner": "mlexchange team",
+        "image_name": "ghcr.io/mlexchange/mlex_clustering",
+        "image_tag": "main",
+        "conda_env": "mlex_clustering",
+        "application": [
+            "latent_space_explorer"
+        ],
+        "description": "Clustering with HDBSCAN",
+        "gui_parameters": [
+            {
+                "type": "int",
+                "name": "mincluster-size",
+                "title": "Minimum cluster size",
+                "value": 5,
+                "param_key": "min_cluster_size"
+            }
+        ],
+        "python_file_name": "mlex_clustering/src/clustering_hdbscan.py",
+        "public": false
+        }
+    ]
+}

@@ -1,52 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+    packages = ["src/**/*"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [project]
-name = "mlex_latent_explorer"
-version = "0.0.1"
-authors = [
-    { name="Runbo Jiang", email="rjiang2@lbl.gov"}
-]
-description = "A web app to visualize latent vectors in 2D or 3D, supporting PCA and UMAP for dimension reduction."
-readme = "README.md"
-requires-python = ">=3.9"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
-]
+name = "latent_space_explorer"
+version = "0.1.0"
+description = "Latent Space Explorer"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.11"
 
 dependencies = [
     "dash==2.9.3",
     "dash-core-components==2.0.0",
-    "dash-bootstrap-components==1.0.2",
-    "dash-html-components==2.0.0",
+    "dash-bootstrap-components>=1.1.0",
+    "dash-extensions==0.0.71",
     "dash-iconify==0.1.2",
-    "plotly==5.14.1",
-    "scikit-learn==1.3.0",
-    "dash-uploader==0.6.0",
-    "requests==2.26.0",
-    "pyarrow==11.0.0",
-    "diskcache==5.6.3",
-    "dash_component_editor@git+https://github.com/mlexchange/mlex_dash_component_editor",
-    "mlex_file_manager@git+https://github.com/mlexchange/mlex_file_manager",
-    "Pillow",
+    "dask>=2024.3.0",
+    "dask-expr==1.0.10",
+    "flask==3.0.0",
+    "Flask-Caching",
+    "kaleido",
+    "humanhash3",
+    "mlex_file_manager@git+https://github.com/mlexchange/mlex_file_manager.git",
+    "mlex_utils[all]@git+https://github.com/mlexchange/mlex_utils.git",
+    "numpy<2.0.0",
     "pandas",
-    "numpy",
+    "Pillow",
+    "plotly>=5.21.0,<6.0.0",
+    "plotly-express",
+    "pyFAI==2023.9.0",
     "python-dotenv",
-    "prefect-client==2.14.21"
+    "pyarrow>=14.0.1",
+    "requests==2.26.0",
+    "diskcache==5.6.3",
+    "scikit-learn==1.3.0",
 ]
 
 [project.optional-dependencies]
-# These are required for developing the package (running the tests, building
-# the documentation) but not necessarily required for _using_ it.
 dev = [
-    "dash[testing]",
-    "flake8",
-    "pre-commit",
-    "pytest-mock",
-    "tiled[all]",
+    "black==24.2.0",
+    "flake8==7.0.0",
+    "isort==5.13.2",
+    "pre-commit==3.6.2",
+    "pytest==8.1.1",
 ]
 
-[project.urls]
-Homepage = "https://github.com/mlexchange/mlex_latent_explorer"
-Issues = "https://github.com/mlexchange/mlex_latent_explorer/issues/"
-
-[tool.isort]
-profile = "black"
+simulator = [
+    "websocket",
+    "aio-pika"
+]
