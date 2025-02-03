@@ -1,15 +1,37 @@
-# MLExchange Latent Space Explorer 
+# MLExchange Latent Space Explorer
 
 An app to visulize latent vectors in 2D or 3D. It supports PCA and UMAP for dimension reduction.
- 
-To run this demo:
-- install Docker.
-- clone and run the MLExchange [Compute API](https://github.com/mlexchange/mlex_computing_api) and [Content Registry](https://github.com/mlexchange/mlex_content_registry) in their corresponding folders.
-- clone the [PCA](https://github.com/runboj/mlex_dimension_reduction_pca) and [UMAP](https://github.com/runboj/mlex_dimension_reduction_umap) repo.
-    - Register these two models in Content Registry using the json file in the description folder
-    - Run these two models in Docker
-- clone this repo and then run `docker-compose up` in the main folder.  
-- Go to `http://0.0.0.0:8070/` in a brower.
+
+## Running as a standalone application
+
+1. Start a Tiled and Prefect servers in the [MLExchange platform](https://github.com/mlexchange/mlex_tomo_framework). Before moving to the next step, please make sure that both services are running accordingly.
+
+2. Create a new Python environment and install dependencies:
+```
+conda create -n new_env python==3.11
+conda activate new_env
+pip install .
+```
+
+3. Create a `.env` file using `.env.example` as reference. Update this file accordingly.
+
+4. Start example app:
+```
+python frontend.py
+```
+
+Finally, you can access Latent Space Explorer at:
+* Dash app: http://localhost:8070/
+
+## Model Description
+
+For dimension reduction:
+- [PCA](https://github.com/mlexchange/mlex_dimension_reduction_pca)
+
+- [UMAP](https://github.com/mlexchange/mlex_dimension_reduction_umap)
+
+For clustering:
+- [KMeans, DBSCAN, HDBSCAN](https://github.com/mlexchange/mlex_clustering)
 
 
 ## Copyright
@@ -55,6 +77,3 @@ non-exclusive, royalty-free perpetual license to install, use, modify,
 prepare derivative works, incorporate into other computer software,
 distribute, and sublicense such enhancements or derivative works thereof,
 in binary and source code form.
- 
-
- 
