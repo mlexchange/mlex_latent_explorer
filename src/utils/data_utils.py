@@ -66,22 +66,3 @@ def hash_list_of_strings(strings_list):
     concatenated = "".join(strings_list)
     digest = hashlib.sha256(concatenated.encode("utf-8")).hexdigest()
     return humanize(digest)
-
-
-def get_input_params(children):
-    """
-    Gets the model parameters and its corresponding values
-    """
-    input_params = {}
-    if bool(children):
-        try:
-            for child in children["props"]["children"]:
-                key = child["props"]["children"][1]["props"]["id"]["param_key"]
-                value = child["props"]["children"][1]["props"]["value"]
-                input_params[key] = value
-        except Exception:
-            for child in children:
-                key = child["props"]["children"][1]["props"]["id"]
-                value = child["props"]["children"][1]["props"]["value"]
-                input_params[key] = value
-    return input_params
