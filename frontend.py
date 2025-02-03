@@ -47,7 +47,8 @@ PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]')
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
 FLOW_NAME = os.getenv("FLOW_NAME", "")
 
-HOST = os.getenv("HOST", "127.0.0.1")
+HOST = os.getenv("APP_HOST", "127.0.0.1")
+PORT = os.getenv("APP_PORT", "8070")
 
 
 @app.callback(
@@ -112,5 +113,5 @@ if __name__ == "__main__":
     app.run_server(
         debug=True,
         host=HOST,
-        port=8070,
+        port=PORT,
     )
