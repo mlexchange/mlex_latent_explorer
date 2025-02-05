@@ -5,7 +5,8 @@ services:
   front-end:
     restart: "unless-stopped"
     container_name: "latentxp"
-    image: ghcr.io/mlexchange/mlex_latent_explorer:main
+    build:
+      context: "."
     environment:
       # Dash
       APP_HOST: "0.0.0.0"
@@ -42,9 +43,8 @@ services:
       WEBSOCKET_URL: ${WEBSOCKET_URL}
       WEBSOCKET_PORT: ${WEBSOCKET_PORT}
     volumes:
-      - $READ_DIR:/app/work/data
-      - $WRITE_DIR:/app/work/mlex_store
-      - ./src:/app/work/src
+      - ${READ_DIR}:/app/work/data
+      - ${WRITE_DIR}:/app/work/mlex_store
     ports:
       - "127.0.0.1:8070:8070"
     networks:
