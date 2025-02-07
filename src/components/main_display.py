@@ -66,7 +66,7 @@ def main_display():
             ),
             dbc.Card(
                 id="image-card",
-                style={"height": "67vh"},
+                style={"height": "64vh"},
                 children=[
                     dbc.CardHeader("Latent Space Analysis"),
                     dbc.CardBody(
@@ -74,27 +74,53 @@ def main_display():
                             dbc.Row(
                                 [
                                     dbc.Col(
-                                        dbc.Label(
+                                        dbc.Row(
                                             [
-                                                "Select a Group of Points using ",
-                                                html.Span(
-                                                    html.I(
-                                                        DashIconify(icon="lucide:lasso")
-                                                    ),
-                                                    className="icon",
+                                                dbc.Col(
+                                                    [
+                                                        dbc.Label(
+                                                            [
+                                                                "Select a Group of Points using ",
+                                                                html.Span(
+                                                                    html.I(
+                                                                        DashIconify(
+                                                                            icon="lucide:lasso"
+                                                                        )
+                                                                    ),
+                                                                    className="icon",
+                                                                ),
+                                                                " or ",
+                                                                html.Span(
+                                                                    html.I(
+                                                                        DashIconify(
+                                                                            icon="lucide:box-select"
+                                                                        )
+                                                                    ),
+                                                                    className="icon",
+                                                                ),
+                                                                " tools",
+                                                            ],
+                                                        ),
+                                                    ],
                                                 ),
-                                                " or ",
-                                                html.Span(
-                                                    html.I(
-                                                        DashIconify(
-                                                            icon="lucide:box-select"
-                                                        )
-                                                    ),
-                                                    className="icon",
+                                                dbc.Col(
+                                                    [
+                                                        dbc.Button(
+                                                            DashIconify(
+                                                                icon="lucide:circle-pause",
+                                                                style={
+                                                                    "padding": "0px"
+                                                                },
+                                                            ),
+                                                            id="pause-button",
+                                                            color="secondary",
+                                                            style={"display": "none"},
+                                                        ),
+                                                    ],
+                                                    width=1,
                                                 ),
-                                                " tools",
-                                            ],
-                                        ),
+                                            ]
+                                        )
                                     ),
                                     dbc.Col(
                                         dbc.RadioItems(
@@ -136,7 +162,7 @@ def main_display():
                                     ),
                                 ],
                                 className="g-0",
-                                style={"height": "90%"},
+                                style={"height": "85%"},
                             ),
                             dbc.Row(
                                 dbc.Label(

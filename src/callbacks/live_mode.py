@@ -15,6 +15,7 @@ from src.utils.plot_utils import generate_scatter_data
     Output("data-overview-card", "style"),
     Output("image-card", "style"),
     Output("go-live", "style"),
+    Output("pause-button", "style"),
     Input("go-live", "n_clicks"),
     prevent_initial_call=True,
 )
@@ -37,6 +38,11 @@ def toggle_controls(n_clicks):
                 "background-color": "#00313C",
                 "border": "0px",
             },
+            {
+                "display": "flex",
+                "font-size": "1.5rem",
+                "padding": "5px",
+            },
         )
     else:
         return (
@@ -52,6 +58,9 @@ def toggle_controls(n_clicks):
                 "color": "#00313C",
                 "background-color": "white",
                 "border": "0px",
+            },
+            {
+                "display": "none",
             },
         )
 
