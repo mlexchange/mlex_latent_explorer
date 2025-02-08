@@ -1,9 +1,10 @@
 import json
 
-from dash import Input, Output, State, callback
+import numpy as np
+from dash import Input, Output, State, callback, no_update
 from dash.exceptions import PreventUpdate
+from dash_iconify import DashIconify
 
-from src.app_layout import USER
 from src.utils.data_utils import tiled_results
 from src.utils.plot_utils import generate_scatter_data
 
@@ -103,17 +104,12 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict):
     """
     if n_clicks is not None and n_clicks % 2 == 1:
         message = json.loads(message["data"])
-        flow_id = message["flow_id"]
-        project_name = message["project_name"]
+        root_uri = message["root_uri"]
+        data_uri = message["data_uri"]
 
-        dim_red_uri = f"{USER}/{project_name}/{flow_id}"
-        dim_red_data = tiled_results.get_data_by_trimmed_uri(dim_red_uri)
-        metadata = dim_red_data.metadata
-
-        root_uri = metadata["io_parameters"]["root_uri"]
-        assert len(metadata["io_parameters"]["data_uris"]) == 1
-        data_uri = metadata["io_parameters"]["data_uris"][0]
-        data_project_dict["root_uri"] = root_uri
+        # Update the data project dict
+        if data_project_dict["root_uri"] != root_uri:
+            data_project_dict["root_uri"] = root_uri
 
         if len(data_project_dict["datasets"]) == 0:
             cum_size = 1
@@ -130,33 +126,91 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict):
 
 
 @callback(
+    Output("buffer", "data"),
     Output("scatter", "figure", allow_duplicate=True),
     Input("ws-live", "message"),
-    State("go-live", "n_clicks"),
+    State("scatter", "figure"),
+    State("pause-button", "n_clicks"),
+    State("buffer", "data"),
+    prevent_initial_call=True,
+)
+def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data):
+    # Parse the incoming message
+    message = json.loads(message["data"])
+    latent_vectors_uri = message["feature_vector_uri"]
+
+    # Retrieve data from tiled_uri
+    latent_vectors = tiled_results.get_data_by_trimmed_uri(latent_vectors_uri)
+    n_components = latent_vectors.shape[1]
+
+    # If the pause button is clicked, buffer the latent vectors
+    if pause_n_clicks is not None and pause_n_clicks % 2 == 1:
+        if buffer_data == {}:
+            buffer_data["num_components"] = n_components
+            buffer_data["latent_vectors"] = latent_vectors
+            return buffer_data, no_update
+        else:
+            buffer_data["latent_vectors"] = np.vstack(
+                (buffer_data["latent_vectors"], latent_vectors)
+            )
+            return buffer_data, no_update
+
+    # If the scatter plot is empty, generate new scatter data
+    if "customdata" not in current_figure["data"][0]:
+        return {}, generate_scatter_data(latent_vectors, n_components)
+
+    # If the scatter plot is not empty, append the new latent vectors
+    else:
+        current_figure["data"][0]["customdata"].append([0])
+        current_figure["data"][0]["x"].append(int(latent_vectors[:, 0]))
+        current_figure["data"][0]["y"].append(int(latent_vectors[:, 1]))
+        return {}, current_figure
+
+
+@callback(
+    Output("scatter", "figure", allow_duplicate=True),
+    Input("pause-button", "n_clicks"),
+    State("buffer", "data"),
     State("scatter", "figure"),
     prevent_initial_call=True,
 )
-def set_live_latent_vectors(message, n_clicks, current_figure):
-    # Parse the incoming message
-    message = json.loads(message["data"])
-    flow_id = message["flow_id"]
-    project_name = message["project_name"]
+def set_buffered_latent_vectors(n_clicks, buffer_data, current_figure):
+    if n_clicks is not None and n_clicks % 2 == 1 or buffer_data == {}:
+        raise PreventUpdate
 
-    # Retrieve data from wherever
-    dim_red_uri = f"{USER}/{project_name}/{flow_id}"
-    dim_red_data = tiled_results.get_data_by_trimmed_uri(dim_red_uri)
-    latent_vectors = dim_red_data.read().to_numpy()
-    metadata = dim_red_data.metadata
-    num_latent_vectors = latent_vectors.shape[0]
+    num_components = buffer_data["num_components"]
+    latent_vectors = buffer_data["latent_vectors"]
 
+    # If the scatter plot is empty, generate new scatter data
     if "customdata" not in current_figure["data"][0]:
-        # Generate new scatter data
-        return generate_scatter_data(
-            latent_vectors, metadata["model_parameters"]["n_components"]
-        )
+        return generate_scatter_data(latent_vectors, num_components)
 
+    # If the scatter plot is not empty, append the new latent vectors
     else:
-        current_figure["data"][0]["customdata"].append([num_latent_vectors - 1])
-        current_figure["data"][0]["x"].append(int(latent_vectors[:, 0]))
-        current_figure["data"][0]["y"].append(int(latent_vectors[:, 1]))
+        for latent_vector in latent_vectors:
+            current_figure["data"][0]["customdata"].append([0])
+            current_figure["data"][0]["x"].append(int(latent_vector[0]))
+            current_figure["data"][0]["y"].append(int(latent_vector[1]))
         return current_figure
+
+
+@callback(
+    Output("pause-button", "children", allow_duplicate=True),
+    Input("pause-button", "n_clicks"),
+    prevent_initial_call=True,
+)
+def toggle_pause_button(n_clicks):
+    if n_clicks is not None and n_clicks % 2 == 1:
+        icon = "lucide:circle-play"
+    else:
+        icon = "lucide:circle-pause"
+    return DashIconify(icon=icon, style={"padding": "0px"})
+
+
+@callback(
+    Output("pause-button", "children"),
+    Input("go-live", "n_clicks"),
+    prevent_initial_call=True,
+)
+def toggle_pause_button_go_live(go_live_n_clicks):
+    return DashIconify(icon="lucide:circle-pause", style={"padding": "0px"})

@@ -28,8 +28,11 @@ from src.callbacks.execute import (  # noqa: F401
 )
 from src.callbacks.live_mode import (  # noqa: F401
     live_update_data_project_dict,
+    set_buffered_latent_vectors,
     set_live_latent_vectors,
     toggle_controls,
+    toggle_pause_button,
+    toggle_pause_button_go_live,
     update_data_project_dict,
 )
 
