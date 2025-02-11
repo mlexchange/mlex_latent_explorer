@@ -251,6 +251,8 @@ def clear_click_data(show_feature_vectors):
     Input("scatter", "clickData"),
     Input("scatter", "selectedData"),
     Input("mean-std-toggle", "value"),
+    Input("log-transform", "value"),
+    Input("min-max-percentile", "value"),
     State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
     prevent_initial_call=True,
 )
@@ -258,6 +260,8 @@ def update_heatmap(
     click_data,
     selected_data,
     display_option,
+    log_transform,
+    percentiles,
     data_project_dict,
 ):
     """
@@ -266,6 +270,8 @@ def update_heatmap(
         click_data:             clicked data on scatter figure
         selected_data:          lasso or rect selected data points on scatter figure
         display_option:         option to display mean or std
+        log_transform:          log transform option
+        percentiles:            percentiles for min-max scaling
         data_project_dict:      data project dictionary
     Returns:
         fig:                    updated heatmap
@@ -284,8 +290,16 @@ def update_heatmap(
             "Number of images selected: 0",
         )
 
+    if percentiles is None:
+        percentiles = [0, 100]
+
     data_project = DataProject.from_dict(data_project_dict, api_key=DATA_TILED_KEY)
-    selected_images, _ = data_project.read_datasets(selected_indices, export="pillow")
+    selected_images, _ = data_project.read_datasets(
+        selected_indices,
+        export="pillow",
+        log=log_transform,
+        percentiles=percentiles,
+    )
 
     selected_images = np.array(selected_images)
 
