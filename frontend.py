@@ -26,6 +26,10 @@ from src.callbacks.execute import (  # noqa: F401
     run_clustering,
     run_latent_space,
 )
+from src.callbacks.infrastructure_check import (  # noqa: F401
+    check_infra_state,
+    update_infra_state,
+)
 from src.callbacks.live_mode import (  # noqa: F401
     live_update_data_project_dict,
     set_buffered_latent_vectors,

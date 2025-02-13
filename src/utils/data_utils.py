@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 
 import httpx
@@ -8,23 +9,43 @@ from tiled.client import from_uri
 RESULTS_TILED_URI = os.getenv("RESULTS_TILED_URI", "")
 RESULTS_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
 
+logger = logging.getLogger(__name__)
+
 
 class TiledDataLoader:
     def __init__(self, data_tiled_uri, data_tiled_api_key):
         self.data_tiled_uri = data_tiled_uri
         self.data_tiled_api_key = data_tiled_api_key
-        self.data_client = from_uri(
-            self.data_tiled_uri,
-            api_key=self.data_tiled_api_key,
-            timeout=httpx.Timeout(30.0),
-        )
+        self.refresh_data_client()
 
     def refresh_data_client(self):
-        self.data_client = from_uri(
-            self.data_tiled_uri,
-            api_key=self.data_tiled_api_key,
-            timeout=httpx.Timeout(30.0),
-        )
+        try:
+            self.data_client = from_uri(
+                self.data_tiled_uri,
+                api_key=self.data_tiled_api_key,
+                timeout=httpx.Timeout(30.0),
+            )
+        except Exception as e:
+            logger.warning(f"Error connecting to Tiled: {e}")
+            self.data_client = None
+
+    def check_dataloader_ready(self):
+        """
+        Check if the data client is available and ready to be used.
+        If base_only is True, only check the base uri.
+        """
+        if self.data_client is None:
+            # Try refreshing once
+            self.refresh_data_client()
+            return False if self.data_client is None else True
+        else:
+            try:
+                # Refresh tiled client to check if the server is still available
+                self.data_client.refresh()
+            except Exception as e:
+                logger.warning(f"Error connecting to Tiled: {e}")
+                return False
+        return True
 
     def prepare_project_container(self, user, project_name):
         """

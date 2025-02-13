@@ -256,6 +256,9 @@ def allow_run_clustering(job_id, project_name):
     Returns:
         run-clustering:         Whether to run clustering
     """
+    if job_id is None:
+        raise PreventUpdate
+
     children_job_ids = get_children_flow_run_ids(job_id)
 
     if get_flow_run_state(children_job_ids[0]) != "COMPLETED":
@@ -470,6 +473,9 @@ def allow_show_clusters(job_id, project_name):
     Returns:
         show-clusters:          Whether to show the clusters
     """
+    if job_id is None:
+        raise PreventUpdate
+
     children_job_ids = get_children_flow_run_ids(job_id)
 
     if get_flow_run_state(children_job_ids[0]) != "COMPLETED":
