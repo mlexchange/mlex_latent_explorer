@@ -11,8 +11,13 @@ from tiled.client import from_uri
 
 load_dotenv(".env")
 
-DATA_TILED_URI = os.getenv("DEFAULT_TILED_URI")
+DATA_TILED_URI = (
+    "https://tiled-demo.blueskyproject.io/api/v1/metadata/rsoxs/raw/"
+    "468810ed-2ff9-4e92-8ca9-dcb376d01a56/primary/data/Small Angle CCD Detector_image"
+)
 DATA_TILED_API_KEY = os.getenv("DATA_TILED_KEY")
+if DATA_TILED_API_KEY == "":
+    DATA_TILED_API_KEY = None
 
 RESULTS_TILED_URI = os.getenv("RESULTS_TILED_URI", "")
 # Only append "/api/v1/metadata/" if it's not already in the string
@@ -29,13 +34,13 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-def get_tiled_list(tiled_uri, tiled_api_key=None):
+def get_num_frames(tiled_uri, tiled_api_key=None):
     client = from_uri(tiled_uri, api_key=tiled_api_key)
-    return list(client.keys())
+    return client.shape
 
 
 def get_feature_vectors(num_messages):
-    return np.random.rand(num_messages, 2)
+    return 5 * np.random.rand(num_messages, 2)
 
 
 async def client_main():
@@ -45,10 +50,9 @@ async def client_main():
     """
 
     logger.info("Preparing messages to send...")
-    time.sleep(10)
-    num_messages = 20
+    time.sleep(3)
 
-    data_list = get_tiled_list(DATA_TILED_URI, DATA_TILED_API_KEY)[0:num_messages]
+    num_messages, c, x, y = get_num_frames(DATA_TILED_URI, DATA_TILED_API_KEY)
     feature_vector_list = get_feature_vectors(num_messages)
 
     # Construct the WebSocket URI (e.g., ws://localhost:8765)
@@ -59,11 +63,11 @@ async def client_main():
     async with websockets.connect(uri) as websocket:
         logger.info("Successfully connected to the server!")
 
-        for data_uri, latent_vector in zip(data_list, feature_vector_list):
+        for index, latent_vector in zip(range(num_messages), feature_vector_list):
             message = {
                 "tiled_uri": DATA_TILED_URI,
-                "index": data_uri,
-                "feature_vector": latent_vector,
+                "index": index,
+                "feature_vector": latent_vector.tolist(),
             }
             logger.info(f"Sending message: {message}")
 

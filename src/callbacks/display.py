@@ -254,6 +254,7 @@ def clear_click_data(show_feature_vectors):
     Input("log-transform", "value"),
     Input("min-max-percentile", "value"),
     State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
+    State("live-indices", "data"),
     prevent_initial_call=True,
 )
 def update_heatmap(
@@ -263,6 +264,7 @@ def update_heatmap(
     log_transform,
     percentiles,
     data_project_dict,
+    live_indices,
 ):
     """
     This callback update the heatmap
@@ -292,6 +294,9 @@ def update_heatmap(
 
     if percentiles is None:
         percentiles = [0, 100]
+
+    if len(live_indices) > 0:
+        selected_indices = [live_indices[i] for i in selected_indices]
 
     data_project = DataProject.from_dict(data_project_dict, api_key=DATA_TILED_KEY)
     selected_images, _ = data_project.read_datasets(

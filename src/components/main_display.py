@@ -176,6 +176,7 @@ def main_display():
                 ],
             ),
             dcc.Store(id="buffer", data={}),
+            dcc.Store(id="live-indices", data=[]),
             WebSocket(id="ws-live", url=f"ws:{WEBSOCKET_URL}:{WEBSOCKET_PORT}"),
         ],
     )

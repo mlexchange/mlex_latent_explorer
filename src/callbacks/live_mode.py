@@ -1,11 +1,11 @@
 import json
+from urllib.parse import urlsplit, urlunsplit
 
 import numpy as np
 from dash import Input, Output, State, callback, no_update
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
-from src.utils.data_utils import tiled_results
 from src.utils.plot_utils import generate_scatter_data
 
 
@@ -17,6 +17,7 @@ from src.utils.plot_utils import generate_scatter_data
     Output("image-card", "style"),
     Output("go-live", "style"),
     Output("pause-button", "style"),
+    Output("live-indices", "data", allow_duplicate=True),
     Input("go-live", "n_clicks"),
     prevent_initial_call=True,
 )
@@ -44,6 +45,7 @@ def toggle_controls(n_clicks):
                 "font-size": "1.5rem",
                 "padding": "5px",
             },
+            [],
         )
     else:
         return (
@@ -63,6 +65,7 @@ def toggle_controls(n_clicks):
             {
                 "display": "none",
             },
+            [],
         )
 
 
@@ -93,36 +96,53 @@ def update_data_project_dict(n_clicks):
         "data",
         allow_duplicate=True,
     ),
+    Output("live-indices", "data", allow_duplicate=True),
     Input("ws-live", "message"),
     State("go-live", "n_clicks"),
     State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
+    State("live-indices", "data"),
     prevent_initial_call=True,
 )
-def live_update_data_project_dict(message, n_clicks, data_project_dict):
+def live_update_data_project_dict(message, n_clicks, data_project_dict, live_indices):
     """
     Update data project dict with the data uri from the live experiment
     """
     if n_clicks is not None and n_clicks % 2 == 1:
         message = json.loads(message["data"])
-        root_uri = message["root_uri"]
-        data_uri = message["data_uri"]
+        tiled_uri = message["tiled_uri"]
+        split_uri = urlsplit(tiled_uri)
+        path_parts = split_uri.path.rsplit("/", 1)
+        root_uri = urlunsplit(
+            (split_uri.scheme, split_uri.netloc, path_parts[0] + "/", "", "")
+        )
+        uri = path_parts[1]
+
+        index = message["index"]
+
+        live_indices.append(index)
+
+        # Update cum_size according to the received index
+        cum_size = max(live_indices) + 1
 
         # Update the data project dict
         if data_project_dict["root_uri"] != root_uri:
             data_project_dict["root_uri"] = root_uri
+            data_project_dict["type"] = "tiled"
 
         if len(data_project_dict["datasets"]) == 0:
-            cum_size = 1
+            data_project_dict["datasets"] = [
+                {
+                    "uri": uri,
+                    "cumulative_data_count": cum_size,
+                }
+            ]
         else:
-            cum_size = data_project_dict["datasets"][-1]["cumulative_data_count"] + 1
-
-        data_project_dict["datasets"] += [
-            {
-                "uri": data_uri,
+            data_project_dict["datasets"][0] = {
+                "uri": uri,
                 "cumulative_data_count": cum_size,
             }
-        ]
-    return data_project_dict
+
+    return data_project_dict, live_indices
 
 
 @callback(
@@ -137,10 +157,12 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict):
 def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data):
     # Parse the incoming message
     message = json.loads(message["data"])
-    latent_vectors_uri = message["feature_vector_uri"]
 
-    # Retrieve data from tiled_uri
-    latent_vectors = tiled_results.get_data_by_trimmed_uri(latent_vectors_uri)
+    latent_vectors = np.array(message["feature_vector"], dtype=float)
+    # Ensure latent_vectors is always 2D
+    latent_vectors = (
+        latent_vectors.reshape(1, -1) if latent_vectors.ndim == 1 else latent_vectors
+    )
     n_components = latent_vectors.shape[1]
 
     # If the pause button is clicked, buffer the latent vectors
