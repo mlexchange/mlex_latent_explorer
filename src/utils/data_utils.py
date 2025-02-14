@@ -40,8 +40,8 @@ class TiledDataLoader:
             return False if self.data_client is None else True
         else:
             try:
-                # Refresh tiled client to check if the server is still available
-                self.data_client.refresh()
+                headers = {"Authorization": f"Bearer {self.data_tiled_api_key}"}
+                httpx.get(self.data_tiled_uri, headers=headers)
             except Exception as e:
                 logger.warning(f"Error connecting to Tiled: {e}")
                 return False
