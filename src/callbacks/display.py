@@ -388,3 +388,18 @@ def show_clusters(
     )
 
     return scatter_figure, True, True
+
+
+@callback(
+    Output("sidebar-offcanvas", "is_open", allow_duplicate=True),
+    Output("main-display", "style"),
+    Input("sidebar-view", "n_clicks"),
+    State("sidebar-offcanvas", "is_open"),
+    prevent_initial_call=True,
+)
+def toggle_sidebar(n_clicks, is_open):
+    if is_open:
+        style = {}
+    else:
+        style = {"padding": "0px 10px 0px 510px", "width": "100%"}
+    return not is_open, style
