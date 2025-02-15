@@ -4,7 +4,7 @@ from datetime import datetime
 import pytz
 from dash import Input, Output, callback, no_update
 
-from src.components.sidebar import create_infra_state_details
+from src.components.infrastructure import create_infra_state_details
 from src.utils.data_utils import tiled_results
 from src.utils.prefect import check_prefect_ready, check_prefect_worker_ready
 

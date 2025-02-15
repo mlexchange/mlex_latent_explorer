@@ -14,7 +14,9 @@ WEBSOCKET_PORT = os.getenv("WEBSOCKET_PORT", 5000)
 
 def main_display():
     main_display = html.Div(
-        [
+        id="main-display",
+        style={"padding": "0px 10px 0px 510px"},
+        children=[
             dbc.Card(
                 id="data-overview-card",
                 children=[
