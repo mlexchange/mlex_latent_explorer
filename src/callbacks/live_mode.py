@@ -12,8 +12,11 @@ from src.utils.plot_utils import generate_scatter_data
 @callback(
     Output("show-clusters", "value", allow_duplicate=True),
     Output("show-feature-vectors", "value", allow_duplicate=True),
-    Output("sidebar", "style"),
+    Output("data-selection-controls", "style"),
+    Output("dimension-reduction-controls", "style"),
+    Output("clustering-controls", "style"),
     Output("data-overview-card", "style"),
+    Output("sidebar", "active_item"),
     Output("image-card", "style"),
     Output("go-live", "style"),
     Output("pause-button", "style"),
@@ -31,7 +34,10 @@ def toggle_controls(n_clicks):
             False,
             {"display": "none"},
             {"display": "none"},
-            {"width": "98vw", "height": "88vh"},
+            {"display": "none"},
+            {"display": "none"},
+            ["item-1"],
+            {"width": "100%", "height": "88vh"},
             {
                 "display": "flex",
                 "font-size": "40px",
@@ -51,8 +57,11 @@ def toggle_controls(n_clicks):
         return (
             False,
             False,
-            {"overflow-y": "scroll", "height": "90vh"},
             {},
+            {},
+            {},
+            {},
+            no_update,
             {"height": "67vh"},
             {
                 "display": "flex",
