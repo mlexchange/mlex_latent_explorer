@@ -8,8 +8,7 @@ from dash_iconify import DashIconify
 from ..utils.plot_utils import draw_rows, plot_empty_heatmap, plot_empty_scatter
 
 NUM_IMGS_OVERVIEW = 6
-WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "localhost")
-WEBSOCKET_PORT = os.getenv("WEBSOCKET_PORT", 5000)
+WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://localhost/lse")
 
 
 def main_display():
@@ -177,7 +176,7 @@ def main_display():
             ),
             dcc.Store(id="buffer", data={}),
             dcc.Store(id="live-indices", data=[]),
-            WebSocket(id="ws-live", url=f"ws:{WEBSOCKET_URL}:{WEBSOCKET_PORT}"),
+            WebSocket(id="ws-live", url=WEBSOCKET_URL),
         ],
     )
     return main_display

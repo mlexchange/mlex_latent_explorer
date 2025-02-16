@@ -26,9 +26,9 @@ PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]')
 USER = os.getenv("USER")
 NUM_IMGS_OVERVIEW = 6
 
-# Websocket
-WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "127.0.0.1")
-WEBSOCKET_PORT = os.getenv("WEBSOCKET_PORT", 8765)
+# # Websocket
+# WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "127.0.0.1")
+# WEBSOCKET_PORT = os.getenv("WEBSOCKET_PORT", 8765)
 
 # SETUP DASH APP
 cache = diskcache.Cache("./cache")
