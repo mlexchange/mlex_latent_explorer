@@ -19,6 +19,7 @@ from src.utils.plot_utils import generate_scatter_data
     Output("sidebar", "active_item"),
     Output("image-card", "style"),
     Output("go-live", "style"),
+    Output("tooltip-go-live", "children"),
     Output("pause-button", "style"),
     Output("live-indices", "data", allow_duplicate=True),
     Input("go-live", "n_clicks"),
@@ -43,9 +44,10 @@ def toggle_controls(n_clicks):
                 "font-size": "40px",
                 "padding": "5px",
                 "color": "white",
-                "background-color": "#00313C",
+                "background-color": "#D57800",
                 "border": "0px",
             },
+            "Go to Offline Mode",
             {
                 "display": "flex",
                 "font-size": "1.5rem",
@@ -71,6 +73,7 @@ def toggle_controls(n_clicks):
                 "background-color": "white",
                 "border": "0px",
             },
+            "Go to Live Mode",
             {
                 "display": "none",
             },
@@ -227,21 +230,28 @@ def set_buffered_latent_vectors(n_clicks, buffer_data, current_figure):
 
 @callback(
     Output("pause-button", "children", allow_duplicate=True),
+    Output("tooltip-pause-button", "children", allow_duplicate=True),
     Input("pause-button", "n_clicks"),
     prevent_initial_call=True,
 )
 def toggle_pause_button(n_clicks):
     if n_clicks is not None and n_clicks % 2 == 1:
-        icon = "lucide:circle-play"
+        icon = "pajamas:play"
+        children = "Continue live display"
     else:
         icon = "lucide:circle-pause"
-    return DashIconify(icon=icon, style={"padding": "0px"})
+        children = "Pause live display"
+    return DashIconify(icon=icon, style={"padding": "0px"}), children
 
 
 @callback(
-    Output("pause-button", "children"),
+    Output("pause-button", "children", allow_duplicate=True),
+    Output("tooltip-pause-button", "children", allow_duplicate=True),
     Input("go-live", "n_clicks"),
     prevent_initial_call=True,
 )
 def toggle_pause_button_go_live(go_live_n_clicks):
-    return DashIconify(icon="lucide:circle-pause", style={"padding": "0px"})
+    return (
+        DashIconify(icon="lucide:circle-pause", style={"padding": "0px"}),
+        "Pause live display",
+    )

@@ -100,7 +100,7 @@ def header(app_title, github_url):
                                                 [
                                                     dbc.Button(
                                                         DashIconify(
-                                                            icon="lucide:circle-play",
+                                                            icon="fluent:video-recording-20-regular",
                                                             style={"padding": "0px"},
                                                         ),
                                                         id="go-live",
@@ -115,6 +115,7 @@ def header(app_title, github_url):
                                                     ),
                                                     dbc.Tooltip(
                                                         "Go to Live Mode",
+                                                        id="tooltip-go-live",
                                                         target="go-live",
                                                         placement="bottom",
                                                     ),
