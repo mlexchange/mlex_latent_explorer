@@ -118,6 +118,37 @@ def main_display():
                                                             color="primary",
                                                             style={"display": "none"},
                                                         ),
+                                                        dbc.Tooltip(
+                                                            "Pause live display",
+                                                            id="tooltip-pause-button",
+                                                            target="pause-button",
+                                                            placement="top",
+                                                        ),
+                                                    ],
+                                                    width=1,
+                                                ),
+                                                dbc.Col(
+                                                    [
+                                                        dbc.Button(
+                                                            DashIconify(
+                                                                icon="pajamas:clear-all",
+                                                                style={
+                                                                    "padding": "0px",
+                                                                },
+                                                            ),
+                                                            id="clear-selection-button",
+                                                            color="primary",
+                                                            style={
+                                                                "display": "flex",
+                                                                "font-size": "1.3rem",
+                                                                "padding": "6.5px",
+                                                            },
+                                                        ),
+                                                        dbc.Tooltip(
+                                                            "Clear lasso selection",
+                                                            target="clear-selection-button",
+                                                            placement="top",
+                                                        ),
                                                     ],
                                                     width=1,
                                                 ),

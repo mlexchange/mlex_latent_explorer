@@ -3,7 +3,7 @@ import math
 from base64 import b64encode
 
 import numpy as np
-from dash import ALL, Input, Output, State, callback, no_update
+from dash import ALL, Input, Output, Patch, State, callback, no_update
 from dash.exceptions import PreventUpdate
 from file_manager.data_project import DataProject
 from mlex_utils.prefect_utils.core import get_children_flow_run_ids
@@ -236,13 +236,34 @@ def show_feature_vectors(
 
 
 @callback(
-    Output("scatter", "clickData"),
-    Input("show-feature-vectors", "value"),
+    Output("scatter", "figure", allow_duplicate=True),
+    Input("clear-selection-button", "n_clicks"),
+    State("scatter", "figure"),
     prevent_initial_call=True,
 )
-def clear_click_data(show_feature_vectors):
-    if show_feature_vectors is False:
-        return None
+def clear_selections(n_clicks, current_fig):
+    """
+    Clears any 'selectedpoints' in the figure's traces using a Dash Patch,
+    so we don't have to re-plot from scratch.
+    """
+    if not n_clicks:
+        return no_update
+
+    # Create a Patch object to mutate the figure incrementally
+    fig_patch = Patch()
+
+    # Remove layout.selections if present
+    if "selections" in current_fig["layout"]:
+        fig_patch["layout"]["selections"] = []
+
+    # Clear selectedpoints for each trace
+    for i, trace in enumerate(current_fig["data"]):
+        if "selectedpoints" in trace and trace["selectedpoints"] is not None:
+            fig_patch["data"][i]["selectedpoints"] = None
+        if "selected" in trace and trace["selected"] is not None:
+            fig_patch["data"][i]["selected"] = {}
+
+    return fig_patch
 
 
 @callback(
