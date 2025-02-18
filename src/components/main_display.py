@@ -106,51 +106,53 @@ def main_display():
                                                     ],
                                                 ),
                                                 dbc.Col(
-                                                    [
-                                                        dbc.Button(
-                                                            DashIconify(
-                                                                icon="lucide:circle-pause",
+                                                    dbc.ButtonGroup(
+                                                        [
+                                                            dbc.Button(
+                                                                DashIconify(
+                                                                    icon="lucide:circle-pause",
+                                                                    style={
+                                                                        "padding": "0px"
+                                                                    },
+                                                                ),
+                                                                id="pause-button",
+                                                                color="primary",
                                                                 style={
-                                                                    "padding": "0px"
+                                                                    "display": "none"
+                                                                },
+                                                                className="me-1",
+                                                            ),
+                                                            dbc.Tooltip(
+                                                                "Pause live display",
+                                                                id="tooltip-pause-button",
+                                                                target="pause-button",
+                                                                placement="top",
+                                                            ),
+                                                            dbc.Button(
+                                                                DashIconify(
+                                                                    icon="pajamas:clear-all",
+                                                                    style={
+                                                                        "padding": "0px",
+                                                                    },
+                                                                ),
+                                                                id="clear-selection-button",
+                                                                color="primary",
+                                                                style={
+                                                                    "display": "flex",
+                                                                    "font-size": "1.3rem",
+                                                                    "padding": "6.5px",
                                                                 },
                                                             ),
-                                                            id="pause-button",
-                                                            color="primary",
-                                                            style={"display": "none"},
-                                                        ),
-                                                        dbc.Tooltip(
-                                                            "Pause live display",
-                                                            id="tooltip-pause-button",
-                                                            target="pause-button",
-                                                            placement="top",
-                                                        ),
-                                                    ],
-                                                    width=1,
-                                                ),
-                                                dbc.Col(
-                                                    [
-                                                        dbc.Button(
-                                                            DashIconify(
-                                                                icon="pajamas:clear-all",
-                                                                style={
-                                                                    "padding": "0px",
-                                                                },
+                                                            dbc.Tooltip(
+                                                                "Clear lasso selection",
+                                                                target="clear-selection-button",
+                                                                placement="top",
                                                             ),
-                                                            id="clear-selection-button",
-                                                            color="primary",
-                                                            style={
-                                                                "display": "flex",
-                                                                "font-size": "1.3rem",
-                                                                "padding": "6.5px",
-                                                            },
-                                                        ),
-                                                        dbc.Tooltip(
-                                                            "Clear lasso selection",
-                                                            target="clear-selection-button",
-                                                            placement="top",
-                                                        ),
-                                                    ],
-                                                    width=1,
+                                                        ],
+                                                        className="w-auto",
+                                                    ),
+                                                    width=2,
+                                                    style={"text-align": "right"},
                                                 ),
                                             ]
                                         )
@@ -172,7 +174,7 @@ def main_display():
                                             value="mean",
                                             label_style={"width": "180px"},
                                         ),
-                                        style={"text-align": "right"},
+                                        style={"text-align": "center"},
                                     ),
                                 ],
                             ),
@@ -196,7 +198,6 @@ def main_display():
                                     ),
                                 ],
                                 className="g-0",
-                                # style={"height": "85%"},
                             ),
                             dbc.Row(
                                 dbc.Label(
