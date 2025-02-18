@@ -182,7 +182,7 @@ def main_display():
                                         dcc.Graph(
                                             id="scatter",
                                             figure=plot_empty_scatter(),
-                                            style={"height": "95%"},
+                                            style={"height": "46vh"},
                                         ),
                                         width=6,
                                     ),
@@ -190,13 +190,13 @@ def main_display():
                                         dcc.Graph(
                                             id="heatmap",
                                             figure=plot_empty_heatmap(),
-                                            style={"height": "95%"},
+                                            style={"height": "46vh"},
                                         ),
                                         width=6,
                                     ),
                                 ],
                                 className="g-0",
-                                style={"height": "85%"},
+                                # style={"height": "85%"},
                             ),
                             dbc.Row(
                                 dbc.Label(
