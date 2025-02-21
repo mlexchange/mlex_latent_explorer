@@ -43,6 +43,8 @@ app = Dash(
     external_stylesheets=external_stylesheets,
     suppress_callback_exceptions=True,
     long_callback_manager=long_callback_manager,
+    requests_pathname_prefix="/latent-space/",
+    routes_pathname_prefix="/latent-space/",
 )
 
 server = app.server
