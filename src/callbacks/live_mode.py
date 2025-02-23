@@ -141,11 +141,10 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict, live_ind
 
         # Update cum_size according to the received index
         cum_size = max(live_indices) + 1
-
         # Update the data project dict
         if data_project_dict["root_uri"] != root_uri:
             data_project_dict["root_uri"] = root_uri
-            data_project_dict["type"] = "tiled"
+            data_project_dict["data_type"] = "tiled"
 
         if len(data_project_dict["datasets"]) == 0:
             data_project_dict["datasets"] = [
