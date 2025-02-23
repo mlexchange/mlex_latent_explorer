@@ -14,7 +14,9 @@ WEBSOCKET_PORT = os.getenv("WEBSOCKET_PORT", 5000)
 
 def main_display():
     main_display = html.Div(
-        [
+        id="main-display",
+        style={"padding": "0px 10px 0px 510px"},
+        children=[
             dbc.Card(
                 id="data-overview-card",
                 children=[
@@ -104,20 +106,53 @@ def main_display():
                                                     ],
                                                 ),
                                                 dbc.Col(
-                                                    [
-                                                        dbc.Button(
-                                                            DashIconify(
-                                                                icon="lucide:circle-pause",
+                                                    dbc.ButtonGroup(
+                                                        [
+                                                            dbc.Button(
+                                                                DashIconify(
+                                                                    icon="lucide:circle-pause",
+                                                                    style={
+                                                                        "padding": "0px"
+                                                                    },
+                                                                ),
+                                                                id="pause-button",
+                                                                color="primary",
                                                                 style={
-                                                                    "padding": "0px"
+                                                                    "display": "none"
+                                                                },
+                                                                className="me-1",
+                                                            ),
+                                                            dbc.Tooltip(
+                                                                "Pause live display",
+                                                                id="tooltip-pause-button",
+                                                                target="pause-button",
+                                                                placement="top",
+                                                            ),
+                                                            dbc.Button(
+                                                                DashIconify(
+                                                                    icon="pajamas:clear-all",
+                                                                    style={
+                                                                        "padding": "0px",
+                                                                    },
+                                                                ),
+                                                                id="clear-selection-button",
+                                                                color="primary",
+                                                                style={
+                                                                    "display": "flex",
+                                                                    "font-size": "1.3rem",
+                                                                    "padding": "6.5px",
                                                                 },
                                                             ),
-                                                            id="pause-button",
-                                                            color="primary",
-                                                            style={"display": "none"},
-                                                        ),
-                                                    ],
-                                                    width=1,
+                                                            dbc.Tooltip(
+                                                                "Clear lasso selection",
+                                                                target="clear-selection-button",
+                                                                placement="top",
+                                                            ),
+                                                        ],
+                                                        className="w-auto",
+                                                    ),
+                                                    width=2,
+                                                    style={"text-align": "right"},
                                                 ),
                                             ]
                                         )
@@ -139,7 +174,7 @@ def main_display():
                                             value="mean",
                                             label_style={"width": "180px"},
                                         ),
-                                        style={"text-align": "right"},
+                                        style={"text-align": "center"},
                                     ),
                                 ],
                             ),
@@ -149,7 +184,7 @@ def main_display():
                                         dcc.Graph(
                                             id="scatter",
                                             figure=plot_empty_scatter(),
-                                            style={"height": "95%"},
+                                            style={"height": "46vh"},
                                         ),
                                         width=6,
                                     ),
@@ -157,13 +192,12 @@ def main_display():
                                         dcc.Graph(
                                             id="heatmap",
                                             figure=plot_empty_heatmap(),
-                                            style={"height": "95%"},
+                                            style={"height": "46vh"},
                                         ),
                                         width=6,
                                     ),
                                 ],
                                 className="g-0",
-                                style={"height": "85%"},
                             ),
                             dbc.Row(
                                 dbc.Label(

@@ -2,7 +2,7 @@ import json
 from urllib.parse import urlsplit, urlunsplit
 
 import numpy as np
-from dash import Input, Output, State, callback, no_update
+from dash import Input, Output, Patch, State, callback, no_update
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
@@ -12,10 +12,16 @@ from src.utils.plot_utils import generate_scatter_data
 @callback(
     Output("show-clusters", "value", allow_duplicate=True),
     Output("show-feature-vectors", "value", allow_duplicate=True),
-    Output("sidebar", "style"),
+    Output("data-selection-controls", "style"),
+    Output("dimension-reduction-controls", "style"),
+    Output("clustering-controls", "style"),
     Output("data-overview-card", "style"),
+    Output("sidebar", "active_item"),
     Output("image-card", "style"),
+    Output("scatter", "style"),
+    Output("heatmap", "style"),
     Output("go-live", "style"),
+    Output("tooltip-go-live", "children"),
     Output("pause-button", "style"),
     Output("live-indices", "data", allow_duplicate=True),
     Input("go-live", "n_clicks"),
@@ -31,15 +37,21 @@ def toggle_controls(n_clicks):
             False,
             {"display": "none"},
             {"display": "none"},
-            {"width": "98vw", "height": "88vh"},
+            {"display": "none"},
+            {"display": "none"},
+            ["item-1"],
+            {"width": "100%", "height": "85vh"},
+            {"height": "65vh"},
+            {"height": "65vh"},
             {
                 "display": "flex",
                 "font-size": "40px",
                 "padding": "5px",
                 "color": "white",
-                "background-color": "#00313C",
+                "background-color": "#D57800",
                 "border": "0px",
             },
+            "Go to Offline Mode",
             {
                 "display": "flex",
                 "font-size": "1.5rem",
@@ -51,9 +63,14 @@ def toggle_controls(n_clicks):
         return (
             False,
             False,
-            {"overflow-y": "scroll", "height": "90vh"},
             {},
-            {"height": "67vh"},
+            {},
+            {},
+            {},
+            no_update,
+            {"height": "64vh"},
+            {"height": "46vh"},
+            {"height": "46vh"},
             {
                 "display": "flex",
                 "font-size": "40px",
@@ -62,6 +79,7 @@ def toggle_controls(n_clicks):
                 "background-color": "white",
                 "border": "0px",
             },
+            "Go to Live Mode",
             {
                 "display": "none",
             },
@@ -155,11 +173,10 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict, live_ind
     prevent_initial_call=True,
 )
 def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data):
-    # Parse the incoming message
-    message = json.loads(message["data"])
+    data = json.loads(message["data"])
 
-    latent_vectors = np.array(message["feature_vector"], dtype=float)
-    # Ensure latent_vectors is always 2D
+    latent_vectors = np.array(data["feature_vector"], dtype=float)
+
     latent_vectors = (
         latent_vectors.reshape(1, -1) if latent_vectors.ndim == 1 else latent_vectors
     )
@@ -167,26 +184,36 @@ def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data
 
     # If the pause button is clicked, buffer the latent vectors
     if pause_n_clicks is not None and pause_n_clicks % 2 == 1:
-        if buffer_data == {}:
+        if not buffer_data:
+            # First time buffering
             buffer_data["num_components"] = n_components
             buffer_data["latent_vectors"] = latent_vectors
             return buffer_data, no_update
         else:
+            # Append to existing buffer
             buffer_data["latent_vectors"] = np.vstack(
                 (buffer_data["latent_vectors"], latent_vectors)
             )
             return buffer_data, no_update
 
-    # If the scatter plot is empty, generate new scatter data
-    if "customdata" not in current_figure["data"][0]:
-        return {}, generate_scatter_data(latent_vectors, n_components)
+    # If figure is empty (no customdata yet), return a new figure.
+    if not current_figure["data"] or "customdata" not in current_figure["data"][0]:
+        new_fig = generate_scatter_data(latent_vectors, n_components)
+        return {}, new_fig
 
-    # If the scatter plot is not empty, append the new latent vectors
-    else:
-        current_figure["data"][0]["customdata"].append([0])
-        current_figure["data"][0]["x"].append(int(latent_vectors[:, 0]))
-        current_figure["data"][0]["y"].append(int(latent_vectors[:, 1]))
-        return {}, current_figure
+    # Otherwise, do a partial update of the existing figure using Patch
+    figure_patch = Patch()
+
+    # Build lists from the newly arriving latent vectors
+    xs_new = latent_vectors[:, 0].tolist()
+    ys_new = latent_vectors[:, 1].tolist()
+    customdata_new = [[0]] * len(xs_new)  # or adapt to your custom data usage
+
+    figure_patch["data"][0]["x"].extend(xs_new)
+    figure_patch["data"][0]["y"].extend(ys_new)
+    figure_patch["data"][0]["customdata"].extend(customdata_new)
+
+    return {}, figure_patch
 
 
 @callback(
@@ -218,21 +245,28 @@ def set_buffered_latent_vectors(n_clicks, buffer_data, current_figure):
 
 @callback(
     Output("pause-button", "children", allow_duplicate=True),
+    Output("tooltip-pause-button", "children", allow_duplicate=True),
     Input("pause-button", "n_clicks"),
     prevent_initial_call=True,
 )
 def toggle_pause_button(n_clicks):
     if n_clicks is not None and n_clicks % 2 == 1:
-        icon = "lucide:circle-play"
+        icon = "pajamas:play"
+        children = "Continue live display"
     else:
         icon = "lucide:circle-pause"
-    return DashIconify(icon=icon, style={"padding": "0px"})
+        children = "Pause live display"
+    return DashIconify(icon=icon, style={"padding": "0px"}), children
 
 
 @callback(
-    Output("pause-button", "children"),
+    Output("pause-button", "children", allow_duplicate=True),
+    Output("tooltip-pause-button", "children", allow_duplicate=True),
     Input("go-live", "n_clicks"),
     prevent_initial_call=True,
 )
 def toggle_pause_button_go_live(go_live_n_clicks):
-    return DashIconify(icon="lucide:circle-pause", style={"padding": "0px"})
+    return (
+        DashIconify(icon="lucide:circle-pause", style={"padding": "0px"}),
+        "Pause live display",
+    )

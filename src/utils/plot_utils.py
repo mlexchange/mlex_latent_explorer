@@ -34,57 +34,56 @@ def generate_scattergl_plot(
     custom_indices=None,
 ):
     """
-    Generates a two dimensional Scattergl plot.
+    Generates a multi-trace Scattergl plot with one trace per label,
+    preserving the exact i-th ordering across all data.
 
-    Parameters:
-    x_coords (list): The x-coordinates of the points.
-    y_coords (list): The y-coordinates of the points.
-    labels (list): The labels of the points.
-    label_to_string_map (dict): A mapping from labels to strings.
-    show_legend (bool, optional): Whether to show a legend. Default is False.
-    custom_indices (list, optional): Custom indices for the points. Default is None.
-
-    Returns:
-    go.Figure: The generated Scattergl plot.
+    Each trace is the same length as x_coords/y_coords, but for points
+    not belonging to that trace's label, we insert None. This ensures:
+      - i-th point in the figure is i-th data row (helpful for selectedData).
+      - Each label gets its own legend entry.
     """
-    # Create a set of unique labels
-    unique_labels = set(labels)
+    import plotly.graph_objects as go
 
-    # Create a trace for each unique label
+    if custom_indices is None:
+        custom_indices = list(range(len(x_coords)))
+
+    # Gather unique labels in order of first appearance
+    unique_labels = []
+    for lbl in labels:
+        if lbl not in unique_labels:
+            unique_labels.append(lbl)
+
     traces = []
     for label in unique_labels:
-        # Find the indices of the points with the current label
-        trace_indices = [i for i, l in enumerate(labels) if l == label]
-        trace_x = [x_coords[i] for i in trace_indices]
-        trace_y = [y_coords[i] for i in trace_indices]
+        # Initialize the entire length with None
+        trace_x = [None] * len(x_coords)
+        trace_y = [None] * len(y_coords)
+        trace_custom = [None] * len(x_coords)
 
-        if custom_indices is not None:
-            trace_custom_indices = [custom_indices[i] for i in trace_indices]
-        else:
-            trace_custom_indices = trace_indices
+        # Fill in data only where labels match
+        for i, lbl in enumerate(labels):
+            if lbl == label:
+                trace_x[i] = x_coords[i]
+                trace_y[i] = y_coords[i]
+                trace_custom[i] = custom_indices[i]
+
+        # Convert custom_indices to a 2D array if needed by Plotly
+        trace_custom = np.array(trace_custom).reshape(-1, 1)
 
         traces.append(
             go.Scattergl(
                 x=trace_x,
                 y=trace_y,
-                customdata=np.array(trace_custom_indices).reshape(-1, 1),
                 mode="markers",
                 name=str(label_to_string_map[label]),
+                customdata=trace_custom,
             )
         )
 
-    # Create the plot with the scatter plot traces
     fig = go.Figure(data=traces)
-    if show_legend:
-        fig.update_layout(
-            legend=dict(
-                x=0,
-                y=1,
-                bgcolor="rgba(255, 255, 255, 0.9)",
-                bordercolor="rgba(255, 255, 255, 0.9)",
-                orientation="h",
-            )
-        )
+    if not show_legend:
+        fig.update_layout(showlegend=False)
+
     return fig
 
 
@@ -98,52 +97,70 @@ def generate_scatter3d_plot(
     custom_indices=None,
 ):
     """
-    Generates a three-dimensional Scatter3d plot.
+    Generates a three-dimensional Scatter3d plot with one trace per label,
+    but preserves the global i-th index for each point. This is useful when
+    you need separate legend entries and also need the i-th plotted point
+    to match the i-th row in your original data (e.g., for Dash callbacks).
 
     Parameters:
     x_coords (list): The x-coordinates of the points.
     y_coords (list): The y-coordinates of the points.
     z_coords (list): The z-coordinates of the points.
-    labels (list): The labels of the points.
-    label_to_string_map (dict): A mapping from labels to strings.
+    labels (list): The labels of the points (e.g., clusters).
+    label_to_string_map (dict): A mapping from labels to label strings.
     show_legend (bool, optional): Whether to show a legend. Default is False.
     custom_indices (list, optional): Custom indices for the points. Default is None.
 
     Returns:
     go.Figure: The generated Scatter3d plot.
     """
-    # Create a set of unique labels
-    unique_labels = set(labels)
+    if custom_indices is None:
+        custom_indices = list(range(len(x_coords)))
 
-    # Create a trace for each unique label
+    # Collect unique labels in the order of their first appearance
+    unique_labels = []
+    for lbl in labels:
+        if lbl not in unique_labels:
+            unique_labels.append(lbl)
+
     traces = []
     for label in unique_labels:
-        # Find the indices of the points with the current label
-        trace_indices = [i for i, l in enumerate(labels) if l == label]
-        trace_x = [x_coords[i] for i in trace_indices]
-        trace_y = [y_coords[i] for i in trace_indices]
-        trace_z = [z_coords[i] for i in trace_indices]
+        # Prepare arrays with the full length, initially filled with None
+        trace_x = [None] * len(x_coords)
+        trace_y = [None] * len(y_coords)
+        trace_z = [None] * len(z_coords)
+        trace_custom = [None] * len(x_coords)
 
-        if custom_indices is not None:
-            trace_custom_indices = [custom_indices[i] for i in trace_indices]
-        else:
-            trace_custom_indices = trace_indices
+        # Fill in actual values only for points whose label == current label
+        for i, lbl in enumerate(labels):
+            if lbl == label:
+                trace_x[i] = x_coords[i]
+                trace_y[i] = y_coords[i]
+                trace_z[i] = z_coords[i]
+                trace_custom[i] = custom_indices[i]
+
+        # Convert custom data to a 2D array for Plotly
+        trace_custom = np.array(trace_custom).reshape(-1, 1)
 
         traces.append(
             go.Scatter3d(
                 x=trace_x,
                 y=trace_y,
                 z=trace_z,
-                customdata=np.array(trace_custom_indices).reshape(-1, 1),
+                customdata=trace_custom,
                 mode="markers",
                 name=str(label_to_string_map[label]),
                 marker=dict(size=3),
             )
         )
 
-    # Create the plot with the Scatter3d traces
+    # Create the plot with all Scatter3d traces
     fig = go.Figure(data=traces)
-    if show_legend:
+
+    # Configure legend
+    if not show_legend:
+        fig.update_layout(showlegend=False)
+    else:
         fig.update_layout(
             legend=dict(
                 x=0,
@@ -153,6 +170,7 @@ def generate_scatter3d_plot(
                 orientation="h",
             )
         )
+
     return fig
 
 
