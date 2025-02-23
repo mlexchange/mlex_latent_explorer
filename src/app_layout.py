@@ -10,6 +10,7 @@ from file_manager.main import FileManager
 from mlex_utils.dash_utils.mlex_components import MLExComponents
 
 from src.components.header import header
+from src.components.infrastructure import create_infra_state_affix
 from src.components.main_display import main_display
 from src.components.sidebar import sidebar
 from src.utils.model_utils import Models
@@ -36,7 +37,7 @@ long_callback_manager = DiskcacheLongCallbackManager(cache)
 external_stylesheets = [
     dbc.themes.BOOTSTRAP,
     "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css",
-    "../assets/segmentation-style.css",
+    "../assets/lse-style.css",
 ]
 app = Dash(
     __name__,
@@ -46,6 +47,9 @@ app = Dash(
     requests_pathname_prefix="/latent-space/",
     routes_pathname_prefix="/latent-space/",
 )
+
+app.title = "Latent Space Explorer"
+app._favicon = "mlex.ico"
 
 server = app.server
 
@@ -132,21 +136,15 @@ app.layout = html.Div(
         ),
         dbc.Container(
             children=[
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            sidebar(
-                                file_explorer,
-                                job_manager,
-                                clustering_job_manager,
-                            ),
-                            style={"flex": "0 0 500px"},
-                        ),
-                        dbc.Col(main_display()),
-                    ]
+                sidebar(
+                    file_explorer,
+                    job_manager,
+                    clustering_job_manager,
                 ),
+                dbc.Row(main_display()),
                 dbc.Row(dbc.Col(modal)),
                 dbc.Row(dbc.Col(meta)),
+                create_infra_state_affix(),
             ],
             fluid=True,
         ),

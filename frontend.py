@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from src.app_layout import app, clustering_models, dim_reduction_models, mlex_components
 from src.callbacks.display import (  # noqa: F401
-    clear_click_data,
+    clear_selections,
     disable_buttons,
     go_to_first_page,
     go_to_last_page,
