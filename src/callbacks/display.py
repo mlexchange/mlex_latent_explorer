@@ -322,6 +322,7 @@ def update_heatmap(
     data_project = DataProject.from_dict(data_project_dict, api_key=DATA_TILED_KEY)
     selected_images, _ = data_project.read_datasets(
         selected_indices,
+        resize=True,
         export="pillow",
         log=log_transform,
         percentiles=percentiles,
