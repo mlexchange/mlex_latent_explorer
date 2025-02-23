@@ -2,7 +2,7 @@ import json
 from urllib.parse import urlsplit, urlunsplit
 
 import numpy as np
-from dash import Input, Output, State, callback, no_update
+from dash import Input, Output, Patch, State, callback, no_update
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
@@ -173,11 +173,10 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict, live_ind
     prevent_initial_call=True,
 )
 def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data):
-    # Parse the incoming message
-    message = json.loads(message["data"])
+    data = json.loads(message["data"])
 
-    latent_vectors = np.array(message["feature_vector"], dtype=float)
-    # Ensure latent_vectors is always 2D
+    latent_vectors = np.array(data["feature_vector"], dtype=float)
+
     latent_vectors = (
         latent_vectors.reshape(1, -1) if latent_vectors.ndim == 1 else latent_vectors
     )
@@ -185,26 +184,36 @@ def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data
 
     # If the pause button is clicked, buffer the latent vectors
     if pause_n_clicks is not None and pause_n_clicks % 2 == 1:
-        if buffer_data == {}:
+        if not buffer_data:
+            # First time buffering
             buffer_data["num_components"] = n_components
             buffer_data["latent_vectors"] = latent_vectors
             return buffer_data, no_update
         else:
+            # Append to existing buffer
             buffer_data["latent_vectors"] = np.vstack(
                 (buffer_data["latent_vectors"], latent_vectors)
             )
             return buffer_data, no_update
 
-    # If the scatter plot is empty, generate new scatter data
-    if "customdata" not in current_figure["data"][0]:
-        return {}, generate_scatter_data(latent_vectors, n_components)
+    # If figure is empty (no customdata yet), return a new figure.
+    if not current_figure["data"] or "customdata" not in current_figure["data"][0]:
+        new_fig = generate_scatter_data(latent_vectors, n_components)
+        return {}, new_fig
 
-    # If the scatter plot is not empty, append the new latent vectors
-    else:
-        current_figure["data"][0]["customdata"].append([0])
-        current_figure["data"][0]["x"].append(int(latent_vectors[:, 0]))
-        current_figure["data"][0]["y"].append(int(latent_vectors[:, 1]))
-        return {}, current_figure
+    # Otherwise, do a partial update of the existing figure using Patch
+    figure_patch = Patch()
+
+    # Build lists from the newly arriving latent vectors
+    xs_new = latent_vectors[:, 0].tolist()
+    ys_new = latent_vectors[:, 1].tolist()
+    customdata_new = [[0]] * len(xs_new)  # or adapt to your custom data usage
+
+    figure_patch["data"][0]["x"].extend(xs_new)
+    figure_patch["data"][0]["y"].extend(ys_new)
+    figure_patch["data"][0]["customdata"].extend(customdata_new)
+
+    return {}, figure_patch
 
 
 @callback(
