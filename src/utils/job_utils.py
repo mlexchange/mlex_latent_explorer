@@ -18,7 +18,7 @@ RESERVATIONS_GPU = json.loads(os.getenv("RESERVATIONS_CPU", "[]"))
 MAX_TIME_GPU = os.getenv("MAX_TIME_CPU", "1:00:00")
 SUBMISSION_SSH_KEY = os.getenv("SUBMISSION_SSH_KEY", "")
 FORWARD_PORTS = json.loads(os.getenv("FORWARD_PORTS", "[]"))
-
+DOCKER_NETWORK=os.getenv("DOCKER_NETWORK", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
 
 
@@ -72,7 +72,7 @@ def parse_job_params(
                 {
                     "image_name": image_name,
                     "image_tag": image_tag,
-                    "command": f'python {python_file_name}"',
+                    "command": f'python {python_file_name}',
                     "params": {
                         "io_parameters": io_parameters,
                         "model_parameters": model_parameters,
@@ -81,6 +81,27 @@ def parse_job_params(
                         f"{READ_DIR_MOUNT}:/app/work/data",
                         f"{WRITE_DIR_MOUNT}:/app/work/mlex_store",
                     ],
+                }
+            ],
+        }
+
+    elif flow_type == "docker":
+        job_params = {
+            "flow_type": "docker",
+            "params_list": [
+                {
+                    "image_name": image_name,
+                    "image_tag": image_tag,
+                    "command": f'python {python_file_name}',
+                    "params": {
+                        "io_parameters": io_parameters,
+                        "model_parameters": model_parameters,
+                    },
+                    "volumes": [
+                        f"{READ_DIR_MOUNT}:/tiled_storage",
+                       
+                    ],
+                    "network":DOCKER_NETWORK
                 }
             ],
         }

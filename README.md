@@ -4,7 +4,8 @@ An app to visulize latent vectors in 2D or 3D. It supports PCA and UMAP for dime
 
 ## Running as a standalone application
 
-1. Start a Tiled and Prefect servers in the [MLExchange platform](https://github.com/mlexchange/mlex_tomo_framework). Before moving to the next step, please make sure that both services are running accordingly.
+1. The **Prefect server, Tiled server, the application, and the Prefect worker job** all run within a single Docker container. There is no need to start the servers separately. However, the **Prefect worker** should be run separately on your PC. Refer to [mlex_prefect_worker](https://github.com/mlexchange/mlex_prefect_worker) for instructions on running the Prefect worker.
+
 
 2. Create a new Python environment and install dependencies:
 ```
@@ -17,7 +18,7 @@ pip install .
 
 4. Start example app:
 ```
-python frontend.py
+docker comnpose up
 ```
 
 Finally, you can access Latent Space Explorer at:

@@ -15,6 +15,9 @@ data/output/
 data/upload/
 data/.file_manager_vars.pkl
 data/mlexchange_store/
+data/prefect_db/
+data/tiled_db/
+data/tiled_storage/
 .DS_Store
 
 # C extensions
