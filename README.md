@@ -10,14 +10,14 @@ However, the **Prefect worker** must be run separately on your local machine (re
 
 ## Steps to Run the Application
 
-### 1️ Clone the Repository
+### 1 Clone the Repository
 
 ```sh
 git clone https://github.com/mlexchange/mlex_latent_explorer.git
 cd mlex_latent_explorer
 ```
 
-### 2️ Configure Environment Variables
+### 2 Configure Environment Variables
 
 Create a `.env` file using `.env.example` as a reference:
 
@@ -29,7 +29,7 @@ Then **update the** `.env` file with the correct values.
 
 **Important Note:** Due to the current tiled configuration, ensure that the `WRITE_DIR` is a subdirectory of the `READ_DIR` if the same tiled server is used for both reading data and writing results.
 
-### 3️ Build and Start the Application
+### 3 Build and Start the Application
 
 ```sh
 docker compose up -d
@@ -37,13 +37,13 @@ docker compose up -d
 
 * `-d` → Runs the containers in the background (detached mode).
 
-### 4️ Verify Running Containers
+### 4 Verify Running Containers
 
 ```sh
 docker ps
 ```
 
-### 5️ Start a Prefect Worker
+### 5 Start a Prefect Worker
 
 Open another terminal and start a Prefect worker. Refer to [mlex_prefect_worker](https://github.com/mlexchange/mlex_prefect_worker) for detailed instructions on setting up and running the worker.
 
