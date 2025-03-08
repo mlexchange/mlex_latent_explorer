@@ -43,7 +43,7 @@ services:
       - TILED_SINGLE_USER_API_KEY=${TILED_SINGLE_USER_API_KEY}
     volumes:
       - ./tiled/deploy:/deploy
-      - ./data/tiled_storage:/tiled_storage
+      - ${READ_DIR}:/tiled_storage
     depends_on:
       - tiled_db
     networks:
@@ -58,7 +58,7 @@ services:
       - POSTGRES_DB=${TILED_DB_NAME}
     volumes:
       - ./data/tiled_db:/var/lib/postgresql/data:rw
-      - ./data/tiled_storage:/tiled_storage
+      - ${READ_DIR}:/tiled_storage
     restart: unless-stopped
     networks:
       mle_net:
