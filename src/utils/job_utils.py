@@ -65,29 +65,9 @@ def parse_job_params(
         "results_dir": f"{results_dir}",
     }
 
-    if flow_type == "podman":
+    if flow_type == "podman" or flow_type == "docker":
         job_params = {
-            "flow_type": "podman",
-            "params_list": [
-                {
-                    "image_name": image_name,
-                    "image_tag": image_tag,
-                    "command": f'python {python_file_name}',
-                    "params": {
-                        "io_parameters": io_parameters,
-                        "model_parameters": model_parameters,
-                    },
-                    "volumes": [
-                        f"{READ_DIR_MOUNT}:/app/work/data",
-                        f"{WRITE_DIR_MOUNT}:/app/work/mlex_store",
-                    ],
-                }
-            ],
-        }
-
-    elif flow_type == "docker":
-        job_params = {
-            "flow_type": "docker",
+            "flow_type": flow_type,
             "params_list": [
                 {
                     "image_name": image_name,
