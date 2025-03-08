@@ -8,4 +8,4 @@ RUN pip install .
 
 ENV HOME /app/work
 
-CMD ["gunicorn", "-c", "gunicorn_config.py", "--reload", "src.app_layout:server"]
+CMD ["python", "frontend.py"]

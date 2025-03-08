@@ -1,27 +1,67 @@
 # MLExchange Latent Space Explorer
 
-An app to visulize latent vectors in 2D or 3D. It supports PCA and UMAP for dimension reduction.
+An application for visualizing latent vectors in **2D or 3D** using **PCA** and **UMAP** for dimensionality reduction.
 
-## Running as a standalone application
+## Running as a Standalone Application (Using Docker)
 
-1. Start a Tiled and Prefect servers in the [MLExchange platform](https://github.com/mlexchange/mlex_tomo_framework). Before moving to the next step, please make sure that both services are running accordingly.
+The **Prefect server, Tiled server, the application, and the Prefect worker job** all run within a **single Docker container**. This eliminates the need to start the servers separately.
 
-2. Create a new Python environment and install dependencies:
-```
-conda create -n new_env python==3.11
-conda activate new_env
-pip install .
-```
+However, the **Prefect worker** must be run separately on your local machine (refer to step 5). 
 
-3. Create a `.env` file using `.env.example` as reference. Update this file accordingly.
+## Steps to Run the Application
 
-4. Start example app:
-```
-python frontend.py
+### 1 Clone the Repository
+
+```sh
+git clone https://github.com/mlexchange/mlex_latent_explorer.git
+cd mlex_latent_explorer
 ```
 
-Finally, you can access Latent Space Explorer at:
-* Dash app: http://localhost:8070/
+### 2 Configure Environment Variables
+
+Create a `.env` file using `.env.example` as a reference:
+
+```sh
+cp .env.example .env
+```
+
+Then **update the** `.env` file with the correct values.
+
+**Important Note:** Due to the current tiled configuration, ensure that the `WRITE_DIR` is a subdirectory of the `READ_DIR` if the same tiled server is used for both reading data and writing results.
+
+### 3 Build and Start the Application
+
+```sh
+docker compose up -d
+```
+
+* `-d` → Runs the containers in the background (detached mode).
+
+### 4 Verify Running Containers
+
+```sh
+docker ps
+```
+
+### 5 Start a Prefect Worker
+
+Open another terminal and start a Prefect worker. Refer to [mlex_prefect_worker](https://github.com/mlexchange/mlex_prefect_worker) for detailed instructions on setting up and running the worker.
+
+
+### 6 Access the Application
+
+Once the container is running, open your browser and visit:
+* **Dash app:** http://localhost:8070/
+
+### 7 Stopping the Application
+
+To stop and remove the running containers, use:
+
+```sh
+docker compose down
+```
+
+This will **shut down all services** but **retain data** if volumes are used.
 
 ## Model Description
 

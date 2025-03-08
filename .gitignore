@@ -11,10 +11,7 @@ test.py
 
 # output dir
 results/
-data/output/
-data/upload/
-data/.file_manager_vars.pkl
-data/mlexchange_store/
+data/
 .DS_Store
 
 # C extensions
