@@ -15,7 +15,7 @@ from mlex_utils.prefect_utils.core import (
     schedule_prefect_flow,
 )
 
-from src.app_layout import USER, clustering_models, dim_reduction_models, latent_space_models
+from src.app_layout import USER, clustering_models, dim_reduction_models,latent_space_models
 from src.utils.data_utils import tiled_results
 from src.utils.job_utils import parse_job_params, parse_model_params
 from src.utils.plot_utils import generate_notification
@@ -132,10 +132,8 @@ def run_latent_space(
 
         data_project = DataProject.from_dict(data_project_dict)
 
-        latent_space_params = latent_space_models[model_name]
-        dim_reduction_params = dim_reduction_models[
-            dim_reduction_models.modelname_list[0]
-        ]
+        latent_space_params = latent_space_models[latent_space_models.modelname_list[0]]
+        dim_reduction_params = dim_reduction_models[model_name]
         train_params = parse_job_params(
             data_project,
             model_parameters,
@@ -145,7 +143,7 @@ def run_latent_space(
             latent_space_params,
             dim_reduction_params,
         )
-
+       
         if MODE == "dev":
             job_uid = str(uuid.uuid4())
             job_message = (
@@ -589,100 +587,3 @@ def allow_show_clusters(job_id, project_name):
         return True
 
 
-import os
-import logging
-import mlflow
-from mlflow.tracking import MlflowClient
-from dash import Input, Output, State, callback, html
-import dash_bootstrap_components as dbc
-
-# Configure logging specifically for MLflow retrieval
-logger = logging.getLogger('mlflow_retrieval')
-logger.setLevel(logging.DEBUG)
-
-# Create console handler and set level to DEBUG
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-
-# Create formatter
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# Add formatter to ch
-ch.setFormatter(formatter)
-
-# Add ch to logger
-logger.addHandler(ch)
-
-@callback(
-    Output(
-        {
-            "component": "DbcJobManagerAIO",
-            "subcomponent": "mlflow-model-dropdown",
-            "aio_id": "latent-space-jobs"
-        },
-        "options"
-    ),
-    Input(
-        {
-            "component": "DbcJobManagerAIO",
-            "subcomponent": "mlflow-model-dropdown",
-            "aio_id": "latent-space-jobs"
-        },
-        "focus"
-    ),
-    prevent_initial_call=True
-)
-def update_mlflow_models(focus):
-    """
-    Retrieve MLflow registered models and convert to dropdown options
-    
-    :return: List of dropdown options for MLflow models
-    """
-    try:
-        # Log the start of the retrieval process
-        logger.debug("Entering update_mlflow_models function")
-        
-        # Retrieve tracking URI
-        tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000")
-        logger.info(f"MLflow Tracking URI: {tracking_uri}")
-        
-        # Set tracking URI
-        mlflow.set_tracking_uri(tracking_uri)
-        logger.debug("MLflow tracking URI set successfully")
-        
-        # Create MLflow client
-        logger.debug("Creating MLflow client")
-        client = MlflowClient()
-        
-        # List registered models
-        logger.info("Attempting to list registered models")
-        registered_models = client.list_registered_models()
-        
-        # Log number of models found
-        logger.info(f"Found {len(registered_models)} registered models")
-        
-        # Create options with model names
-        options = [
-            {"label": model.name, "value": model.name} 
-            for model in registered_models
-        ]
-        
-        # Log individual model names
-        for model in options:
-            logger.debug(f"Registered Model: {model['label']}")
-        
-        # Add default option
-        options.insert(0, {"label": "-- Select a model --", "value": ""})
-        
-        logger.info("Successfully retrieved MLflow models")
-        return options
-    
-    except Exception as e:
-        # Log any exceptions with full traceback
-        logger.exception(f"Error retrieving MLflow models: {e}")
-        
-        # Return error option
-        return [
-            {"label": "-- Error retrieving models --", "value": "error"},
-            {"label": str(e), "value": "error_details"}
-        ]

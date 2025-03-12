@@ -5,7 +5,7 @@ from uuid import uuid4
 from dash import Input, Output, html
 from dotenv import load_dotenv
 
-from src.app_layout import app, clustering_models, dim_reduction_models, mlex_components
+from src.app_layout import app, clustering_models, dim_reduction_models, mlex_components,latent_space_models
 from src.callbacks.display import (  # noqa: F401
     clear_selections,
     disable_buttons,
@@ -57,6 +57,33 @@ FLOW_NAME = os.getenv("FLOW_NAME", "")
 HOST = os.getenv("APP_HOST", "127.0.0.1")
 PORT = os.getenv("APP_PORT", "8070")
 
+@app.callback(
+    Output(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "model-parameters",
+            "aio_id": "latent-space-jobs",
+        },
+        "children",
+    ),
+    Input(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "model-list",
+            "aio_id": "latent-space-jobs",
+        },
+        "value",
+    ),
+)
+def update_latent_space_model_parameters(model_name):
+    model = latent_space_models[model_name]
+    if model["gui_parameters"]:
+        item_list = mlex_components.get_parameter_items(
+            _id={"type": str(uuid4())}, json_blob=model["gui_parameters"]
+        )
+        return item_list
+    else:
+        return html.Div("Model has no parameters")
 
 @app.callback(
     Output(
