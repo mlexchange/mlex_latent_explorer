@@ -75,34 +75,6 @@ PORT = os.getenv("APP_PORT", "8070")
         "value",
     ),
 )
-def update_latent_space_model_parameters(model_name):
-    model = latent_space_models[model_name]
-    if model["gui_parameters"]:
-        item_list = mlex_components.get_parameter_items(
-            _id={"type": str(uuid4())}, json_blob=model["gui_parameters"]
-        )
-        return item_list
-    else:
-        return html.Div("Model has no parameters")
-
-@app.callback(
-    Output(
-        {
-            "component": "DbcJobManagerAIO",
-            "subcomponent": "model-parameters",
-            "aio_id": "latent-space-jobs",
-        },
-        "children",
-    ),
-    Input(
-        {
-            "component": "DbcJobManagerAIO",
-            "subcomponent": "model-list",
-            "aio_id": "latent-space-jobs",
-        },
-        "value",
-    ),
-)
 def update_dim_reduction_model_parameters(model_name):
     model = dim_reduction_models[model_name]
     if model["gui_parameters"]:

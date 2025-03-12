@@ -76,7 +76,13 @@ def parse_job_params(
                     "command": f"python {ls_python_file_name_inference}",
                     "params": {
                         "io_parameters": io_parameters,
-                        "model_parameters": model_parameters,
+                        "model_parameters": {
+                            "mlflow_model": "ff905df7-0517-4e42-9ec8-a23b02c30e75",
+                            "target_width": 32,
+                            "target_height": 32,
+                            "batch_size": 32,
+                            "num_workers":2
+                        },
                     },
                     "volumes": [
                         f"{READ_DIR_MOUNT}:/tiled_storage",
@@ -89,11 +95,7 @@ def parse_job_params(
                     "command": f"python {dm_python_file_name}",
                     "params": {
                         "io_parameters": io_parameters,
-                        "model_parameters": {
-                            "n_components": 2,
-                            "min_dist": 0.1,
-                            "n_neighbors": 5,
-                        },
+                        "model_parameters": model_parameters,
                     },
                     "volumes": [
                         f"{READ_DIR_MOUNT}:/tiled_storage",
