@@ -2,6 +2,9 @@ import json
 import os
 from urllib.parse import urljoin
 
+import mlflow
+from mlflow.tracking import MlflowClient
+
 # I/O parameters for job execution
 READ_DIR_MOUNT = os.getenv("READ_DIR_MOUNT", None)
 WRITE_DIR_MOUNT = os.getenv("WRITE_DIR_MOUNT", None)
@@ -20,6 +23,20 @@ SUBMISSION_SSH_KEY = os.getenv("SUBMISSION_SSH_KEY", "")
 FORWARD_PORTS = json.loads(os.getenv("FORWARD_PORTS", "[]"))
 DOCKER_NETWORK=os.getenv("DOCKER_NETWORK", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
+
+mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000"))
+# Create an MLflow client
+client = MlflowClient()
+# Get all registered models
+registered_models = client.search_registered_models()
+# Sort registered models by creation timestamp (newest first)
+sorted_models = sorted(registered_models, 
+                      key=lambda m: m.creation_timestamp, 
+                      reverse=True)
+
+if sorted_models:
+    newest_model = sorted_models[0]
+    print(f"Newest model: {newest_model.name}")
 
 
 def parse_tiled_url(url, user, project_name, tiled_base_path="/api/v1/metadata"):
@@ -77,7 +94,7 @@ def parse_job_params(
                     "params": {
                         "io_parameters": io_parameters,
                         "model_parameters": {
-                            "mlflow_model": "ff905df7-0517-4e42-9ec8-a23b02c30e75",
+                            "mlflow_model": newest_model.name,
                             "target_width": 32,
                             "target_height": 32,
                             "batch_size": 32,
