@@ -162,7 +162,7 @@ def run_latent_space(
                     FLOW_NAME,
                     parameters=train_params,
                     flow_run_name=f"{job_name} {current_time}",
-                    tags=PREFECT_TAGS + ["train", project_name],
+                    tags=PREFECT_TAGS + [project_name, "latent-space"],
                 )
                 job_message = f"Job has been succesfully submitted with uid: {job_uid}"
                 notification_color = "indigo"
