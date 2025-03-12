@@ -15,10 +15,16 @@ from mlex_utils.prefect_utils.core import (
     schedule_prefect_flow,
 )
 
-from src.app_layout import USER, clustering_models, dim_reduction_models
+from src.app_layout import USER, clustering_models, dim_reduction_models, latent_space_models
 from src.utils.data_utils import tiled_results
 from src.utils.job_utils import parse_job_params, parse_model_params
 from src.utils.plot_utils import generate_notification
+
+import os
+import mlflow
+from mlflow.tracking import MlflowClient
+import logging
+
 
 MODE = os.getenv("MODE", "")
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
@@ -125,17 +131,19 @@ def run_latent_space(
             return notification
 
         data_project = DataProject.from_dict(data_project_dict)
-        model_exec_params = dim_reduction_models[model_name]
-        job_params = parse_job_params(
+
+        latent_space_params = latent_space_models[model_name]
+        dim_reduction_params = dim_reduction_models[
+            dim_reduction_models.modelname_list[0]
+        ]
+        train_params = parse_job_params(
             data_project,
             model_parameters,
             USER,
             project_name,
             FLOW_TYPE,
-            model_exec_params["image_name"],
-            model_exec_params["image_tag"],
-            model_exec_params["python_file_name"],
-            model_exec_params["conda_env"],
+            latent_space_params,
+            dim_reduction_params,
         )
 
         if MODE == "dev":
@@ -154,9 +162,9 @@ def run_latent_space(
                 )
                 job_uid = schedule_prefect_flow(
                     FLOW_NAME,
-                    parameters=job_params,
+                    parameters=train_params,
                     flow_run_name=f"{job_name} {current_time}",
-                    tags=PREFECT_TAGS + [project_name, "latent-space"],
+                    tags=PREFECT_TAGS + ["train", project_name],
                 )
                 job_message = f"Job has been succesfully submitted with uid: {job_uid}"
                 notification_color = "indigo"
@@ -173,6 +181,96 @@ def run_latent_space(
 
         return notification
     raise PreventUpdate
+
+# def run_latent_space(
+#     n_clicks,
+#     model_parameter_container,
+#     data_project_dict,
+#     model_name,
+#     log,
+#     percentiles,
+#     mask,
+#     job_name,
+#     project_name,
+# ):
+#     """
+#     This callback submits a job request to the compute service
+#     Args:
+#         n_clicks:                   Number of clicks
+#         model_parameter_container:  App parameters
+#         data_project_dict:          Data project dictionary
+#         model_name:                 Selected model name
+#         log:                        Log transform
+#         percentiles:                Min-max percentiles
+#         mask:                       Mask selection
+#         job_name:                   Job name
+#         project_name:               Project name
+#     Returns:
+#         open the alert indicating that the job was submitted
+#     """
+#     if n_clicks is not None and n_clicks > 0:
+#         model_parameters, parameter_errors = parse_model_params(
+#             model_parameter_container, log, percentiles, mask
+#         )
+#         # Check if the model parameters are valid
+#         if parameter_errors:
+#             notification = generate_notification(
+#                 "Model Parameters",
+#                 "red",
+#                 "fluent-mdl2:machine-learning",
+#                 "Model parameters are not valid!",
+#             )
+#             return notification
+
+#         data_project = DataProject.from_dict(data_project_dict)
+#         model_exec_params = dim_reduction_models[model_name]
+#         job_params = parse_job_params(
+#             data_project,
+#             model_parameters,
+#             USER,
+#             project_name,
+#             FLOW_TYPE,
+#             model_exec_params["image_name"],
+#             model_exec_params["image_tag"],
+#             model_exec_params["python_file_name"],
+#             model_exec_params["conda_env"],
+#         )
+
+#         if MODE == "dev":
+#             job_uid = str(uuid.uuid4())
+#             job_message = (
+#                 f"Dev Mode: Job has been succesfully submitted with uid: {job_uid}"
+#             )
+#             notification_color = "primary"
+#         else:
+#             try:
+#                 # Prepare tiled
+#                 tiled_results.prepare_project_container(USER, project_name)
+#                 # Schedule job
+#                 current_time = datetime.now(pytz.timezone(TIMEZONE)).strftime(
+#                     "%Y/%m/%d %H:%M:%S"
+#                 )
+#                 job_uid = schedule_prefect_flow(
+#                     FLOW_NAME,
+#                     parameters=job_params,
+#                     flow_run_name=f"{job_name} {current_time}",
+#                     tags=PREFECT_TAGS + [project_name, "latent-space"],
+#                 )
+#                 job_message = f"Job has been succesfully submitted with uid: {job_uid}"
+#                 notification_color = "indigo"
+#             except Exception as e:
+#                 # Print the traceback to the console
+#                 traceback.print_exc()
+#                 job_uid = None
+#                 job_message = f"Job presented error: {e}"
+#                 notification_color = "danger"
+
+#         notification = generate_notification(
+#             "Job Submission", notification_color, "formkit:submit", job_message
+#         )
+
+#         return notification
+#     raise PreventUpdate
 
 
 @callback(
@@ -489,3 +587,102 @@ def allow_show_clusters(job_id, project_name):
     except Exception:
         traceback.print_exc()
         return True
+
+
+import os
+import logging
+import mlflow
+from mlflow.tracking import MlflowClient
+from dash import Input, Output, State, callback, html
+import dash_bootstrap_components as dbc
+
+# Configure logging specifically for MLflow retrieval
+logger = logging.getLogger('mlflow_retrieval')
+logger.setLevel(logging.DEBUG)
+
+# Create console handler and set level to DEBUG
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+
+# Create formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Add formatter to ch
+ch.setFormatter(formatter)
+
+# Add ch to logger
+logger.addHandler(ch)
+
+@callback(
+    Output(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "mlflow-model-dropdown",
+            "aio_id": "latent-space-jobs"
+        },
+        "options"
+    ),
+    Input(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "mlflow-model-dropdown",
+            "aio_id": "latent-space-jobs"
+        },
+        "focus"
+    ),
+    prevent_initial_call=True
+)
+def update_mlflow_models(focus):
+    """
+    Retrieve MLflow registered models and convert to dropdown options
+    
+    :return: List of dropdown options for MLflow models
+    """
+    try:
+        # Log the start of the retrieval process
+        logger.debug("Entering update_mlflow_models function")
+        
+        # Retrieve tracking URI
+        tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000")
+        logger.info(f"MLflow Tracking URI: {tracking_uri}")
+        
+        # Set tracking URI
+        mlflow.set_tracking_uri(tracking_uri)
+        logger.debug("MLflow tracking URI set successfully")
+        
+        # Create MLflow client
+        logger.debug("Creating MLflow client")
+        client = MlflowClient()
+        
+        # List registered models
+        logger.info("Attempting to list registered models")
+        registered_models = client.list_registered_models()
+        
+        # Log number of models found
+        logger.info(f"Found {len(registered_models)} registered models")
+        
+        # Create options with model names
+        options = [
+            {"label": model.name, "value": model.name} 
+            for model in registered_models
+        ]
+        
+        # Log individual model names
+        for model in options:
+            logger.debug(f"Registered Model: {model['label']}")
+        
+        # Add default option
+        options.insert(0, {"label": "-- Select a model --", "value": ""})
+        
+        logger.info("Successfully retrieved MLflow models")
+        return options
+    
+    except Exception as e:
+        # Log any exceptions with full traceback
+        logger.exception(f"Error retrieving MLflow models: {e}")
+        
+        # Return error option
+        return [
+            {"label": "-- Error retrieving models --", "value": "error"},
+            {"label": str(e), "value": "error_details"}
+        ]

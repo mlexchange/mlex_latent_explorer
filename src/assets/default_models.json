@@ -1,6 +1,73 @@
 {
     "contents": [
         {
+        "model_name": "pytorch_autoencoder_v0.0.5",
+        "version": "0.0.5",
+        "type": "latent_space_extraction",
+        "owner": "mlexchange team",
+        "image_name": "ghcr.io/mlexchange/mlex_pytorch_autoencoders",
+        "image_tag": "main",
+        "conda_env": "mlex_pytorch_autoencoders",
+        "application": [
+            "latent_space_explorer"
+        ],
+        "description": "PyTorch customizable autoencoders for latent space exploration and/or data compression.",
+        "gui_parameters": [
+            {
+                "type": "dropdown",
+                "name": "mlflow-model-dropdown",
+                "title": "MLflow Model",
+                "param_key": "mlflow_model",
+                "value": "ff905df7-0517-4e42-9ec8-a23b02c30e75",
+                "options": []
+            },
+            {
+                "type": "int",
+                "name": "target_width",
+                "title": "Target Width",
+                "param_key": "target_width",
+                "value": 32
+            },
+            {
+                "type": "int",
+                "name": "target_height",
+                "title": "Target Height",
+                "param_key": "target_height",
+                "value": 32
+            },
+            {
+                "type": "slider",
+                "name": "batch_size",
+                "title": "Batch Size",
+                "param_key": "batch_size",
+                "min": 16,
+                "max": 512,
+                "step": 16,
+                "value": 32,
+                "marks": {
+                    "16": "16",
+                    "32": "32",
+                    "64": "64",
+                    "128": "128",
+                    "256": "256",
+                    "512": "512"
+                }
+            },
+            {
+                "type": "int",
+                "name": "num_workers",
+                "title": "Number of workers",
+                "param_key": "num_workers",
+                "value": 2
+            }
+
+        ],
+        "python_file_name": {
+            "inference": "src/inference.py"
+        },
+        "public": false
+        },
+        {
         "model_name": "umap_v1.0.0",
         "version": "1.0.0",
         "type": "dimension_reduction",
