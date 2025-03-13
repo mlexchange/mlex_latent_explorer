@@ -5,6 +5,8 @@ from mlex_utils.dash_utils.components_bootstrap.component_utils import (
     DbcControlItem as ControlItem,
 )
 
+import os
+
 from ..utils.mask_utils import get_mask_options
 
 
@@ -16,6 +18,7 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
         job_manager:            Job manager object
         clustering_job_manager: Job manager object for clustering
     """
+    
     sidebar = html.Div(
         [
             dbc.Offcanvas(
@@ -80,6 +83,39 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                         dbc.AccordionItem(
                             id="dimension-reduction-controls",
                             children=[
+                                ControlItem(
+                                    "Autoencoder Model",
+                                    "mlflow-model-title",
+                                    html.Div([
+                                        dbc.Row([
+                                            dbc.Col(
+                                                dbc.Select(
+                                                    id="mlflow-model-dropdown",
+                                                    options=[],  # Empty initially, populated by callback
+                                                    value=None,
+                                                    placeholder="Please select a model",
+                                                ),
+                                                width=10
+                                            ),
+                                            dbc.Col(
+                                                dbc.Button(
+                                                    DashIconify(
+                                                        icon="tabler:refresh",
+                                                        width=20,
+                                                        height=20
+                                                    ),
+                                                    id="refresh-mlflow-models",
+                                                    color="light",
+                                                    size="sm",
+                                                    style={"margin-left": "-10px"}
+                                                ),
+                                                width=1,
+                                                style={"padding-left": "0"}
+                                            )
+                                        ])
+                                    ])
+                                ),
+                                html.Div(style={"height": "20px"}),  # Additional spacing
                                 job_manager,
                                 ControlItem(
                                     "",

@@ -222,7 +222,7 @@ def show_feature_vectors(
     if show_feature_vectors is False:
         return plot_empty_scatter()
 
-    child_job_id = get_children_flow_run_ids(job_id)[0]
+    child_job_id = get_children_flow_run_ids(job_id)[1]
     expected_result_uri = f"{USER}/{project_name}/{child_job_id}"
     latent_vectors = (
         tiled_results.get_data_by_trimmed_uri(expected_result_uri).read().to_numpy()
@@ -386,7 +386,7 @@ def show_clusters(
         return plot_empty_scatter(), False, False
 
     # Retrieve latent vectors
-    dim_red_child_id = get_children_flow_run_ids(dimension_reduction_job_id)[0]
+    dim_red_child_id = get_children_flow_run_ids(dimension_reduction_job_id)[1]
     dim_red_uri = f"{USER}/{project_name}/{dim_red_child_id}"
     dim_red_data = tiled_results.get_data_by_trimmed_uri(dim_red_uri)
     latent_vectors = dim_red_data.read().to_numpy()
