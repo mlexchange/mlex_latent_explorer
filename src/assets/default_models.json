@@ -14,14 +14,6 @@
         "description": "PyTorch customizable autoencoders for latent space exploration and/or data compression.",
         "gui_parameters": [
             {
-                "type": "dropdown",
-                "name": "mlflow-model-dropdown",
-                "title": "MLflow Model",
-                "param_key": "mlflow_model",
-                "value": "ff905df7-0517-4e42-9ec8-a23b02c30e75",
-                "options": []
-            },
-            {
                 "type": "int",
                 "name": "target_width",
                 "title": "Target Width",

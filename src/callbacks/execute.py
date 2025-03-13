@@ -19,11 +19,7 @@ from src.app_layout import USER, clustering_models, dim_reduction_models,latent_
 from src.utils.data_utils import tiled_results
 from src.utils.job_utils import parse_job_params, parse_model_params, parse_clustering_job_params
 from src.utils.plot_utils import generate_notification
-
-import os
-import mlflow
-from mlflow.tracking import MlflowClient
-import logging
+from src.utils.mlflow_utils import get_mlflow_models
 
 
 MODE = os.getenv("MODE", "")
@@ -33,6 +29,19 @@ PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]')
 RESULTS_DIR = os.getenv("RESULTS_DIR", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
 
+@callback(
+    Output("mlflow-model-dropdown", "options"),
+    Output("mlflow-model-dropdown", "value"),
+    Input("refresh-mlflow-models", "n_clicks"),
+    prevent_initial_call=True
+)
+def refresh_mlflow_models(n_clicks):
+    """Refresh the MLflow models dropdown when the refresh button is clicked"""
+    if n_clicks:
+        options = get_mlflow_models()
+        return options, options[0]['value'] if options else None
+    return [], None
+    
 
 @callback(
     Output(
@@ -88,6 +97,7 @@ FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
         },
         "data",
     ),
+    State("mlflow-model-dropdown", "value"),  # Add state for the selected MLflow model
     prevent_initial_call=True,
 )
 def run_latent_space(
@@ -100,6 +110,7 @@ def run_latent_space(
     mask,
     job_name,
     project_name,
+    mlflow_model_id,
 ):
     """
     This callback submits a job request to the compute service
@@ -142,6 +153,7 @@ def run_latent_space(
             FLOW_TYPE,
             latent_space_params,
             dim_reduction_params,
+            mlflow_model_id
         )
        
         if MODE == "dev":

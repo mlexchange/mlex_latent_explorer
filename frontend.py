@@ -25,6 +25,7 @@ from src.callbacks.execute import (  # noqa: F401
     allow_show_feature_vectors,
     run_clustering,
     run_latent_space,
+    refresh_mlflow_models
 )
 from src.callbacks.infrastructure_check import (  # noqa: F401
     check_infra_state,
@@ -56,6 +57,7 @@ FLOW_NAME = os.getenv("FLOW_NAME", "")
 
 HOST = os.getenv("APP_HOST", "127.0.0.1")
 PORT = os.getenv("APP_PORT", "8070")
+
 
 @app.callback(
     Output(

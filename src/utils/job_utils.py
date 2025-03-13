@@ -2,9 +2,6 @@ import json
 import os
 from urllib.parse import urljoin
 
-import mlflow
-from mlflow.tracking import MlflowClient
-
 # I/O parameters for job execution
 READ_DIR_MOUNT = os.getenv("READ_DIR_MOUNT", None)
 WRITE_DIR_MOUNT = os.getenv("WRITE_DIR_MOUNT", None)
@@ -26,21 +23,6 @@ DOCKER_NETWORK=os.getenv("DOCKER_NETWORK", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
 
 
-mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-# Create an MLflow client
-client = MlflowClient()
-# Get all registered models
-registered_models = client.search_registered_models()
-# Sort registered models by creation timestamp (newest first)
-sorted_models = sorted(registered_models, 
-                      key=lambda m: m.creation_timestamp, 
-                      reverse=True)
-
-if sorted_models:
-    newest_model = sorted_models[0]
-    print(f"Newest model: {newest_model.name}")
-
-
 def parse_tiled_url(url, user, project_name, tiled_base_path="/api/v1/metadata"):
     """
     Given any URL (e.g. http://localhost:8000/results),
@@ -60,6 +42,7 @@ def parse_job_params(
     flow_type,
     latent_space_params,
     dim_reduction_params,
+    mlflow_model_id=None,
 ):
     """
     Parse training job parameters
@@ -80,7 +63,7 @@ def parse_job_params(
         "results_tiled_api_key": RESULTS_TILED_API_KEY,
         "results_dir": f"{results_dir}",
         "mlflow_uri": MLFLOW_TRACKING_URI,
-        "mlflow_model": newest_model.name
+        "mlflow_model": mlflow_model_id
     }
 
 
