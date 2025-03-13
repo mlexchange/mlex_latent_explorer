@@ -117,7 +117,12 @@ def parse_job_params(
                     "python_file_name": ls_python_file_name_inference,
                     "params": {
                         "io_parameters": io_parameters,
-                        "model_parameters": model_parameters,
+                        "model_parameters": {
+                            "target_width": 32,
+                            "target_height": 32,
+                            "batch_size": 32,
+                            "num_workers":2
+                        },
                     },
                 },
                 {
@@ -125,11 +130,7 @@ def parse_job_params(
                     "python_file_name": dm_python_file_name,
                     "params": {
                         "io_parameters": io_parameters,
-                        "model_parameters": {
-                            "n_components": 2,
-                            "min_dist": 0.1,
-                            "n_neighbors": 5,
-                        },
+                        "model_parameters": model_parameters,
                     },
                 },
             ],
@@ -151,7 +152,12 @@ def parse_job_params(
                     "forward_ports": FORWARD_PORTS,
                     "params": {
                         "io_parameters": io_parameters,
-                        "model_parameters": model_parameters,
+                        "model_parameters": {
+                            "target_width": 32,
+                            "target_height": 32,
+                            "batch_size": 32,
+                            "num_workers":2
+                        },
                     },
                 },
                 {
@@ -166,11 +172,7 @@ def parse_job_params(
                     "forward_ports": FORWARD_PORTS,
                     "params": {
                         "io_parameters": io_parameters,
-                        "model_parameters": {
-                            "n_components": 2,
-                            "min_dist": 0.1,
-                            "n_neighbors": 5,
-                        },
+                        "model_parameters": model_parameters,
                     },
                 },
             ],
