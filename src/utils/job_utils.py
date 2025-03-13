@@ -195,6 +195,96 @@ def parse_job_params(
 
     return job_params
 
+def parse_clustering_job_params(
+    data_project,
+    model_parameters,
+    user,
+    project_name,
+    flow_type,
+    image_name=None,
+    image_tag=None,
+    python_file_name=None,
+    conda_env=None,
+):
+    """
+    Parse job parameters
+    """
+    # TODO: Use model_name to define the conda_env/algorithm to be executed
+    data_uris = [dataset.uri for dataset in data_project.datasets]
+
+    results_dir = f"{WRITE_DIR}/{user}"
+
+    io_parameters = {
+        "uid_retrieve": "",
+        "data_uris": data_uris,
+        "data_tiled_api_key": data_project.api_key,
+        "data_type": data_project.data_type,
+        "root_uri": data_project.root_uri,
+        "save_model_path": f"{results_dir}/models",
+        "results_tiled_uri": parse_tiled_url(RESULTS_TILED_URI, user, project_name),
+        "results_tiled_api_key": RESULTS_TILED_API_KEY,
+        "results_dir": f"{results_dir}",
+    }
+
+    if flow_type == "podman" or flow_type == "docker":
+        job_params = {
+            "flow_type": flow_type,
+            "params_list": [
+                {
+                    "image_name": image_name,
+                    "image_tag": image_tag,
+                    "command": f'python {python_file_name}',
+                    "params": {
+                        "io_parameters": io_parameters,
+                        "model_parameters": model_parameters,
+                    },
+                    "volumes": [
+                        f"{READ_DIR_MOUNT}:/tiled_storage",
+                       
+                    ],
+                    "network":DOCKER_NETWORK
+                }
+            ],
+        }
+
+    elif flow_type == "conda":
+        job_params = {
+            "flow_type": "conda",
+            "params_list": [
+                {
+                    "conda_env_name": conda_env,
+                    "python_file_name": python_file_name,
+                    "params": {
+                        "io_parameters": io_parameters,
+                        "model_parameters": model_parameters,
+                    },
+                },
+            ],
+        }
+
+    else:
+        job_params = {
+            "flow_type": "slurm",
+            "params_list": [
+                {
+                    "job_name": "latent_space_explorer",
+                    "num_nodes": 1,
+                    "partitions": PARTITIONS_CPU,
+                    "reservations": RESERVATIONS_CPU,
+                    "max_time": MAX_TIME_CPU,
+                    "conda_env_name": "mlex_dimension_reduction_pca",
+                    "submission_ssh_key": SUBMISSION_SSH_KEY,
+                    "forward_ports": FORWARD_PORTS,
+                    "params": {
+                        "io_parameters": io_parameters,
+                        "model_parameters": model_parameters,
+                    },
+                }
+            ],
+        }
+
+    return job_params
+
 
 
 def parse_model_params(model_parameters_html, log, percentiles, mask):
