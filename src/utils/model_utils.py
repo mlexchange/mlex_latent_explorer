@@ -23,4 +23,4 @@ class Models:
         try:
             return self.models[key]
         except KeyError:
-            raise KeyError(f"A model with name {key} does not exist. Available models: {self.modelname_list}")
+            raise KeyError(f"A model with name {key} does not exist.")

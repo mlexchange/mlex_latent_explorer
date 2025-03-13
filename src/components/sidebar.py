@@ -18,7 +18,6 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
         job_manager:            Job manager object
         clustering_job_manager: Job manager object for clustering
     """
-    # MLflow models initialization happens in execute.py
     
     sidebar = html.Div(
         [
@@ -155,10 +154,6 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
     )
 
     return sidebar
-
-
-# get_mlflow_models function moved to execute.py
-# Functions that retrieve MLflow models moved to execute.py
 
 
 def create_show_sidebar_affix():
