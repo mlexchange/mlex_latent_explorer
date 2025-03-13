@@ -105,6 +105,8 @@ services:
       # Live mode
       WEBSOCKET_URL: ${WEBSOCKET_URL}
       WEBSOCKET_PORT: ${WEBSOCKET_PORT}
+      # MLflow
+      MLFLOW_TRACKING_URI: '${MLFLOW_TRACKING_URI}'
     volumes:
       - ${READ_DIR}:/tiled_storage
       - ./src:/app/work/src

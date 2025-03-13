@@ -11,6 +11,7 @@ WRITE_DIR_MOUNT = os.getenv("WRITE_DIR_MOUNT", None)
 WRITE_DIR = os.getenv("WRITE_DIR", "")
 RESULTS_TILED_URI = os.getenv("RESULTS_TILED_URI", "")
 RESULTS_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
+MLFLOW_TRACKING_URI= os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 
 # Flow parameters
 PARTITIONS_CPU = json.loads(os.getenv("PARTITIONS_CPU", "[]"))
@@ -23,7 +24,7 @@ SUBMISSION_SSH_KEY = os.getenv("SUBMISSION_SSH_KEY", "")
 FORWARD_PORTS = json.loads(os.getenv("FORWARD_PORTS", "[]"))
 DOCKER_NETWORK=os.getenv("DOCKER_NETWORK", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
-MLFLOW_TRACKING_URI= os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
+
 
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 # Create an MLflow client
