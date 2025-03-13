@@ -93,6 +93,7 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                                     id="mlflow-model-dropdown",
                                                     options=[],  # Empty initially, populated by callback
                                                     value=None,
+                                                    placeholder="Please select a model",
                                                 ),
                                                 width=10
                                             ),

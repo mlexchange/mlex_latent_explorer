@@ -25,7 +25,8 @@ from src.callbacks.execute import (  # noqa: F401
     allow_show_feature_vectors,
     run_clustering,
     run_latent_space,
-    refresh_mlflow_models
+    refresh_mlflow_models,
+    load_mlflow_models_on_render
 )
 from src.callbacks.infrastructure_check import (  # noqa: F401
     check_infra_state,

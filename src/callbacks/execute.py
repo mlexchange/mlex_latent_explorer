@@ -30,6 +30,15 @@ RESULTS_DIR = os.getenv("RESULTS_DIR", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
 
 @callback(
+    Output("mlflow-model-dropdown", "options", allow_duplicate=True),
+    Input("sidebar", "active_item"),  # This will trigger when the sidebar is first rendered
+    prevent_initial_call='initial_duplicate'  # Allow initial call but handle duplicates properly
+)
+def load_mlflow_models_on_render(active_item):
+    """Load MLflow models when the page is first loaded"""
+    return get_mlflow_models()
+
+@callback(
     Output("mlflow-model-dropdown", "options"),
     Output("mlflow-model-dropdown", "value"),
     Input("refresh-mlflow-models", "n_clicks"),
