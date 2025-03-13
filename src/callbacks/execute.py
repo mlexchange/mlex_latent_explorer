@@ -133,6 +133,7 @@ def run_latent_space(
         mask:                       Mask selection
         job_name:                   Job name
         project_name:               Project name
+        mlflow_model_id:            Selected mlflow model id
     Returns:
         open the alert indicating that the job was submitted
     """

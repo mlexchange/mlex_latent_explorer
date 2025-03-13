@@ -5,6 +5,7 @@ from mlflow.tracking import MlflowClient
 def get_mlflow_models():
     """
     Retrieve available MLflow models and create dropdown options.
+    Models are sorted by creation timestamp, from newest to oldest.
    
     Returns:
         list: Dropdown options for MLflow models
@@ -17,6 +18,9 @@ def get_mlflow_models():
        
         # Search for registered models
         registered_models = client.search_registered_models()
+        
+        # Sort models by creation timestamp (newest first)
+        registered_models = sorted(registered_models, key=lambda model: model.creation_timestamp, reverse=True)
        
         # Create dropdown options
         model_options = [
