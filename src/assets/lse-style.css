@@ -50,3 +50,7 @@ label {
     z-index: 1100 !important;
     position: relative;
 }
+
+.modal {
+    z-index: 1100 !important;
+}
