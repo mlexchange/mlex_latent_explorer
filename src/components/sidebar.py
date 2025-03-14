@@ -5,8 +5,6 @@ from mlex_utils.dash_utils.components_bootstrap.component_utils import (
     DbcControlItem as ControlItem,
 )
 
-import os
-
 from ..utils.mask_utils import get_mask_options
 
 
@@ -18,7 +16,7 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
         job_manager:            Job manager object
         clustering_job_manager: Job manager object for clustering
     """
-    
+
     sidebar = html.Div(
         [
             dbc.Offcanvas(
@@ -86,36 +84,44 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                 ControlItem(
                                     "Autoencoder Model",
                                     "mlflow-model-title",
-                                    html.Div([
-                                        dbc.Row([
-                                            dbc.Col(
-                                                dbc.Select(
-                                                    id="mlflow-model-dropdown",
-                                                    options=[],  # Empty initially, populated by callback
-                                                    value=None,
-                                                    placeholder="Please select a model",
-                                                ),
-                                                width=10
-                                            ),
-                                            dbc.Col(
-                                                dbc.Button(
-                                                    DashIconify(
-                                                        icon="tabler:refresh",
-                                                        width=20,
-                                                        height=20
+                                    html.Div(
+                                        [
+                                            dbc.Row(
+                                                [
+                                                    dbc.Col(
+                                                        dbc.Select(
+                                                            id="mlflow-model-dropdown",
+                                                            options=[],  # Empty initially, populated by callback
+                                                            value=None,
+                                                            placeholder="Please select a model",
+                                                        ),
+                                                        width=10,
                                                     ),
-                                                    id="refresh-mlflow-models",
-                                                    color="light",
-                                                    size="sm",
-                                                    style={"margin-left": "-10px"}
-                                                ),
-                                                width=1,
-                                                style={"padding-left": "0"}
+                                                    dbc.Col(
+                                                        dbc.Button(
+                                                            DashIconify(
+                                                                icon="tabler:refresh",
+                                                                width=20,
+                                                                height=20,
+                                                            ),
+                                                            id="refresh-mlflow-models",
+                                                            color="light",
+                                                            size="sm",
+                                                            style={
+                                                                "margin-left": "-10px"
+                                                            },
+                                                        ),
+                                                        width=1,
+                                                        style={"padding-left": "0"},
+                                                    ),
+                                                ]
                                             )
-                                        ])
-                                    ])
+                                        ]
+                                    ),
                                 ),
-                                html.Div(style={"height": "20px"}),  # Additional spacing
+                                html.Div(
+                                    style={"height": "20px"}
+                                ),  # Additional spacing
                                 job_manager,
                                 ControlItem(
                                     "",
@@ -161,7 +167,7 @@ def create_show_sidebar_affix():
     return html.Div(
         [
             dbc.Button(
-                DashIconify(icon="circum:settings", width=30),
+                DashIconify(icon="circum:settings", width=20),
                 id="sidebar-view",
                 size="sm",
                 color="secondary",
@@ -176,9 +182,9 @@ def create_show_sidebar_affix():
         ],
         style={
             "position": "fixed",
-            "bottom": "70px",
+            "bottom": "60px",
             "right": "10px",
-            "zIndex": 9999999,  # Note: zIndex is unitless
+            "zIndex": 9999,  # Note: zIndex is unitless
             "opacity": "0.8",
         },
     )
