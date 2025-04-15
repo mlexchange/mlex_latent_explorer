@@ -3,6 +3,8 @@ import asyncio
 from prefect import get_client
 from prefect.client.schemas.objects import DeploymentStatus
 
+# TODO: Move this to mlex_utils
+
 
 async def _check_prefect_ready():
     async with get_client() as client:
@@ -27,3 +29,15 @@ async def _check_prefect_worker_ready(deployment_name: str):
 
 def check_prefect_worker_ready(deployment_name: str):
     return asyncio.run(_check_prefect_worker_ready(deployment_name))
+
+
+async def _get_flow_run_parent_id(flow_run_id):
+    async with get_client() as client:
+        child_flow_run = await client.read_flow_run(flow_run_id)
+        parent_task_run_id = child_flow_run.parent_task_run_id
+        parent_task_run = await client.read_task_run(parent_task_run_id)
+        return parent_task_run.flow_run_id
+
+
+def get_flow_run_parent_id(flow_run_id):
+    return asyncio.run(_get_flow_run_parent_id(flow_run_id))
