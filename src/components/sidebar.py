@@ -107,8 +107,9 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                                             id="refresh-mlflow-models",
                                                             color="light",
                                                             size="sm",
+                                                            className="rounded-circle",
                                                             style={
-                                                                "margin-left": "-10px"
+                                                                "aspectRatio": "1 / 1"
                                                             },
                                                         ),
                                                         width=1,
