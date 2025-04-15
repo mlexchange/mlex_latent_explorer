@@ -129,7 +129,7 @@
                 "param_key": "n_neighbors"
             }
         ],
-        "python_file_name": "mlex_dimension_reduction_umap/src/umap_run.py",
+        "python_file_name": "src/umap_run.py",
         "public": false
         },
         {
@@ -163,7 +163,7 @@
                 "param_key": "n_components"
             }
         ],
-        "python_file_name": "mlex_dimension_reduction_pca/src/pca_run.py",
+        "python_file_name": "src/pca_run.py",
         "public": false
         },
         {
@@ -187,7 +187,7 @@
                 "param_key": "n_clusters"
             }
         ],
-        "python_file_name": "mlex_clustering/src/clustering_kmeans.py",
+        "python_file_name": "src/clustering_kmeans.py",
         "public": false
         },
         {
@@ -218,7 +218,7 @@
                 "param_key": "min_samples"
             }
         ],
-        "python_file_name": "mlex_clustering/src/clustering_dbscan.py",
+        "python_file_name": "src/clustering_dbscan.py",
         "public": false
         },
         {
@@ -242,7 +242,7 @@
                 "param_key": "min_cluster_size"
             }
         ],
-        "python_file_name": "mlex_clustering/src/clustering_hdbscan.py",
+        "python_file_name": "src/clustering_hdbscan.py",
         "public": false
         }
     ]
