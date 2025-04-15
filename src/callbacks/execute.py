@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import traceback
 import uuid
@@ -15,12 +16,20 @@ from mlex_utils.prefect_utils.core import (
     schedule_prefect_flow,
 )
 
-from src.app_layout import USER, clustering_models, dim_reduction_models,latent_space_models
+from src.app_layout import (
+    USER,
+    clustering_models,
+    dim_reduction_models,
+    latent_space_models,
+)
 from src.utils.data_utils import tiled_results
-from src.utils.job_utils import parse_job_params, parse_model_params, parse_clustering_job_params
-from src.utils.plot_utils import generate_notification
+from src.utils.job_utils import (
+    parse_clustering_job_params,
+    parse_job_params,
+    parse_model_params,
+)
 from src.utils.mlflow_utils import get_mlflow_models
-
+from src.utils.plot_utils import generate_notification
 
 MODE = os.getenv("MODE", "")
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
@@ -29,28 +38,35 @@ PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]')
 RESULTS_DIR = os.getenv("RESULTS_DIR", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
 
+
+logger = logging.getLogger(__name__)
+
+
 @callback(
     Output("mlflow-model-dropdown", "options", allow_duplicate=True),
-    Input("sidebar", "active_item"),  # This will trigger when the sidebar is first rendered
-    prevent_initial_call='initial_duplicate'  # Allow initial call but handle duplicates properly
+    Input(
+        "sidebar", "active_item"
+    ),  # This will trigger when the sidebar is first rendered
+    prevent_initial_call="initial_duplicate",  # Allow initial call but handle duplicates properly
 )
 def load_mlflow_models_on_render(active_item):
     """Load MLflow models when the page is first loaded"""
     return get_mlflow_models()
 
+
 @callback(
     Output("mlflow-model-dropdown", "options"),
     Output("mlflow-model-dropdown", "value"),
     Input("refresh-mlflow-models", "n_clicks"),
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
 def refresh_mlflow_models(n_clicks):
     """Refresh the MLflow models dropdown when the refresh button is clicked"""
     if n_clicks:
         options = get_mlflow_models()
-        return options, options[0]['value'] if options else None
+        return options, options[0]["value"] if options else None
     return [], None
-    
+
 
 @callback(
     Output(
@@ -163,9 +179,9 @@ def run_latent_space(
             FLOW_TYPE,
             latent_space_params,
             dim_reduction_params,
-            mlflow_model_id
+            mlflow_model_id,
         )
-       
+
         if MODE == "dev":
             job_uid = str(uuid.uuid4())
             job_message = (
@@ -189,8 +205,8 @@ def run_latent_space(
                 job_message = f"Job has been succesfully submitted with uid: {job_uid}"
                 notification_color = "indigo"
             except Exception as e:
-                # Print the traceback to the console
-                traceback.print_exc()
+                # Log the traceback
+                logger.error(traceback.format_exc())
                 job_uid = None
                 job_message = f"Job presented error: {e}"
                 notification_color = "danger"
@@ -233,9 +249,16 @@ def allow_show_feature_vectors(job_id, project_name):
     Returns:
         show-feature-vectors:   Whether to show feature vectors
     """
-    children_job_ids = get_children_flow_run_ids(job_id)
+    try:
+        children_job_ids = get_children_flow_run_ids(job_id)
+    except Exception:
+        logger.error(traceback.format_exc())
+        return True
 
-    if get_flow_run_state(children_job_ids[1]) != "COMPLETED":
+    if (
+        len(children_job_ids) < 2
+        or get_flow_run_state(children_job_ids[1]) != "COMPLETED"
+    ):
         return True
 
     child_job_id = children_job_ids[1]
@@ -244,7 +267,7 @@ def allow_show_feature_vectors(job_id, project_name):
         tiled_results.get_data_by_trimmed_uri(expected_result_uri)
         return False
     except Exception:
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         return True
 
 
@@ -289,7 +312,10 @@ def allow_run_clustering(job_id, project_name):
 
     children_job_ids = get_children_flow_run_ids(job_id)
 
-    if get_flow_run_state(children_job_ids[1]) != "COMPLETED":
+    if (
+        len(children_job_ids) < 2
+        or get_flow_run_state(children_job_ids[1]) != "COMPLETED"
+    ):
         return True
 
     child_job_id = children_job_ids[1]
@@ -298,7 +324,7 @@ def allow_run_clustering(job_id, project_name):
         tiled_results.get_data_by_trimmed_uri(expected_result_uri)
         return False
     except Exception:
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         return True
 
 
@@ -457,8 +483,7 @@ def run_clustering(
                 job_message = f"Job has been succesfully submitted with uid: {job_uid}"
                 notification_color = "indigo"
             except Exception as e:
-                # Print the traceback to the console
-                traceback.print_exc()
+                logger.error(traceback.format_exc())
                 job_uid = None
                 job_message = f"Job presented error: {e}"
                 notification_color = "danger"
@@ -504,7 +529,11 @@ def allow_show_clusters(job_id, project_name):
     if job_id is None:
         raise PreventUpdate
 
-    children_job_ids = get_children_flow_run_ids(job_id)
+    try:
+        children_job_ids = get_children_flow_run_ids(job_id)
+    except Exception:
+        logger.error(traceback.format_exc())
+        return True
 
     if get_flow_run_state(children_job_ids[0]) != "COMPLETED":
         return True
@@ -515,7 +544,5 @@ def allow_show_clusters(job_id, project_name):
         tiled_results.get_data_by_trimmed_uri(expected_result_uri)
         return False
     except Exception:
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         return True
-
-
