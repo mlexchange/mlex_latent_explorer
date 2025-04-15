@@ -15,6 +15,7 @@ def create_infra_state_status(title, icon, id, color):
 
 def create_infra_state_details(
     tiled_results_ready=False,
+    mlflow_ready=False,
     prefect_ready=False,
     prefect_worker_ready=False,
     timestamp=None,
@@ -39,6 +40,13 @@ def create_infra_state_details(
                     icon=ready_icon if tiled_results_ready else not_ready_icon,
                     color=ready_color if tiled_results_ready else not_ready_color,
                     id="tiled-results-ready",
+                ),
+                html.Hr(),
+                create_infra_state_status(
+                    "MLFlow (Server)",
+                    icon=ready_icon if mlflow_ready else not_ready_icon,
+                    color=ready_color if mlflow_ready else not_ready_color,
+                    id="mlflow-ready",
                 ),
                 html.Hr(),
                 create_infra_state_status(
