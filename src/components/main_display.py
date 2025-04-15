@@ -130,7 +130,7 @@ def main_display():
                                                             ),
                                                             dbc.Button(
                                                                 DashIconify(
-                                                                    icon="pajamas:clear-all",
+                                                                    icon="lucide:eraser",
                                                                     style={
                                                                         "padding": "0px",
                                                                     },
