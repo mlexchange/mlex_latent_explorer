@@ -171,9 +171,3 @@ cython_debug/
 #.idea/
 
 work/.prefect/
-
-.dotnet/
-.vscode/
-.vscode-server/
-.gnupg/
-.ssh/

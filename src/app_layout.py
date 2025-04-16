@@ -26,10 +26,7 @@ MODE = os.getenv("MODE", "dev")
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 USER = os.getenv("USER")
 NUM_IMGS_OVERVIEW = 6
-
-# # Websocket
-# WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "127.0.0.1")
-# WEBSOCKET_PORT = os.getenv("WEBSOCKET_PORT", 8765)
+PATH_NAME_PREFIX = os.getenv("PATH_NAME_PREFIX", "/")
 
 # SETUP DASH APP
 cache = diskcache.Cache("./cache")
@@ -44,8 +41,8 @@ app = Dash(
     external_stylesheets=external_stylesheets,
     suppress_callback_exceptions=True,
     long_callback_manager=long_callback_manager,
-    requests_pathname_prefix="/latent-space/",
-    routes_pathname_prefix="/latent-space/",
+    requests_pathname_prefix=PATH_NAME_PREFIX,
+    routes_pathname_prefix=PATH_NAME_PREFIX,
 )
 
 app.title = "Latent Space Explorer"
