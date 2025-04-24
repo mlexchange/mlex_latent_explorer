@@ -137,10 +137,15 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict, live_ind
 
         index = message["index"]
 
-        live_indices.append(index)
-
+        
+        # this change was for 733 and not SMI. SMI has each frame in a 3D array, 733 does not.
+        # we need to figure out how to handle both cases.
         # Update cum_size according to the received index
-        cum_size = max(live_indices) + 1
+        if len(data_project_dict["datasets"]) == 0:
+            cum_size = 1
+        else:
+            cum_size = data_project_dict["datasets"][-1]["cumulative_data_count"] + 1
+        
         # Update the data project dict
         if data_project_dict["root_uri"] != root_uri:
             data_project_dict["root_uri"] = root_uri
@@ -154,10 +159,16 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict, live_ind
                 }
             ]
         else:
-            data_project_dict["datasets"][0] = {
-                "uri": uri,
-                "cumulative_data_count": cum_size,
-            }
+            # data_project_dict["datasets"][0] = {
+            #     "uri": uri,
+            #     "cumulative_data_count": cum_size,
+            # }
+            data_project_dict["datasets"] += [
+                {
+                    "uri": uri,
+                    "cumulative_data_count": cum_size,
+                }
+            ]
 
     return data_project_dict, live_indices
 
