@@ -12,6 +12,8 @@ WRITE_DIR = os.getenv("WRITE_DIR", "")
 RESULTS_TILED_URI = os.getenv("RESULTS_TILED_URI", "")
 RESULTS_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
+MLFLOW_TRACKING_USERNAME = os.getenv("MLFLOW_TRACKING_USERNAME", "")
+MLFLOW_TRACKING_PASSWORD = os.getenv("MLFLOW_TRACKING_PASSWORD", "")
 
 # Flow parameters
 PARTITIONS_CPU = json.loads(os.getenv("PARTITIONS_CPU", "[]"))
@@ -69,6 +71,8 @@ def parse_job_params(
         "results_tiled_api_key": RESULTS_TILED_API_KEY,
         "results_dir": f"{results_dir}",
         "mlflow_uri": MLFLOW_TRACKING_URI,
+        "mlflow_tracking_username": MLFLOW_TRACKING_USERNAME,
+        "mlflow_tracking_password": MLFLOW_TRACKING_PASSWORD,
         "mlflow_model": mlflow_model_id,
     }
 

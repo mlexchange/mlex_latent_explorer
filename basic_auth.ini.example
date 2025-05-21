@@ -1,0 +1,5 @@
+[mlflow]
+default_permission = READ
+database_uri = sqlite:///basic_auth.db
+admin_username = <MLFLOW_TRACKING_USERNAME>
+admin_password = <MLFLOW_TRACKING_PASSWORD>

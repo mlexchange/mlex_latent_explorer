@@ -71,19 +71,30 @@ services:
     image: ghcr.io/mlflow/mlflow:latest  # Custom MLflow image with PostgreSQL support
     container_name: mlflow-server
     command: >
-      /bin/sh -c "pip install --no-cache-dir psycopg2-binary &&
+      /bin/sh -c "pip install --no-cache-dir psycopg2-binary 'mlflow[auth]' &&
       mlflow server
       --backend-store-uri postgresql://${MLFLOW_DB_USER}:${MLFLOW_DB_PW}@mlflow_db:5432/${MLFLOW_DB_NAME}
       --host 0.0.0.0
-      --port 5000"
+      --port 5000
+      --app-name basic-auth"
     ports:
       - "127.0.0.1:5000:5000"
+    environment:
+      - POSTGRES_USER=${MLFLOW_DB_USER}
+      - POSTGRES_PASSWORD=${MLFLOW_DB_PW}
+      - POSTGRES_DB=${MLFLOW_DB_NAME}
+      - MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME}
+      - MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
+      - MLFLOW_FLASK_SERVER_SECRET_KEY=${MLFLOW_FLASK_SERVER_SECRET_KEY}
+      - MLFLOW_AUTH_CONFIG_PATH=/basic_auth.ini
     depends_on:
       - mlflow_db
     networks:
       - mle_net
     volumes:
       - ./data/mlflow_storage:/mlartifacts:rw  # Persist MLflow models, logs, and artifacts
+      - ./data/mlflow_auth:/mlflow_auth:rw # Dedicated volume for auth database
+      - ./basic_auth.ini:/basic_auth.ini
 
   mlflow_db:
     image: postgres:14.5-alpine  # Lightweight PostgreSQL version
@@ -143,6 +154,8 @@ services:
       WEBSOCKET_PORT: ${WEBSOCKET_PORT}
       # MLflow
       MLFLOW_TRACKING_URI: '${MLFLOW_TRACKING_URI}'
+      MLFLOW_TRACKING_USERNAME: '${MLFLOW_TRACKING_USERNAME}'
+      MLFLOW_TRACKING_PASSWORD: '${MLFLOW_TRACKING_PASSWORD}'
     volumes:
       - ${READ_DIR}:/tiled_storage
       - ./src:/app/work/src
