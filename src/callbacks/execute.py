@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import traceback
 import uuid
@@ -15,9 +16,19 @@ from mlex_utils.prefect_utils.core import (
     schedule_prefect_flow,
 )
 
-from src.app_layout import USER, clustering_models, dim_reduction_models
+from src.app_layout import (
+    USER,
+    clustering_models,
+    dim_reduction_models,
+    latent_space_models,
+)
 from src.utils.data_utils import tiled_results
-from src.utils.job_utils import parse_job_params, parse_model_params
+from src.utils.job_utils import (
+    parse_clustering_job_params,
+    parse_job_params,
+    parse_model_params,
+)
+from src.utils.mlflow_utils import get_mlflow_models
 from src.utils.plot_utils import generate_notification
 
 MODE = os.getenv("MODE", "")
@@ -26,6 +37,35 @@ FLOW_NAME = os.getenv("FLOW_NAME", "")
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 RESULTS_DIR = os.getenv("RESULTS_DIR", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
+
+
+logger = logging.getLogger(__name__)
+
+
+@callback(
+    Output("mlflow-model-dropdown", "options", allow_duplicate=True),
+    Input(
+        "sidebar", "active_item"
+    ),  # This will trigger when the sidebar is first rendered
+    prevent_initial_call="initial_duplicate",  # Allow initial call but handle duplicates properly
+)
+def load_mlflow_models_on_render(active_item):
+    """Load MLflow models when the page is first loaded"""
+    return get_mlflow_models()
+
+
+@callback(
+    Output("mlflow-model-dropdown", "options"),
+    Output("mlflow-model-dropdown", "value"),
+    Input("refresh-mlflow-models", "n_clicks"),
+    prevent_initial_call=True,
+)
+def refresh_mlflow_models(n_clicks):
+    """Refresh the MLflow models dropdown when the refresh button is clicked"""
+    if n_clicks:
+        options = get_mlflow_models()
+        return options, options[0]["value"] if options else None
+    return [], None
 
 
 @callback(
@@ -82,6 +122,7 @@ FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
         },
         "data",
     ),
+    State("mlflow-model-dropdown", "value"),  # Add state for the selected MLflow model
     prevent_initial_call=True,
 )
 def run_latent_space(
@@ -94,6 +135,7 @@ def run_latent_space(
     mask,
     job_name,
     project_name,
+    mlflow_model_id,
 ):
     """
     This callback submits a job request to the compute service
@@ -107,10 +149,20 @@ def run_latent_space(
         mask:                       Mask selection
         job_name:                   Job name
         project_name:               Project name
+        mlflow_model_id:            Selected mlflow model id
     Returns:
         open the alert indicating that the job was submitted
     """
     if n_clicks is not None and n_clicks > 0:
+
+        if mlflow_model_id is None:
+            notification = generate_notification(
+                "MLflow Model",
+                "red",
+                "fluent-mdl2:machine-learning",
+                "Please select a valid MLflow model!",
+            )
+            return notification
         model_parameters, parameter_errors = parse_model_params(
             model_parameter_container, log, percentiles, mask
         )
@@ -125,17 +177,18 @@ def run_latent_space(
             return notification
 
         data_project = DataProject.from_dict(data_project_dict)
-        model_exec_params = dim_reduction_models[model_name]
-        job_params = parse_job_params(
+
+        latent_space_params = latent_space_models[latent_space_models.modelname_list[0]]
+        dim_reduction_params = dim_reduction_models[model_name]
+        train_params = parse_job_params(
             data_project,
             model_parameters,
             USER,
             project_name,
             FLOW_TYPE,
-            model_exec_params["image_name"],
-            model_exec_params["image_tag"],
-            model_exec_params["python_file_name"],
-            model_exec_params["conda_env"],
+            latent_space_params,
+            dim_reduction_params,
+            mlflow_model_id,
         )
 
         if MODE == "dev":
@@ -154,15 +207,15 @@ def run_latent_space(
                 )
                 job_uid = schedule_prefect_flow(
                     FLOW_NAME,
-                    parameters=job_params,
+                    parameters=train_params,
                     flow_run_name=f"{job_name} {current_time}",
                     tags=PREFECT_TAGS + [project_name, "latent-space"],
                 )
                 job_message = f"Job has been succesfully submitted with uid: {job_uid}"
                 notification_color = "indigo"
             except Exception as e:
-                # Print the traceback to the console
-                traceback.print_exc()
+                # Log the traceback
+                logger.error(traceback.format_exc())
                 job_uid = None
                 job_message = f"Job presented error: {e}"
                 notification_color = "danger"
@@ -205,18 +258,25 @@ def allow_show_feature_vectors(job_id, project_name):
     Returns:
         show-feature-vectors:   Whether to show feature vectors
     """
-    children_job_ids = get_children_flow_run_ids(job_id)
-
-    if get_flow_run_state(children_job_ids[0]) != "COMPLETED":
+    try:
+        children_job_ids = get_children_flow_run_ids(job_id)
+    except Exception:
+        logger.error(traceback.format_exc())
         return True
 
-    child_job_id = children_job_ids[0]
+    if (
+        len(children_job_ids) < 2
+        or get_flow_run_state(children_job_ids[1]) != "COMPLETED"
+    ):
+        return True
+
+    child_job_id = children_job_ids[1]
     expected_result_uri = f"{USER}/{project_name}/{child_job_id}"
     try:
         tiled_results.get_data_by_trimmed_uri(expected_result_uri)
         return False
     except Exception:
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         return True
 
 
@@ -261,16 +321,19 @@ def allow_run_clustering(job_id, project_name):
 
     children_job_ids = get_children_flow_run_ids(job_id)
 
-    if get_flow_run_state(children_job_ids[0]) != "COMPLETED":
+    if (
+        len(children_job_ids) < 2
+        or get_flow_run_state(children_job_ids[1]) != "COMPLETED"
+    ):
         return True
 
-    child_job_id = children_job_ids[0]
+    child_job_id = children_job_ids[1]
     expected_result_uri = f"{USER}/{project_name}/{child_job_id}"
     try:
         tiled_results.get_data_by_trimmed_uri(expected_result_uri)
         return False
     except Exception:
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         return True
 
 
@@ -379,7 +442,7 @@ def run_clustering(
 
         # Prepare data project with feature vectors
         children_job_ids = get_children_flow_run_ids(dimension_reduction_job_id)
-        child_job_id = children_job_ids[0]
+        child_job_id = children_job_ids[1]
 
         expected_result_uri = f"/{USER}/{project_name}/{child_job_id}"
         data_project_fvec = DataProject.from_dict(
@@ -393,7 +456,7 @@ def run_clustering(
         )
 
         model_exec_params = clustering_models[model_name]
-        job_params = parse_job_params(
+        job_params = parse_clustering_job_params(
             data_project_fvec,
             model_parameters,
             USER,
@@ -429,8 +492,7 @@ def run_clustering(
                 job_message = f"Job has been succesfully submitted with uid: {job_uid}"
                 notification_color = "indigo"
             except Exception as e:
-                # Print the traceback to the console
-                traceback.print_exc()
+                logger.error(traceback.format_exc())
                 job_uid = None
                 job_message = f"Job presented error: {e}"
                 notification_color = "danger"
@@ -476,7 +538,11 @@ def allow_show_clusters(job_id, project_name):
     if job_id is None:
         raise PreventUpdate
 
-    children_job_ids = get_children_flow_run_ids(job_id)
+    try:
+        children_job_ids = get_children_flow_run_ids(job_id)
+    except Exception:
+        logger.error(traceback.format_exc())
+        return True
 
     if get_flow_run_state(children_job_ids[0]) != "COMPLETED":
         return True
@@ -487,5 +553,5 @@ def allow_show_clusters(job_id, project_name):
         tiled_results.get_data_by_trimmed_uri(expected_result_uri)
         return False
     except Exception:
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         return True

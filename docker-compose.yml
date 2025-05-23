@@ -4,6 +4,7 @@ services:
   prefect:
     image: prefecthq/prefect:2.14-python3.11
     command: prefect server start
+    container_name: prefect-server
     environment:
       - PREFECT_SERVER_API_HOST=0.0.0.0
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${PREFECT_DB_USER}:${PREFECT_DB_PW}@prefect_db:5432/${PREFECT_DB_NAME} # Needed if using postgres and not sqlite
@@ -19,6 +20,7 @@ services:
 
   prefect_db:
     image: postgres:14.5-alpine
+    container_name: prefect-db
     environment:
       - POSTGRES_USER=${PREFECT_DB_USER}
       - POSTGRES_PASSWORD=${PREFECT_DB_PW}
@@ -33,6 +35,7 @@ services:
   tiled:
     # see the file ./tiled/deploy/config.yml for detailed configuration of tiled
     image: ghcr.io/bluesky/tiled:v0.1.0a118
+    container_name: tiled-server
     ports:
       - "127.0.0.1:8000:8000"
     environment:
@@ -52,6 +55,7 @@ services:
 
   tiled_db:
     image: postgres:14.5-alpine
+    container_name: tiled-db
     environment:
       - POSTGRES_USER=${TILED_DB_USER}
       - POSTGRES_PASSWORD=${TILED_DB_PW}
@@ -63,9 +67,52 @@ services:
     networks:
       mle_net:
 
-  front-end:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest  # Custom MLflow image with PostgreSQL support
+    container_name: mlflow-server
+    command: >
+      /bin/sh -c "pip install --no-cache-dir psycopg2-binary 'mlflow[auth]' &&
+      mlflow server
+      --backend-store-uri postgresql://${MLFLOW_DB_USER}:${MLFLOW_DB_PW}@mlflow_db:5432/${MLFLOW_DB_NAME}
+      --host 0.0.0.0
+      --port 5000
+      --app-name basic-auth"
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      - POSTGRES_USER=${MLFLOW_DB_USER}
+      - POSTGRES_PASSWORD=${MLFLOW_DB_PW}
+      - POSTGRES_DB=${MLFLOW_DB_NAME}
+      - MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME}
+      - MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
+      - MLFLOW_FLASK_SERVER_SECRET_KEY=${MLFLOW_FLASK_SERVER_SECRET_KEY}
+      - MLFLOW_AUTH_CONFIG_PATH=/basic_auth.ini
+    depends_on:
+      - mlflow_db
+    networks:
+      - mle_net
+    volumes:
+      - ./data/mlflow_storage:/mlartifacts:rw  # Persist MLflow models, logs, and artifacts
+      - ./data/mlflow_auth:/mlflow_auth:rw # Dedicated volume for auth database
+      - ./basic_auth.ini:/basic_auth.ini
+
+  mlflow_db:
+    image: postgres:14.5-alpine  # Lightweight PostgreSQL version
+    container_name: mlflow-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${MLFLOW_DB_USER}
+      - POSTGRES_PASSWORD=${MLFLOW_DB_PW}
+      - POSTGRES_DB=${MLFLOW_DB_NAME}
+    volumes:
+      - ./data/mlflow_db:/var/lib/postgresql/data:rw
+      - ./data/mlflow_storage:/mlartifacts:rw  # Persist PostgreSQL database
+    networks:
+      - mle_net
+
+  latent-space-explorer:
     restart: "unless-stopped"
-    container_name: "latentxp"
+    container_name: "latent-space-explorer"
     build:
       context: "."
     command: "python frontend.py"
@@ -89,7 +136,7 @@ services:
       TIMEZONE: "${TIMEZONE}"
       PREFECT_TAGS: "${PREFECT_TAGS}"
       FLOW_TYPE: "${FLOW_TYPE}"
-      DOCKER_NETWORK: "${DOCKER_NETWORK}"
+      CONTAINER_NETWORK: "${CONTAINER_NETWORK}"
       # Slurm jobs
       PARTITIONS_CPU: "${PARTITIONS_CPU}"
       MAX_TIME_CPU: "${MAX_TIME_CPU}"
@@ -105,11 +152,19 @@ services:
       # Live mode
       WEBSOCKET_URL: ${WEBSOCKET_URL}
       WEBSOCKET_PORT: ${WEBSOCKET_PORT}
+      # MLflow
+      MLFLOW_TRACKING_URI: '${MLFLOW_TRACKING_URI}'
+      MLFLOW_TRACKING_USERNAME: '${MLFLOW_TRACKING_USERNAME}'
+      MLFLOW_TRACKING_PASSWORD: '${MLFLOW_TRACKING_PASSWORD}'
     volumes:
       - ${READ_DIR}:/tiled_storage
       - ./src:/app/work/src
     ports:
       - "127.0.0.1:8070:8070"
+    depends_on:
+      - mlflow
+      - tiled
+      - prefect
     networks:
       mle_net:
 

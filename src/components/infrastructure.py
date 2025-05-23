@@ -15,6 +15,7 @@ def create_infra_state_status(title, icon, id, color):
 
 def create_infra_state_details(
     tiled_results_ready=False,
+    mlflow_ready=False,
     prefect_ready=False,
     prefect_worker_ready=False,
     timestamp=None,
@@ -42,6 +43,13 @@ def create_infra_state_details(
                 ),
                 html.Hr(),
                 create_infra_state_status(
+                    "MLFlow (Server)",
+                    icon=ready_icon if mlflow_ready else not_ready_icon,
+                    color=ready_color if mlflow_ready else not_ready_color,
+                    id="mlflow-ready",
+                ),
+                html.Hr(),
+                create_infra_state_status(
                     "Prefect (Server)",
                     icon=ready_icon if prefect_ready else not_ready_icon,
                     color=ready_color if prefect_ready else not_ready_color,
@@ -63,22 +71,30 @@ def create_infra_state_details(
 
 def create_infra_state_affix():
     return html.Div(
-        style={"position": "fixed", "bottom": "20px", "right": "10px", "zIndex": 9999},
+        style={
+            "position": "fixed",
+            "bottom": "20px",
+            "right": "10px",
+            "zIndex": 9999,
+            "opacity": "0.8",
+        },
         children=[
-            dbc.DropdownMenu(
+            dbc.Button(
+                DashIconify(icon="ph:network-fill", id="infra-state-icon", width=20),
                 id="infra-state-summary",
+                size="sm",
                 color="secondary",
-                label=DashIconify(
-                    icon="ph:network-fill", id="infra-state-icon", width=30
+                className="rounded-circle",
+                style={"aspectRatio": "1 / 1"},
+            ),
+            dbc.Popover(
+                dbc.PopoverBody(
+                    create_infra_state_details(),
+                    id="infra-state-details",
+                    style={"border": "none", "padding": "0px"},
                 ),
-                children=[
-                    dbc.DropdownMenuItem(
-                        create_infra_state_details(),
-                        header=False,
-                        id="infra-state-details",
-                        style={"border": "none", "padding": "0px"},
-                    ),
-                ],
+                target="infra-state-summary",
+                trigger="click",
             ),
             dcc.Interval(id="infra-check", interval=60000),
             dcc.Store(id="infra-state"),

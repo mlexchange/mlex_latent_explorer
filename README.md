@@ -29,6 +29,25 @@ Then **update the** `.env` file with the correct values.
 
 **Important Note:** Due to the current tiled configuration, ensure that the `WRITE_DIR` is a subdirectory of the `READ_DIR` if the same tiled server is used for both reading data and writing results.
 
+#### MLFlow Configuration in .env
+
+When setting `MLFLOW_TRACKING_URI` in the `.env` file:
+
+- If you run the [MLFlow server](https://github.com/xiaoyachong/mlex_mlflow) locally, you can set it to:
+  ```
+  MLFLOW_TRACKING_URI="http://mlflow-server:5000"
+  ```
+  This works because the MLFlow server also runs in the `mle_net` Docker network.
+
+- If you run MLFlow server on vaughan and use SSH port forwarding:
+  ```
+  ssh -S forward -L 5000:localhost:5000 <your-username>@vaughan.als.lbl.gov
+  ```
+  Then you can set it to:
+  ```
+  MLFLOW_TRACKING_URI="http://host.docker.internal:5000"
+  ```
+
 ### 3 Build and Start the Application
 
 ```sh
