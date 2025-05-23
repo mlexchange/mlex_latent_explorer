@@ -154,6 +154,15 @@ def run_latent_space(
         open the alert indicating that the job was submitted
     """
     if n_clicks is not None and n_clicks > 0:
+
+        if mlflow_model_id is None:
+            notification = generate_notification(
+                "MLflow Model",
+                "red",
+                "fluent-mdl2:machine-learning",
+                "Please select a valid MLflow model!",
+            )
+            return notification
         model_parameters, parameter_errors = parse_model_params(
             model_parameter_container, log, percentiles, mask
         )
