@@ -24,7 +24,7 @@ RESERVATIONS_GPU = json.loads(os.getenv("RESERVATIONS_CPU", "[]"))
 MAX_TIME_GPU = os.getenv("MAX_TIME_CPU", "1:00:00")
 SUBMISSION_SSH_KEY = os.getenv("SUBMISSION_SSH_KEY", "")
 FORWARD_PORTS = json.loads(os.getenv("FORWARD_PORTS", "[]"))
-DOCKER_NETWORK = os.getenv("DOCKER_NETWORK", "")
+CONTAINER_NETWORK = os.getenv("CONTAINER_NETWORK", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ def parse_job_params(
                     "volumes": [
                         f"{READ_DIR_MOUNT}:/tiled_storage",
                     ],
-                    "network": DOCKER_NETWORK,
+                    "network": CONTAINER_NETWORK,
                 },
                 {
                     "image_name": dim_reduction_params["image_name"],
@@ -110,7 +110,7 @@ def parse_job_params(
                     "volumes": [
                         f"{READ_DIR_MOUNT}:/tiled_storage",
                     ],
-                    "network": DOCKER_NETWORK,
+                    "network": CONTAINER_NETWORK,
                 },
             ],
         }
@@ -224,7 +224,7 @@ def parse_clustering_job_params(
                     "volumes": [
                         f"{READ_DIR_MOUNT}:/tiled_storage",
                     ],
-                    "network": DOCKER_NETWORK,
+                    "network": CONTAINER_NETWORK,
                 }
             ],
         }
