@@ -1,0 +1,12 @@
+---
+logging_level: DEBUG
+
+lse_operator:
+  ws_publisher:
+    host: 0.0.0.0
+    port: 8765
+  listener:
+    zmq_address: tcp://tiled_poller:5000
+
+
+dynaconf_merge: true

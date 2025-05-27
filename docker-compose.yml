@@ -165,6 +165,40 @@ services:
       - mlflow
       - tiled
       - prefect
+    profiles:
+
+      - arroyo
+    networks:
+      mle_net:
+
+
+  # arroyo and arroyo_sim are made optional via profiles
+  # To run them, use 
+  #  `docker-compose --profile arroyo up`
+  #  or
+  #  `docker-compose --profile arroyoy --profile arroyo_sim up
+  # or set the profile in the environment variable
+  #  `export COMPOSE_PROFILES=arroyo, arroyo_sim`
+
+  arroyo:
+    image: ghcr.io/als-computing/arroyopy:latest
+    container_name: arroyo
+    command: python -m arroyogisas.app.viz_operator_cli
+    profiles:
+      - arroyo
+    networks:
+      mle_net:
+  
+  arroyo_sim:
+    command: python -m arroyosas.app.tiled_poller_sim_cli
+    image: ghcr.io/als-computing/arroyosas:main
+    restart: unless-stopped
+    volumes:
+      - .:/app:Z
+      - ./settings.yaml:/app/settings.yaml:Z
+    profiles:
+      - sim
+      - arroyo
     networks:
       mle_net:
 
