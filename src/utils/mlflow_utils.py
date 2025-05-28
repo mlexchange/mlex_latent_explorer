@@ -88,9 +88,16 @@ def get_mlflow_params(mlflow_model_id):
     return params
 
 
-def get_mlflow_models_live():
+def get_mlflow_models_live(model_type=None):
     """
     Retrieve available MLflow models and create dropdown options
+    
+    Args:
+        model_type (str, optional): Filter models by type tag. Possible values: 
+                                    'autoencoder', 'dimension_reduction', or None to return all models
+    
+    Returns:
+        list: Dropdown options for MLflow models filtered by type if specified
     """
     try:
         # Set MLflow tracking URI and credentials
@@ -101,8 +108,37 @@ def get_mlflow_models_live():
         # Get all registered models
         client = mlflow.MlflowClient()
         models = client.search_registered_models()
-        # Filter models with "smi" in the name
+        
+        # Filter models with "smi" in the name as a basic filter
         models = [model for model in models if "smi" in model.name.lower()]
+        
+        # Since MLflow doesn't support searching by tags directly,
+        # we need to manually filter the models by checking their tags
+        if model_type:
+            filtered_models = []
+            for model in models:
+                # Get the latest version of the model
+                latest_versions = client.search_model_versions(f"name='{model.name}'")
+                if not latest_versions:
+                    continue
+                    
+                latest_version = max(latest_versions, key=lambda mv: int(mv.version))
+                
+                # Get run ID associated with the model version
+                run_id = latest_version.run_id
+                if not run_id:
+                    continue
+                    
+                # Get the run and check its tags
+                try:
+                    run = client.get_run(run_id)
+                    if run.data.tags.get("model_type") == model_type:
+                        filtered_models.append(model)
+                except Exception as e:
+                    logger.warning(f"Error retrieving run {run_id}: {e}")
+                    continue
+            
+            models = filtered_models
         
         # Format as dropdown options
         model_options = [
@@ -112,4 +148,5 @@ def get_mlflow_models_live():
         
         return model_options
     except Exception as e:
+        logger.warning(f"Error retrieving MLflow models: {e}")
         return [{"label": "Error loading models", "value": None}]

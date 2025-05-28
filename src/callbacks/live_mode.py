@@ -6,9 +6,8 @@ from dash import Input, Output, Patch, State, callback, no_update
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
-from src.utils.plot_utils import generate_scatter_data
+from src.utils.plot_utils import generate_scatter_data, generate_notification
 from src.utils.mlflow_utils import get_mlflow_models_live
-
 
 
 @callback(
@@ -20,23 +19,78 @@ from src.utils.mlflow_utils import get_mlflow_models_live
 )
 def show_model_selection_dialog(n_clicks):
     if n_clicks is not None and n_clicks % 2 == 1:
-        model_options = get_mlflow_models_live()
+        # Get model options filtered by type
+        autoencoder_options = get_mlflow_models_live(model_type=None)
+        dimred_options = get_mlflow_models_live(model_type=None)
        
-        return True, model_options, model_options
+        return True, autoencoder_options, dimred_options
     return False, [], []
 
 
 @callback(
     Output("live-model-dialog", "is_open", allow_duplicate=True),
     Output("selected-live-models", "data"),
+    Output("data-selection-controls", "style"),
+    Output("dimension-reduction-controls", "style"),
+    Output("clustering-controls", "style"),
+    Output("data-overview-card", "style"),
+    Output("live-mode-models", "style"),  # Added this output
+    Output("live-mode-autoencoder-dropdown", "options"),  # Added this output
+    Output("live-mode-autoencoder-dropdown", "value"),  # Added this output
+    Output("live-mode-dimred-dropdown", "options"),  # Added this output
+    Output("live-mode-dimred-dropdown", "value"),  # Added this output
+    Output("sidebar", "active_item"),
+    Output("image-card", "style"),
+    Output("scatter", "style"),
+    Output("heatmap", "style"),
+    Output("go-live", "style"),
+    Output("tooltip-go-live", "children"),
+    Output("pause-button", "style"),
     Input("live-model-continue", "n_clicks"),
     State("live-autoencoder-dropdown", "value"),
     State("live-dimred-dropdown", "value"),
+    State("live-autoencoder-dropdown", "options"),
+    State("live-dimred-dropdown", "options"),
     prevent_initial_call=True,
 )
-def handle_model_continue(continue_clicks, selected_autoencoder, selected_dimred):
+def handle_model_continue(continue_clicks, selected_autoencoder, selected_dimred, 
+                          autoencoder_options, dimred_options):
     if continue_clicks:
-        return False, {"autoencoder": selected_autoencoder, "dimred": selected_dimred}
+        # Close dialog and save selected models
+        selected_models = {"autoencoder": selected_autoencoder, "dimred": selected_dimred}
+        
+        # Transition to live mode UI
+        return (
+            False,  # Close dialog
+            selected_models,  # Save selected models
+            {"display": "none"},  # Hide data selection controls
+            {"display": "none"},  # Hide dimension reduction controls
+            {"display": "none"},  # Hide clustering controls
+            {"display": "none"},  # Hide data overview card
+            {},  # Show live mode models section
+            autoencoder_options,  # Copy options from dialog to sidebar
+            selected_autoencoder,  # Set selected autoencoder
+            dimred_options,  # Copy options from dialog to sidebar
+            selected_dimred,  # Set selected dimension reduction model
+            ["item-1"],  # Active sidebar item
+            {"width": "100%", "height": "85vh"},  # Image card style
+            {"height": "65vh"},  # Scatter style
+            {"height": "65vh"},  # Heatmap style
+            {  # Go-live button style
+                "display": "flex",
+                "font-size": "40px",
+                "padding": "5px",
+                "color": "white",
+                "background-color": "#D57800",
+                "border": "0px",
+            },
+            "Go to Offline Mode",  # Go-live tooltip
+            {  # Pause button style
+                "display": "flex",
+                "font-size": "1.5rem",
+                "padding": "5px",
+            }
+        )
     raise PreventUpdate
 
 
@@ -65,66 +119,44 @@ def toggle_continue_button(selected_autoencoder, selected_dimred):
 @callback(
     Output("show-clusters", "value", allow_duplicate=True),
     Output("show-feature-vectors", "value", allow_duplicate=True),
-    Output("data-selection-controls", "style"),
-    Output("dimension-reduction-controls", "style"),
-    Output("clustering-controls", "style"),
-    Output("data-overview-card", "style"),
-    Output("sidebar", "active_item"),
-    Output("image-card", "style"),
-    Output("scatter", "style"),
-    Output("heatmap", "style"),
-    Output("go-live", "style"),
-    Output("tooltip-go-live", "children"),
-    Output("pause-button", "style"),
+    Output("data-selection-controls", "style", allow_duplicate=True),
+    Output("dimension-reduction-controls", "style", allow_duplicate=True),
+    Output("clustering-controls", "style", allow_duplicate=True),
+    Output("data-overview-card", "style", allow_duplicate=True),
+    Output("live-mode-models", "style", allow_duplicate=True),  # Added this output
+    Output("sidebar", "active_item", allow_duplicate=True),
+    Output("image-card", "style", allow_duplicate=True),
+    Output("scatter", "style", allow_duplicate=True),
+    Output("heatmap", "style", allow_duplicate=True),
+    Output("go-live", "style", allow_duplicate=True),
+    Output("tooltip-go-live", "children", allow_duplicate=True),
+    Output("pause-button", "style", allow_duplicate=True),
     Output("live-indices", "data", allow_duplicate=True),
+    Output("selected-live-models", "data", allow_duplicate=True),  # Added this output to clear selected models
     Input("go-live", "n_clicks"),
+    State("selected-live-models", "data"),
     prevent_initial_call=True,
 )
-def toggle_controls(n_clicks):
+def toggle_controls(n_clicks, selected_models):
     """
     Toggle the visibility of the sidebar, data overview card, image card, and go-live button
     """
-    if n_clicks is not None and n_clicks % 2 == 1:
+    # Check if continue was already clicked (selected_models is not None)
+    if n_clicks is not None and n_clicks % 2 == 0 and selected_models is not None:
+        # Going back to offline mode
         return (
             False,
             False,
-            {"display": "none"},
-            {"display": "none"},
-            {"display": "none"},
-            {"display": "none"},
-            ["item-1"],
-            {"width": "100%", "height": "85vh"},
-            {"height": "65vh"},
-            {"height": "65vh"},
-            {
-                "display": "flex",
-                "font-size": "40px",
-                "padding": "5px",
-                "color": "white",
-                "background-color": "#D57800",
-                "border": "0px",
-            },
-            "Go to Offline Mode",
-            {
-                "display": "flex",
-                "font-size": "1.5rem",
-                "padding": "5px",
-            },
-            [],
-        )
-    else:
-        return (
-            False,
-            False,
-            {},
-            {},
-            {},
-            {},
-            no_update,
-            {"height": "64vh"},
-            {"height": "46vh"},
-            {"height": "46vh"},
-            {
+            {},  # Show data selection controls
+            {},  # Show dimension reduction controls
+            {},  # Show clustering controls
+            {},  # Show data overview card
+            {"display": "none"},  # Hide live mode models section
+            no_update,  # Don't change active sidebar item
+            {"height": "64vh"},  # Normal image card height
+            {"height": "46vh"},  # Normal scatter height
+            {"height": "46vh"},  # Normal heatmap height
+            {  # Regular go-live button style
                 "display": "flex",
                 "font-size": "40px",
                 "padding": "5px",
@@ -132,12 +164,47 @@ def toggle_controls(n_clicks):
                 "background-color": "white",
                 "border": "0px",
             },
-            "Go to Live Mode",
-            {
+            "Go to Live Mode",  # Change tooltip text
+            {  # Hide pause button
                 "display": "none",
             },
-            [],
+            [],  # Clear live indices
+            None,  # Clear selected models
         )
+    
+    # First click or other odd clicks - going to live mode        
+    if n_clicks is not None and n_clicks % 2 == 1:
+        return (
+            False,
+            False,
+            {"display": "none"},  # Hide data selection controls
+            {"display": "none"},  # Hide dimension reduction controls
+            {"display": "none"},  # Hide clustering controls
+            {"display": "none"},  # Hide data overview card
+            {},  # Show live mode models section
+            ["item-1"],  # Set first item as active
+            {"width": "100%", "height": "85vh"},  # Full width and taller image card
+            {"height": "65vh"},  # Taller scatter
+            {"height": "65vh"},  # Taller heatmap
+            {  # Orange go-live button
+                "display": "flex",
+                "font-size": "40px",
+                "padding": "5px",
+                "color": "white",
+                "background-color": "#D57800",
+                "border": "0px",
+            },
+            "Go to Offline Mode",  # Change tooltip text
+            {  # Show pause button
+                "display": "flex",
+                "font-size": "1.5rem",
+                "padding": "5px",
+            },
+            [],  # Initialize empty live indices
+            no_update,  # Don't change selected models
+        )
+    
+    raise PreventUpdate
 
 
 @callback(
@@ -161,6 +228,62 @@ def update_data_project_dict(selected_models, n_clicks):
         }
     else:
         raise PreventUpdate
+
+
+@callback(
+    Output("selected-live-models", "data", allow_duplicate=True),
+    Output({"base_id": "file-manager", "name": "data-project-dict"}, "data", allow_duplicate=True),
+    Output("update-live-models-button", "color"),  # Add output for button color
+    Output("update-live-models-button", "children"),  # Add output for button text
+    Input("update-live-models-button", "n_clicks"),
+    State("live-mode-autoencoder-dropdown", "value"),
+    State("live-mode-dimred-dropdown", "value"),
+    State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
+    prevent_initial_call=True,
+)
+def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_dict):
+    """
+    Update the selected models when the update button is clicked
+    """
+    if n_clicks is None:
+        raise PreventUpdate
+        
+    if autoencoder_model is None or dimred_model is None:
+        # Show error notification
+        return no_update, no_update, "danger", "Invalid Selection"
+    
+    # Update the selected models
+    selected_models = {"autoencoder": autoencoder_model, "dimred": dimred_model}
+    
+    # Update data project dict with new models
+    data_project_dict["live_models"] = selected_models
+    
+    return selected_models, data_project_dict, "secondary", "Updated"
+
+
+@callback(
+    Output("update-live-models-button", "color", allow_duplicate=True),
+    Output("update-live-models-button", "children", allow_duplicate=True),
+    Input("live-mode-autoencoder-dropdown", "value"),
+    Input("live-mode-dimred-dropdown", "value"),
+    State("selected-live-models", "data"),
+    prevent_initial_call=True,
+)
+def reset_update_button(autoencoder_model, dimred_model, selected_models):
+    """
+    Reset the update button color when dropdowns change
+    """
+    # If no models are selected yet or either dropdown is empty
+    if selected_models is None or autoencoder_model is None or dimred_model is None:
+        return "primary", "Update Models"
+        
+    # Check if the current selection is different from what's already selected
+    if (autoencoder_model != selected_models.get("autoencoder") or 
+        dimred_model != selected_models.get("dimred")):
+        return "primary", "Update Models"
+    
+    # If the selection is the same as current, keep the "Updated" state
+    return "secondary", "Updated"
 
 
 @callback(

@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 """
-Simplified MLflow Model Processing
+Simplified MLflow Model Processing using PyFunc Wrappers
 
-This script loads both direct and wrapped models from MLflow and uses them for inference.
-- ViT model: Loaded directly as a PyTorch model (no wrapper)
-- UMAP model: Loaded through a wrapper
+This script loads both ViT and UMAP models from MLflow using PyFunc wrappers and uses them for inference.
+- ViT model: Loaded through a PyFunc wrapper
+- UMAP model: Loaded through a PyFunc wrapper
 
 Usage:
-    python process_models.py
+    python lse_operator_mlflow.py
 """
 
 import os
@@ -44,63 +44,51 @@ if not hasattr(torch, "get_default_device"):
     torch.get_default_device = get_default_device
 
 
-def get_model(model_name, needs_eval=True, use_wrapper=True):
+def get_model(model_name):
     """
-    Load a model from MLflow by its name
+    Load a model from MLflow by its name using PyFunc wrapper
     
     Parameters:
     -----------
     model_name : str
         Name of the registered model in MLflow
-    needs_eval : bool
-        If True, sets the model to evaluation mode (for PyTorch models)
-    use_wrapper : bool
-        If True, assumes model is wrapped with PyFunc and needs unwrapping
-        If False, loads model directly as PyTorch model
     
     Returns:
     --------
-    model : object
-        The loaded model from MLflow
+    model : mlflow.pyfunc.PyFuncModel
+        The loaded model wrapper from MLflow
     """
     # Set MLflow tracking URI and credentials
     os.environ['MLFLOW_TRACKING_USERNAME'] = MLFLOW_TRACKING_USERNAME
     os.environ['MLFLOW_TRACKING_PASSWORD'] = MLFLOW_TRACKING_PASSWORD
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     
-    # Get latest version
-    client = mlflow.tracking.MlflowClient()
-    latest_version = max([mv.version for mv in client.search_model_versions(f"name='{model_name}'")])
-    model_uri = f"models:/{model_name}/{latest_version}"
-    
     try:
-        if use_wrapper:
-            # Load via PyFunc wrapper
-            logger.info(f"Loading model with wrapper: {model_name}")
-            wrapper = mlflow.pyfunc.load_model(model_uri)
-            logger.info(f"Successfully loaded model wrapper: {model_name}, version: {latest_version}")
+        # Get latest version
+        client = mlflow.tracking.MlflowClient()
+        versions = client.search_model_versions(f"name='{model_name}'")
+        if not versions:
+            logger.error(f"No versions found for model {model_name}")
+            return None
             
-            # Unwrap the python model
-            python_model = wrapper.unwrap_python_model()
+        latest_version = max([mv.version for mv in versions])
+        model_uri = f"models:/{model_name}/{latest_version}"
+        
+        # Get model info to check tags
+        model_info = client.get_model_version(model_name, latest_version)
+        model_tags = {}
+        if hasattr(model_info, "tags") and model_info.tags:
+            model_tags = model_info.tags
             
-            if hasattr(python_model, 'model') and python_model.model is not None:
-                logger.info(f"Found model in the wrapper")
-                model = python_model.model
-            else:
-                logger.error(f"No 'model' attribute found in the Python model")
-                return None
-        else:
-            # Load directly as PyTorch model
-            logger.info(f"Loading model directly (no wrapper): {model_name}")
-            model = mlflow.pytorch.load_model(model_uri)
-            logger.info(f"Successfully loaded PyTorch model: {model_name}, version: {latest_version}")
+        # Show model type if available
+        model_type = model_tags.get("model_type", "unknown")
+        logger.info(f"Loading {model_type} model via PyFunc wrapper: {model_name}")
         
-        # Set to evaluation mode if needed
-        if needs_eval and hasattr(model, 'eval'):
-            model.eval()
-            logger.info(f"Set model to evaluation mode")
+        # Load via PyFunc wrapper
+        wrapper = mlflow.pyfunc.load_model(model_uri)
+        logger.info(f"✓ Successfully loaded {model_type} model: {model_name}, version: {latest_version}")
         
-        return model
+        return wrapper
         
     except Exception as e:
         logger.error(f"Error loading model {model_name}: {e}")
@@ -111,37 +99,25 @@ def get_model(model_name, needs_eval=True, use_wrapper=True):
 
 if __name__ == "__main__":
     # Get model names from command line arguments or environment variables
-    autoencoder_model_name = "smi_autoencoder_model"
-    dimred_model_name = "smi_umap_model"
+    autoencoder_model_name = "smi_autoencoder_model_wrapper"
+    dimred_model_name = "smi_umap_model_wrapper"
     
-    # Load the autoencoder model directly (no wrapper)
+    # Load the autoencoder model with wrapper
     logger.info(f"Loading autoencoder model: {autoencoder_model_name}")
-    model = get_model(autoencoder_model_name, needs_eval=True, use_wrapper=False)  # PyTorch model without wrapper
+    autoencoder_wrapper = get_model(autoencoder_model_name)
     
-    if model is None:
+    if autoencoder_wrapper is None:
         logger.error("Failed to load autoencoder model. Exiting.")
         sys.exit(1)
     
     # Load the umap model with wrapper
     logger.info(f"Loading UMAP model from MLflow: {dimred_model_name}")
-    dim_reduction_model = get_model(dimred_model_name, needs_eval=False, use_wrapper=True)  # UMAP model with wrapper
+    umap_wrapper = get_model(dimred_model_name)
 
-    if dim_reduction_model is None:
+    if umap_wrapper is None:
         logger.error("Failed to load UMAP model. Exiting.")
         sys.exit(1)
     
-    
-    # Check for CUDA availability
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-        logger.info(f"Using CUDA: {torch.cuda.get_device_name(0)}")
-    else:
-        device = torch.device("cpu")
-        logger.info("Using CPU")
-    
-    # Move model to the appropriate device
-    model = model.to(device)
-
     # Define image transformation pipeline
     transform = transforms.Compose(
         [
@@ -161,18 +137,17 @@ if __name__ == "__main__":
         try:
             # Get datapoint from Tiled
             datapoint = data_client[indx]  # noqa: F821
-            tensor = transform(datapoint).unsqueeze(0).to(device)  # Add batch dimension and move to device
             
-            # Process with autoencoder (extract latent vector)
-            with torch.no_grad():
-                # For autoencoder models, access the encoder
-                latent, _ = model.encoder(tensor)
-
-                # Convert to numpy for dimension reduction
-                f_vec_nn = latent.cpu().numpy()
+            # Transform the datapoint
+            tensor = transform(datapoint).numpy()
             
-            # Apply dimension reduction
-            f_vec = dim_reduction_model.transform(f_vec_nn)
+            # Process with autoencoder to get latent features using wrapper
+            autoencoder_result = autoencoder_wrapper.predict({"image": tensor})
+            latent_features = autoencoder_result["latent_features"]
+            
+            # Apply dimension reduction using wrapper
+            umap_result = umap_wrapper.predict({"latent": latent_features})
+            f_vec = umap_result["umap_coords"]
             
             # Save results to Tiled
             write_results(
