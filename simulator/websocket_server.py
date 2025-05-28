@@ -5,7 +5,7 @@ import websockets
 clients = set()
 
 
-async def handler(websocket, path):
+async def handler(websocket):
     clients.add(websocket)
     try:
         async for message in websocket:

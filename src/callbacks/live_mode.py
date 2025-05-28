@@ -7,6 +7,59 @@ from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
 from src.utils.plot_utils import generate_scatter_data
+from src.utils.mlflow_utils import get_mlflow_models_live
+
+
+
+@callback(
+    Output("live-model-dialog", "is_open"),
+    Output("live-autoencoder-dropdown", "options"),
+    Output("live-dimred-dropdown", "options"),
+    Input("go-live", "n_clicks"),
+    prevent_initial_call=True,
+)
+def show_model_selection_dialog(n_clicks):
+    if n_clicks is not None and n_clicks % 2 == 1:
+        model_options = get_mlflow_models_live()
+       
+        return True, model_options, model_options
+    return False, [], []
+
+
+@callback(
+    Output("live-model-dialog", "is_open", allow_duplicate=True),
+    Output("selected-live-models", "data"),
+    Input("live-model-continue", "n_clicks"),
+    State("live-autoencoder-dropdown", "value"),
+    State("live-dimred-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def handle_model_continue(continue_clicks, selected_autoencoder, selected_dimred):
+    if continue_clicks:
+        return False, {"autoencoder": selected_autoencoder, "dimred": selected_dimred}
+    raise PreventUpdate
+
+
+@callback(
+    Output("live-model-dialog", "is_open", allow_duplicate=True),
+    Output("go-live", "n_clicks"),
+    Input("live-model-cancel", "n_clicks"),
+    State("go-live", "n_clicks"),
+    prevent_initial_call=True,
+)
+def handle_model_cancel(cancel_clicks, go_live_clicks):
+    if cancel_clicks and go_live_clicks is not None and go_live_clicks % 2 == 1:
+        return False, go_live_clicks - 1
+    raise PreventUpdate
+
+
+@callback(
+    Output("live-model-continue", "disabled"),
+    Input("live-autoencoder-dropdown", "value"),
+    Input("live-dimred-dropdown", "value"),
+)
+def toggle_continue_button(selected_autoencoder, selected_dimred):
+    return selected_autoencoder is None or selected_dimred is None
 
 
 @callback(
@@ -93,16 +146,18 @@ def toggle_controls(n_clicks):
         "data",
         allow_duplicate=True,
     ),
-    Input("go-live", "n_clicks"),
+    Input("selected-live-models", "data"),
+    State("go-live", "n_clicks"),
     prevent_initial_call=True,
 )
-def update_data_project_dict(n_clicks):
-    if n_clicks is not None:
+def update_data_project_dict(selected_models, n_clicks):
+    if n_clicks is not None and n_clicks % 2 == 1 and selected_models is not None:
         return {
             "root_uri": "",
             "data_type": "tiled",
             "datasets": [],
             "project_id": None,
+            "live_models": selected_models
         }
     else:
         raise PreventUpdate
@@ -116,16 +171,17 @@ def update_data_project_dict(n_clicks):
     ),
     Output("live-indices", "data", allow_duplicate=True),
     Input("ws-live", "message"),
+    State("selected-live-models", "data"),
     State("go-live", "n_clicks"),
     State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
     State("live-indices", "data"),
     prevent_initial_call=True,
 )
-def live_update_data_project_dict(message, n_clicks, data_project_dict, live_indices):
+def live_update_data_project_dict(message, selected_models, n_clicks, data_project_dict, live_indices):
     """
     Update data project dict with the data uri from the live experiment
     """
-    if n_clicks is not None and n_clicks % 2 == 1:
+    if n_clicks is not None and n_clicks % 2 == 1 and selected_models is not None:
         message = json.loads(message["data"])
         tiled_uri = message["tiled_uri"]
         split_uri = urlsplit(tiled_uri)
@@ -146,7 +202,8 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict, live_ind
         if data_project_dict["root_uri"] != root_uri:
             data_project_dict["root_uri"] = root_uri
             data_project_dict["data_type"] = "tiled"
-
+            if "live_models" not in data_project_dict:
+                data_project_dict["live_models"] = selected_models
 
         if len(data_project_dict["datasets"]) == 0:
             data_project_dict["datasets"] = [
@@ -171,9 +228,13 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict, live_ind
     State("scatter", "figure"),
     State("pause-button", "n_clicks"),
     State("buffer", "data"),
+    State("selected-live-models", "data"),
     prevent_initial_call=True,
 )
-def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data):
+def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data, selected_models):
+    if selected_models is None:
+        raise PreventUpdate
+        
     data = json.loads(message["data"])
 
     latent_vectors = np.array(data["feature_vector"], dtype=float)

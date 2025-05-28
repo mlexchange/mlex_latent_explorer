@@ -51,6 +51,9 @@ def get_mlflow_models():
         # Search for registered models
         registered_models = client.search_registered_models()
 
+        # Filter out models with "smi" in the name
+        registered_models = [model for model in registered_models if "smi" not in model.name.lower()]
+
         # Sort models by creation timestamp (newest first)
         registered_models = sorted(
             registered_models, key=lambda model: model.creation_timestamp, reverse=True
@@ -83,3 +86,30 @@ def get_mlflow_params(mlflow_model_id):
     run_info = client.get_run(run_id)
     params = run_info.data.params
     return params
+
+
+def get_mlflow_models_live():
+    """
+    Retrieve available MLflow models and create dropdown options
+    """
+    try:
+        # Set MLflow tracking URI and credentials
+        os.environ['MLFLOW_TRACKING_USERNAME'] = MLFLOW_TRACKING_USERNAME
+        os.environ['MLFLOW_TRACKING_PASSWORD'] = MLFLOW_TRACKING_PASSWORD
+        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+        
+        # Get all registered models
+        client = mlflow.MlflowClient()
+        models = client.search_registered_models()
+        # Filter models with "smi" in the name
+        models = [model for model in models if "smi" in model.name.lower()]
+        
+        # Format as dropdown options
+        model_options = [
+            {"label": model.name, "value": model.name}
+            for model in models
+        ]
+        
+        return model_options
+    except Exception as e:
+        return [{"label": "Error loading models", "value": None}]
