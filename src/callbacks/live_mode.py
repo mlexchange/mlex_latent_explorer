@@ -6,7 +6,7 @@ from dash import Input, Output, Patch, State, callback, no_update
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
-from src.utils.plot_utils import generate_scatter_data, generate_notification
+from src.utils.plot_utils import generate_scatter_data, generate_notification, plot_empty_scatter
 from src.utils.mlflow_utils import get_mlflow_models_live
 
 
@@ -14,17 +14,28 @@ from src.utils.mlflow_utils import get_mlflow_models_live
     Output("live-model-dialog", "is_open"),
     Output("live-autoencoder-dropdown", "options"),
     Output("live-dimred-dropdown", "options"),
+    Output("live-autoencoder-dropdown", "value"),  # Add output for default value
+    Output("live-dimred-dropdown", "value"),  # Add output for default value
     Input("go-live", "n_clicks"),
+    State("selected-live-models", "data"),  # Add state to access previous models
     prevent_initial_call=True,
 )
-def show_model_selection_dialog(n_clicks):
+def show_model_selection_dialog(n_clicks, last_selected_models):
     if n_clicks is not None and n_clicks % 2 == 1:
         # Get model options filtered by type
         autoencoder_options = get_mlflow_models_live(model_type=None)
         dimred_options = get_mlflow_models_live(model_type=None)
+        
+        # Set default values from previous selection if available
+        autoencoder_default = None
+        dimred_default = None
+        
+        if last_selected_models is not None:
+            autoencoder_default = last_selected_models.get("autoencoder")
+            dimred_default = last_selected_models.get("dimred")
        
-        return True, autoencoder_options, dimred_options
-    return False, [], []
+        return True, autoencoder_options, dimred_options, autoencoder_default, dimred_default
+    return False, [], [], None, None
 
 
 @callback(
@@ -132,7 +143,6 @@ def toggle_continue_button(selected_autoencoder, selected_dimred):
     Output("tooltip-go-live", "children", allow_duplicate=True),
     Output("pause-button", "style", allow_duplicate=True),
     Output("live-indices", "data", allow_duplicate=True),
-    Output("selected-live-models", "data", allow_duplicate=True),  # Added this output to clear selected models
     Input("go-live", "n_clicks"),
     State("selected-live-models", "data"),
     prevent_initial_call=True,
@@ -169,7 +179,6 @@ def toggle_controls(n_clicks, selected_models):
                 "display": "none",
             },
             [],  # Clear live indices
-            None,  # Clear selected models
         )
     
     # First click or other odd clicks - going to live mode        
@@ -201,7 +210,6 @@ def toggle_controls(n_clicks, selected_models):
                 "padding": "5px",
             },
             [],  # Initialize empty live indices
-            no_update,  # Don't change selected models
         )
     
     raise PreventUpdate
@@ -235,6 +243,8 @@ def update_data_project_dict(selected_models, n_clicks):
     Output({"base_id": "file-manager", "name": "data-project-dict"}, "data", allow_duplicate=True),
     Output("update-live-models-button", "color"),  # Add output for button color
     Output("update-live-models-button", "children"),  # Add output for button text
+    Output("scatter", "figure", allow_duplicate=True),  # Add output to reset scatter plot
+    Output("live-indices", "data", allow_duplicate=True),  # Reset indices when models change
     Input("update-live-models-button", "n_clicks"),
     State("live-mode-autoencoder-dropdown", "value"),
     State("live-mode-dimred-dropdown", "value"),
@@ -250,7 +260,7 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
         
     if autoencoder_model is None or dimred_model is None:
         # Show error notification
-        return no_update, no_update, "danger", "Invalid Selection"
+        return no_update, no_update, "danger", "Invalid Selection", no_update, no_update
     
     # Update the selected models
     selected_models = {"autoencoder": autoencoder_model, "dimred": dimred_model}
@@ -258,8 +268,13 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
     # Update data project dict with new models
     data_project_dict["live_models"] = selected_models
     
-    return selected_models, data_project_dict, "secondary", "Updated"
-
+    # Create empty figure to reset the scatter plot
+    empty_figure = plot_empty_scatter()
+    
+    # Reset live indices
+    empty_indices = []
+    
+    return selected_models, data_project_dict, "secondary", "Updated", empty_figure, empty_indices
 
 @callback(
     Output("update-live-models-button", "color", allow_duplicate=True),
