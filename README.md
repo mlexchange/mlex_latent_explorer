@@ -48,6 +48,14 @@ When setting `MLFLOW_TRACKING_URI` in the `.env` file:
   MLFLOW_TRACKING_URI="http://host.docker.internal:5000"
   ```
 
+You also need to set  `MLFLOW_TRACKING_USERNAME` and `MLFLOW_TRACKING_PASSWORD` in the `.env` file and modify the admin_username and admin_password in `basic_auth.ini` as well.
+
+Create a `basic_auth.ini` file using `basic_auth.ini.example` as a reference:
+
+```sh
+cp basic_auth.ini.example basic_auth.ini
+```
+
 ### 3 Build and Start the Application
 
 ```sh
