@@ -11,11 +11,11 @@ from .publisher import LSEWSResultPublisher
 
 settings = Dynaconf(
     envvar_prefix="",
-    settings_files=["arroyo_settings.yaml", ".arroyo_secrets.yaml"],
+    settings_files=["settings.yaml", ".secrets.yaml"],
     load_dotenv=True,
 )
 app = typer.Typer()
-logger = logging.getLogger("lse_arroyo")
+logger = logging.getLogger("arroyo_reduction")
 
 
 

@@ -1,9 +1,10 @@
-import glob
+from abc import ABC, abstractmethod
 import importlib
 import logging
 import os
 import sys
 from pathlib import Path
+from typing import Tuple
 
 from arroyosas.schemas import RawFrameEvent
 import joblib
@@ -22,8 +23,21 @@ logger = logging.getLogger(__name__)
 #     "feature_vector": latent_vector.tolist(),
 # }
 
+class Reducer(ABC):
+    """
+    Abstract base class for reducers.
+    Reducers are responsible for taking an image, encoding it into a
+    latent space, and saving the latent space to a Tiled dataset.
+    """
 
-class LatentSpaceReducer:
+    @abstractmethod
+    def reduce(self, message: RawFrameEvent) -> np.ndarray:
+        """
+        Reduce the image to a feature vector.
+        """
+        pass
+
+class LatentSpaceReducer(Reducer):
     """
     Responsible for taking an image, encoding it into a
     latent space, and saving the latent space to a Tiled dataset.
@@ -102,6 +116,9 @@ class LatentSpaceReducer:
     def get_model(self, name: str):
         # check for model in configured models
         current_model_config = None
+        if self.models_config is None:
+            logger.error("No models configured")
+            return self.model_cache
         for model_config in self.models_config:
             if model_config.name == name:
                 current_model_config = model_config
@@ -180,21 +197,6 @@ class LatentSpaceReducer:
         model(latent_dim=512).load_state_dict(state_dict)
         return model
 
-    def import_torch_models(self):
-        torch_models = []
-        model_dir = self.settings.models.model_dir
-        py_files = glob.glob(os.path.join(model_dir, "**/*.py"), recursive=True)
-
-        for py_file in py_files:
-            module_name = os.path.splitext(os.path.relpath(py_file, model_dir))[
-                0
-            ].replace(os.sep, ".")
-            module = importlib.import_module(module_name)
-            for name, obj in module.__dict__.items():
-                if isinstance(obj, type) and issubclass(obj, torch.nn.Module):
-                    logger.info(f"Found torch model: {name} in {module_name}")
-                    torch_models.append(obj)
-        return torch_models
 
     @classmethod
     def from_settings(cls, settings) -> "LatentSpaceReducer":
@@ -207,6 +209,52 @@ class LatentSpaceReducer:
         return reducer
 
 
+class FunReducer(Reducer):
+    """
+    A fun reducer that yields one (x, y) position at a time as a feature vector.
+    This is useful for testing and debugging.
+    """
+    def __init__(self, dimensions: Tuple[int, int] = (256, 256)):
+        self.dimensions = dimensions
+        self.count = 0
+        self._xy_positions = None
+        self._pos_idx = 0
+
+    def reduce(self, message: RawFrameEvent) -> np.ndarray:
+        logger.debug("Reducing image to feature vector (single smiley face pixel position)")
+        if self._xy_positions is None:
+            arr = np.zeros(self.dimensions, dtype=np.float32)
+            h, w = self.dimensions
+
+            # Eyes
+            eye_y = h // 3
+            left_eye_x = w // 3
+            right_eye_x = 2 * w // 3
+            arr[eye_y-2:eye_y+2, left_eye_x-2:left_eye_x+2] = 1.0
+            arr[eye_y-2:eye_y+2, right_eye_x-2:right_eye_x+2] = 1.0
+
+            # Mouth (arc)
+            mouth_y = 2 * h // 3
+            mouth_radius = w // 5
+            for x in range(w):
+                dx = x - w // 2
+                if abs(dx) < mouth_radius:
+                    y = int(mouth_y + 0.3 * mouth_radius * np.sin(np.pi * dx / mouth_radius))
+                    if 0 <= y < h:
+                        arr[y:y+2, x] = 1.0
+
+            # Find all (y, x) positions where arr == 1.0
+            yx_indices = np.argwhere(arr == 1.0)
+            # Convert to (x, y) pairs
+            self._xy_positions = np.array([[x, y] for y, x in yx_indices], dtype=np.int32)
+            self._pos_idx = 0
+
+        if self._pos_idx >= len(self._xy_positions):
+            self._pos_idx = 0  # Reset or raise StopIteration if desired
+
+        xy = self._xy_positions[self._pos_idx]
+        self._pos_idx += 1
+        return np.expand_dims(xy, axis=0)
 # if __name__ == "__main__":
 #     reducer = LatentSpaceReducer.from_settings(default_settings.lse)
 #     reducer.reduce()

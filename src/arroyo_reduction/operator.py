@@ -7,14 +7,14 @@ from arroyopy.operator import Operator
 from arroyopy.schemas import  Start, Stop
 from arroyosas.schemas import RawFrameEvent, SASMessage
 
-from .reducer import LatentSpaceReducer
+from .reducer import Reducer
 from .schemas import LatentSpaceEvent
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("arroyo_reduction.operator")
 
 
 class LatentSpaceOperator(Operator):
-    def __init__(self, proxy_socket: zmq.Socket, reducer: LatentSpaceReducer):
+    def __init__(self, proxy_socket: zmq.Socket, reducer: Reducer):
         super().__init__()
         self.proxy_socket = proxy_socket
         self.reducer = reducer
@@ -47,7 +47,10 @@ class LatentSpaceOperator(Operator):
         except Exception as e:
             logger.error(f"Error sending message to broker {e}")
 
-    async def dispatch2(self, message: RawFrameEvent) -> LatentSpaceEvent:
+    async def dispatch_workers(self, message: RawFrameEvent) -> LatentSpaceEvent:
+        """Dispatch the message to the worker and return the response. This is applicable
+        when the reducer is setup to run in a zqm req/rep worker pool. Currently unsupported."""
+
         try:
             message = message.model_dump()
             message = msgpack.packb(message, use_bin_type=True)
@@ -69,9 +72,16 @@ class LatentSpaceOperator(Operator):
         socket = context.socket(zmq.REQ)
         socket.setsockopt(zmq.SNDHWM, 10000)  # Allow up to 10,000 messages
         socket.setsockopt(zmq.RCVHWM, 10000)
-        socket.connect(settings.zmq_broker.router_address)
-        logger.info(f"Connected to broker at {settings.zmq_broker.router_address}")
+        # socket.connect(settings.zmq_broker.router_address)
+        # logger.info(f"Connected to broker at {settings.zmq_broker.router_address}")
         reducer = None
         if reducer_settings:
-            reducer = LatentSpaceReducer.from_settings(reducer_settings)
+            if reducer_settings.get("demo_mode", True):
+                logger.info("Running in demo mode, using dummy reducer")
+                from .reducer import FunReducer
+                reducer = FunReducer()
+            else:
+                from .reducer import LatentSpaceReducer
+                reducer = LatentSpaceReducer.from_settings(reducer_settings)
+                logger.info("Running in production mode, using LatentSpaceReducer")
         return cls(socket, reducer)

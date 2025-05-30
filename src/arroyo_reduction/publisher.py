@@ -7,11 +7,11 @@ from typing import Union
 # import numpy as np
 import websockets
 from arroyopy.publisher import Publisher
+from arroyosas.schemas import SASStart, SASStop
+from .schemas import LatentSpaceEvent
 
-from .schemas import LatentSpaceEvent, SASStart, SASStop
 
-
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("arroyo_reduction.publisher")
 
 
 class LSEWSResultPublisher(Publisher):
@@ -49,7 +49,7 @@ class LSEWSResultPublisher(Publisher):
 
     async def publish_ws(
         self,
-        client: websockets.ServerConnection,
+        client,
         message: Union[LatentSpaceEvent | SASStart | SASStop],
     ) -> None:
         if isinstance(message, SASStop):
