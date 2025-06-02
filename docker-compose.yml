@@ -149,7 +149,6 @@ services:
       USER: ${USER}
       # Live mode
       WEBSOCKET_URL:: ${WEBSOCKET_URL:-ws://localhost:8765/ws}
-      # WEBSOCKET_URL: ws://localhost:8765/ws
       # MLflow
       MLFLOW_TRACKING_URI: '${MLFLOW_TRACKING_URI}'
       MLFLOW_TRACKING_USERNAME: '${MLFLOW_TRACKING_USERNAME}'
@@ -185,9 +184,8 @@ services:
       - arroyo
     volumes:
       - .:/app:Z
-      - ../arroyosas:/app/arroyosas:Z
     ports:
-      - 8765:8765
+      - 127.0.0.01:8765:8765
     networks:
       mle_net:
   
