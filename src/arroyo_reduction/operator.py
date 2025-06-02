@@ -20,7 +20,7 @@ class LatentSpaceOperator(Operator):
         self.reducer = reducer
 
     async def process(self, message: SASMessage) -> None:
-        logger.debug("message recvd")
+        # logger.debug("message recvd")
         if isinstance(message, Start):
             logger.info("Received Start Message")
             await self.publish(message)
