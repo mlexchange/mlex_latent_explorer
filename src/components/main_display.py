@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 NUM_IMGS_OVERVIEW = 6
-WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://localhost:8765")
+WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://localhost:8765/lse")
 logger.info(f"WebSocket URL: {WEBSOCKET_URL}")
 
 def main_display():
