@@ -154,7 +154,7 @@ def toggle_controls(n_clicks, selected_models):
     Toggle the visibility of the sidebar, data overview card, image card, and go-live button
     """
     # Check if continue was already clicked (selected_models is not None)
-    if n_clicks is not None and n_clicks % 2 == 0 and selected_models is not None:
+    if n_clicks is not None and n_clicks % 2 == 0:
         # Going back to offline mode
         return (
             False,
@@ -184,7 +184,7 @@ def toggle_controls(n_clicks, selected_models):
         )
     
     # First click or other odd clicks - going to live mode        
-    if n_clicks is not None and n_clicks % 2 == 1:
+    if n_clicks is not None and n_clicks % 2 == 1 and selected_models is not None:
         return (
             False,
             False,
