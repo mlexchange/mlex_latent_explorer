@@ -129,6 +129,55 @@ pre-commit run --all-files
 python -m pytest
 ```
 
+## Live Mode Processing wth Arroyo
+arroyopy and arroyosas code has been added to create a pipeline that does dimensionality reduction in a streaming fashion, providing faster reduction on models that are loaded at startup, avoidng latency from Prefect.
+
+### Setup
+Copy a provided "models" directory into the root of the project.
+
+Note that this step will go away when MLFlow is integrated.
+
+The following file structure is
+```
+models
+├── cnn_autoencoder
+│   ├── model.py
+│   └── model_state_dict.npz
+├── g_saxs
+│   ├── ViT.py
+│   ├── model_weights.npz
+│   └── vit_joblib.joblib
+└── t_waxs
+    ├── ViT.py
+    ├── __pycache__
+    │   └── ViT.cpython-311.pyc
+    ├── model_weights.npz
+    └── vit_joblib_test.joblib
+```
+
+maps to the `lse_reducer` section in arroyo_settings.yml:
+```
+lse_reducer:
+  models:
+    - name: CNNAutoencoder
+      state_dict: ./models/cnn_autoencoder/model_state_dict.npz
+      python_class: CNNAutoencoder
+      python_file: ./models/cnn_autoencoder/model.py
+      type: torch
+    
+    - name: AE
+      state_dict: ./models/ae_v1/ae_model_finetuned.npz
+      python_class: CNNAutoencoder
+      python_file: ./models/ae_v1/ae.py
+      type: torch
+
+    - name: UMAP
+      file: ./models/umap/quick_test.joblib
+      type: joblib
+      
+  current_latent_space: AE
+  current_dim_reduction: UMAP
+```
 
 ## Copyright
 MLExchange Copyright (c) 2023, The Regents of the University of California,

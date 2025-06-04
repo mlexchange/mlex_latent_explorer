@@ -9,7 +9,7 @@ from tiled.client import from_uri
 RESULTS_TILED_URI = os.getenv("RESULTS_TILED_URI", "")
 RESULTS_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("lse.data_utils")
 
 
 class TiledDataLoader:

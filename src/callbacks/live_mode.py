@@ -1,4 +1,5 @@
 import json
+import logging
 from urllib.parse import urlsplit, urlunsplit
 
 import numpy as np
@@ -9,6 +10,7 @@ from dash_iconify import DashIconify
 from src.utils.plot_utils import generate_scatter_data, generate_notification, plot_empty_scatter
 from src.utils.mlflow_utils import get_mlflow_models_live
 
+logging.getLogger("lse.live_mode")
 
 @callback(
     Output("live-model-dialog", "is_open"),
@@ -374,7 +376,7 @@ def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data
         raise PreventUpdate
         
     data = json.loads(message["data"])
-
+    logging.debug(f"Received data: {data}")
     latent_vectors = np.array(data["feature_vector"], dtype=float)
 
     latent_vectors = (

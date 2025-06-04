@@ -1,5 +1,3 @@
-version: "3"
-
 services:
   prefect:
     image: prefecthq/prefect:2.14-python3.11
@@ -152,8 +150,7 @@ services:
       MODE: "development"
       USER: ${USER}
       # Live mode
-      WEBSOCKET_URL: ${WEBSOCKET_URL}
-      WEBSOCKET_PORT: ${WEBSOCKET_PORT}
+      WEBSOCKET_URL:: ${WEBSOCKET_URL:-ws://localhost:8765/lse}
       # MLflow
       MLFLOW_TRACKING_URI: '${MLFLOW_TRACKING_URI}'
       MLFLOW_TRACKING_USERNAME: '${MLFLOW_TRACKING_USERNAME}'
@@ -167,6 +164,51 @@ services:
       - mlflow
       - tiled
       - prefect
+    networks:
+      mle_net:
+
+  kvrocks:  
+    image: docker.io/apache/kvrocks:latest  
+    volumes:  
+      - ./conf/kvrocks/kvrocks.conf:/etc/kvrocks/kvrocks.conf  
+      - ./persist/kvrocks/data:/data  
+    networks:  
+      mle_net: 
+
+  # arroyo and arroyo_sim are made optional via profiles
+  # To run them, use 
+  #  `docker-compose --profile arroyo up`
+  #  or
+  #  `docker-compose --profile sim up
+  # or set the profile in the environment variable
+  #  `export COMPOSE_PROFILES=arroyo, arroyo_sim`
+
+  arroyo:
+    build:
+      context: .
+      dockerfile: Dockerfile_arroyo
+    container_name: arroyo
+    profiles:
+      - arroyo
+    volumes:
+      - .:/app:Z
+    ports:
+      - 127.0.0.1:8765:8765
+    networks:
+      mle_net:
+  
+  arroyo_sim:
+    command: python -m simulator.websocket_simulator
+    build:
+      context: .
+      dockerfile: Dockerfile_arroyo
+    container_name: arroyo_sim
+    profiles:
+      - sim
+    volumes:
+      - .:/app:Z
+    ports:
+      - 127.0.0.1:8765:8765
     networks:
       mle_net:
 
