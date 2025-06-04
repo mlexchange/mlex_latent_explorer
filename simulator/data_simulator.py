@@ -5,7 +5,6 @@ import os
 import time
 
 import numpy as np
-import websockets
 from dotenv import load_dotenv
 from tiled.client import from_uri
 
@@ -43,7 +42,7 @@ def get_feature_vectors(num_messages):
     return 5 * np.random.rand(num_messages, 2)
 
 
-async def client_main():
+async def stream():
     """
     Connect to the existing WebSocket server elsewhere,
     send messages, then close the connection.
@@ -60,24 +59,21 @@ async def client_main():
     logger.info(f"Connecting to {uri}...")
 
     # Connect to the server
-    async with websockets.connect(uri) as websocket:
-        logger.info("Successfully connected to the server!")
 
-        for index, latent_vector in zip(range(num_messages), feature_vector_list):
-            message = {
-                "tiled_uri": DATA_TILED_URI,
-                "index": index,
-                "feature_vector": latent_vector.tolist(),
-            }
-            logger.info(f"Sending message: {message}")
+    logger.info("Successfully connected to the server!")
 
-            # Send the message (as JSON) to the server
-            await websocket.send(json.dumps(message))
+    for index, latent_vector in zip(range(num_messages), feature_vector_list):
+        message = {
+            "tiled_uri": DATA_TILED_URI,
+            "index": index,
+            "feature_vector": latent_vector.tolist(),
+        }
+        logger.info(f"Sending message: {message}")
 
-            await asyncio.sleep(1)
+        # Send the message (as JSON) to the server
+        yield message
+
+        await asyncio.sleep(1)
 
     logger.info("All messages sent; connection closed.")
 
-
-if __name__ == "__main__":
-    asyncio.run(client_main())

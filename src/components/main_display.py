@@ -1,3 +1,4 @@
+import logging
 import os
 
 import dash_bootstrap_components as dbc
@@ -7,10 +8,12 @@ from dash_iconify import DashIconify
 
 from ..utils.plot_utils import draw_rows, plot_empty_heatmap, plot_empty_scatter
 
-NUM_IMGS_OVERVIEW = 6
-WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "localhost")
-WEBSOCKET_PORT = os.getenv("WEBSOCKET_PORT", 5000)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+NUM_IMGS_OVERVIEW = 6
+WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://localhost:8765/lse")
+logger.info(f"WebSocket URL: {WEBSOCKET_URL}")
 
 def main_display():
     main_display = html.Div(
@@ -211,7 +214,7 @@ def main_display():
             ),
             dcc.Store(id="buffer", data={}),
             dcc.Store(id="live-indices", data=[]),
-            WebSocket(id="ws-live", url=f"ws:{WEBSOCKET_URL}:{WEBSOCKET_PORT}"),
+            WebSocket(id="ws-live", url=WEBSOCKET_URL),
         ],
     )
     return main_display

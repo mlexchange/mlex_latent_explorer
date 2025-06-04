@@ -1,0 +1,44 @@
+### This is a dynconf settings file for the Arroyo components of theLSE (Latent Space Explorer).
+
+---
+logging_level: DEBUG
+
+lse_operator:
+  ws_publisher:
+    host: 0.0.0.0
+    port: 8765
+  listener:
+    zmq_address: tcp://arroyo_sim:5000
+
+lse_reducer:
+  demo_mode: true
+  models:
+    
+    # - name: GISAXS
+    #   state_dict: ./models/g_saxs/model_weights.npz
+    #   python_class: Autoencoder
+    #   python_file: ./models/g_saxs/ViT.py
+    #   type: torch
+
+    # - name: GISAXS_UMAP
+    #   file: ./models/g_saxs/vit_joblib.joblib
+    #   type: joblib
+
+    # - name: T_WAXS
+    #   state_dict: ./models/t_waxs/model_weights.npz
+    #   python_class: Autoencoder
+    #   python_file: ./models/t_waxs/ViT.py
+    #   type: torch
+    
+    # - name: WAXS_UMAP
+    #   file: ./models/t_Waxs/vit_joblib.joblib
+    #   type: joblib
+
+  current_latent_space: GISAXS
+  current_dim_reduction: GISAXS_UMAP
+
+# for the simulator
+tiled_poller:
+  zmq_frame_publisher:
+    address: tcp://0.0.0.0:5000
+dynaconf_merge: true

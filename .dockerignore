@@ -1,0 +1,8 @@
+.env
+.secrets
+data/
+cache/
+*code-workspace*
+.vscode/
+*.log
+.egg-info

@@ -1,4 +1,5 @@
 import json
+import logging
 from urllib.parse import urlsplit, urlunsplit
 
 import numpy as np
@@ -8,6 +9,7 @@ from dash_iconify import DashIconify
 
 from src.utils.plot_utils import generate_scatter_data
 
+logging.getLogger("lse.live_mode")
 
 @callback(
     Output("show-clusters", "value", allow_duplicate=True),
@@ -175,7 +177,7 @@ def live_update_data_project_dict(message, n_clicks, data_project_dict, live_ind
 )
 def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data):
     data = json.loads(message["data"])
-
+    logging.debug(f"Received data: {data}")
     latent_vectors = np.array(data["feature_vector"], dtype=float)
 
     latent_vectors = (

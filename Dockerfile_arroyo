@@ -1,0 +1,14 @@
+FROM python:3.11
+
+WORKDIR /app
+
+COPY . /app
+
+RUN pip install --upgrade pip
+RUN pip install .[arroyo]
+
+ENV HOME /app
+
+# CMD ["python", "-m", "arroyo_reduction.app"]
+# Temporarily using the src directory until the package structure is refactored
+CMD ["python", "-m", "src.arroyo_reduction.app"]
