@@ -1,3 +1,5 @@
+### This is a dynconf settings file for the Arroyo components of theLSE (Latent Space Explorer).
+
 ---
 logging_level: DEBUG
 

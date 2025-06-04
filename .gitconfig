@@ -1,0 +1,7 @@
+[user]
+	email = dmcreynolds@lbl.gov
+	name = Dylan McReynolds
+[init]
+	defaultBranch = main
+[credential]
+	helper = "!f() { /app/.vscode-server/bin/848b80aeb52026648a8ff9f7c45a9b0a80641e2e/node /tmp/vscode-remote-containers-63beef50-6f08-47d9-b36e-b28c34a76dc3.js git-credential-helper $*; }; f"

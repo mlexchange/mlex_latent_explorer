@@ -24,10 +24,13 @@ class LSEWSResultPublisher(Publisher):
     connected_clients = set()
     current_start_message = None
 
-    def __init__(self, host: str = "localhost", port: int = 8001):
+    def __init__(self, host: str = "localhost", port: int = 8001, path="/ws"):
+
         super().__init__()
         self.host = host
         self.port = port
+        self.path = path
+        logger.info(f"Initialized LSEWSResultPublisher on {self.host}:{self.port}{self.path}")
 
     async def start(
         self,
@@ -66,19 +69,13 @@ class LSEWSResultPublisher(Publisher):
 
         if isinstance(message, LatentSpaceEvent):
             # send image data separately to client memory issues
-            message = {
-                "tiled_uri": message.tiled_url,
-                "index": message.index,
-                "feature_vector": message.feature_vector,
-            }
-            logger.debug(f"WS Sending LatentSpaceEvent {message['feature_vector']}")
-            await client.send(json.dumps(message))
+           
+            logger.debug(f"WS Sending LatentSpaceEvent {message.feature_vector}")
+            await client.send(message.model_dump_json())
 
     async def websocket_handler(self, websocket):
         logger.info(f"New connection from {websocket.remote_address}")
-        # if websocket.request.path != "/viz":
-        #     logger.info(f"Invalid path: {websocket.request.path}, we only support /viz")
-        #     return
+        
         self.connected_clients.add(websocket)
         try:
             # Keep the connection open and do nothing until the client disconnects

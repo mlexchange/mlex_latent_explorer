@@ -177,12 +177,11 @@ services:
   # To run them, use 
   #  `docker-compose --profile arroyo up`
   #  or
-  #  `docker-compose --profile arroyoy --profile arroyo_sim up
+  #  `docker-compose --profile sim up
   # or set the profile in the environment variable
   #  `export COMPOSE_PROFILES=arroyo, arroyo_sim`
 
   arroyo:
-    command: sleep 99999
     build:
       context: .
       dockerfile: Dockerfile_arroyo
@@ -197,14 +196,17 @@ services:
       mle_net:
   
   arroyo_sim:
-    command: python -m arroyosas.app.frame_listener_sim_cli
-    image: ghcr.io/als-computing/arroyosas:main
-    restart: unless-stopped
-    volumes:
-      - .:/app:Z
+    command: python -m simulator.websocket_simulator
+    build:
+      context: .
+      dockerfile: Dockerfile_arroyo
+    container_name: arroyo_sim
     profiles:
       - sim
-      - arroyo
+    volumes:
+      - .:/app:Z
+    ports:
+      - 127.0.0.1:8765:8765
     networks:
       mle_net:
 
