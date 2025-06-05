@@ -11,7 +11,7 @@ import redis
 
 from arroyosas.schemas import RawFrameEvent
 
-from src.utils.mlflow_client import load_model
+from src.utils.mlflow_utils import load_model
 from .redis_model_store import RedisModelStore
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ class Reducer(ABC):
         """
         pass
 
-class LatentSpaceReducer:
+class LatentSpaceReducer(Reducer):
     """
     Responsible for taking an image, encoding it into a
     latent space, and reducing it to 2D

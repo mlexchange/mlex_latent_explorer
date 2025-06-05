@@ -7,7 +7,7 @@ from arroyopy.operator import Operator
 from arroyopy.schemas import  Start, Stop
 from arroyosas.schemas import RawFrameEvent, SASMessage
 
-from .reducer_mlflow import Reducer, LatentSpaceReducer
+from .reducer import Reducer, LatentSpaceReducer
 from .schemas import LatentSpaceEvent
 
 logger = logging.getLogger("arroyo_reduction.operator")
@@ -74,6 +74,5 @@ class LatentSpaceOperator(Operator):
         socket.setsockopt(zmq.RCVHWM, 10000)
         # socket.connect(settings.zmq_broker.router_address)
         # logger.info(f"Connected to broker at {settings.zmq_broker.router_address}")
-        # reducer = LatentSpaceReducer.from_settings(reducer_settings)
         reducer = LatentSpaceReducer()
         return cls(socket, reducer)
