@@ -52,11 +52,11 @@ def get_mlflow_models():
         registered_models = client.search_registered_models()
 
         # Filter out models with "smi" in the name
-        registered_models = [model for model in registered_models if "smi" not in model.name.lower()]
+        filtered_models = [model for model in registered_models if "smi" not in model.name.lower()]
 
         # Sort models by creation timestamp (newest first)
-        registered_models = sorted(
-            registered_models, key=lambda model: model.creation_timestamp, reverse=True
+        filtered_models = sorted(
+            filtered_models, key=lambda model: model.creation_timestamp, reverse=True
         )
 
         # Create dropdown options
@@ -65,7 +65,7 @@ def get_mlflow_models():
                 "label": get_flow_run_name(get_flow_run_parent_id(model.name)),
                 "value": model.name,
             }
-            for model in registered_models
+            for model in filtered_models
         ]
 
         return model_options
@@ -150,3 +150,42 @@ def get_mlflow_models_live(model_type=None):
     except Exception as e:
         logger.warning(f"Error retrieving MLflow models: {e}")
         return [{"label": "Error loading models", "value": None}]
+    
+
+def load_model(model_name: str):
+    """
+    Load a model from MLflow by name
+    
+    Args:
+        model_name: Name of the model in MLflow
+        
+    Returns:
+        The loaded model or None if loading fails
+    """
+    
+    try:
+        # Set MLflow tracking URI and credentials
+        os.environ['MLFLOW_TRACKING_USERNAME'] = MLFLOW_TRACKING_USERNAME
+        os.environ['MLFLOW_TRACKING_PASSWORD'] = MLFLOW_TRACKING_PASSWORD
+        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    
+        # Get latest version
+        client = MlflowClient()
+        versions = client.search_model_versions(f"name='{model_name}'")
+        
+        if not versions:
+            logger.error(f"No versions found for model {model_name}")
+            return None
+            
+        latest_version = max([int(mv.version) for mv in versions])
+        model_uri = f"models:/{model_name}/{latest_version}"
+        
+        # Load via PyFunc wrapper
+        logger.info(f"Loading model {model_name}, version {latest_version}")
+        model = mlflow.pyfunc.load_model(model_uri)
+        logger.info(f"Successfully loaded model: {model_name}")
+        
+        return model
+    except Exception as e:
+        logger.error(f"Error loading model {model_name}: {e}")
+        return None

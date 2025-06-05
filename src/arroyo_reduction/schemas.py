@@ -34,6 +34,6 @@ class SerializableNumpyArrayModel(BaseModel):
         arbitrary_types_allowed = True
 
 class LatentSpaceEvent(Event):
-    tiled_url: str
+    tiled_uri: str
     feature_vector: list[float]
     index: int

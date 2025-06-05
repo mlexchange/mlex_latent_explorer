@@ -4,6 +4,7 @@ import os
 import traceback
 import uuid
 from datetime import datetime
+import redis
 
 import pytz
 from dash import Input, Output, State, callback
@@ -37,10 +38,19 @@ FLOW_NAME = os.getenv("FLOW_NAME", "")
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 RESULTS_DIR = os.getenv("RESULTS_DIR", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
+# Initialize Redis client
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+redis_client = None
+
 
 
 logger = logging.getLogger(__name__)
 
+try:
+    redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+except Exception as e:
+    logger.warning(f"Could not connect to Redis: {e}")
 
 @callback(
     Output("mlflow-model-dropdown", "options", allow_duplicate=True),
@@ -67,6 +77,100 @@ def refresh_mlflow_models(n_clicks):
         return options, options[0]["value"] if options else None
     return [], None
 
+
+# Add this callback for dropdown model selection in dialog
+@callback(
+    Output("run-counter", "data", allow_duplicate=True),
+    Input("live-autoencoder-dropdown", "value"),
+    Input("live-dimred-dropdown", "value"),
+    State("run-counter", "data"),
+    prevent_initial_call=True
+)
+def store_dialog_models_in_redis(autoencoder_model, dim_reduction_model, counter):
+    """Store both model selections from dialog dropdowns in Redis"""
+    if redis_client is None:
+        return counter
+    
+    try:
+        # Store both models from dialog dropdowns
+        if autoencoder_model:
+            logger.info(f"Storing autoencoder model from dialog: {autoencoder_model}")
+            redis_client.set("selected_mlflow_model", autoencoder_model)
+            
+            # Also publish update notification
+            message = {
+                "model_type": "autoencoder",
+                "model_name": autoencoder_model,
+                "timestamp": import_time_module().time()
+            }
+            redis_client.publish("model_updates", json.dumps(message))
+            
+        if dim_reduction_model:
+            logger.info(f"Storing dimension reduction model from dialog: {dim_reduction_model}")
+            redis_client.set("selected_dim_reduction_model", dim_reduction_model)
+            
+            # Also publish update notification
+            message = {
+                "model_type": "dimred",
+                "model_name": dim_reduction_model,
+                "timestamp": import_time_module().time()
+            }
+            redis_client.publish("model_updates", json.dumps(message))
+            
+        return (counter or 0) + 1
+    except Exception as e:
+        logger.error(f"Error storing dialog dropdown models in Redis: {e}")
+        return counter
+
+# Add this callback for sidebar model selection
+@callback(
+    Output("run-counter", "data", allow_duplicate=True),
+    Input("live-mode-autoencoder-dropdown", "value"),
+    Input("live-mode-dimred-dropdown", "value"),
+    State("run-counter", "data"),
+    prevent_initial_call=True
+)
+def store_sidebar_models_in_redis(autoencoder_model, dim_reduction_model, counter):
+    """Store both model selections from sidebar in Redis"""
+    if redis_client is None:
+        return counter
+    
+    try:
+        # Store both models from sidebar
+        if autoencoder_model:
+            logger.info(f"Storing autoencoder model from sidebar: {autoencoder_model}")
+            redis_client.set("selected_mlflow_model", autoencoder_model)
+            
+            # Also publish update notification
+            message = {
+                "model_type": "autoencoder",
+                "model_name": autoencoder_model,
+                "timestamp": import_time_module().time()
+            }
+            redis_client.publish("model_updates", json.dumps(message))
+            
+        if dim_reduction_model:
+            logger.info(f"Storing dimension reduction model from sidebar: {dim_reduction_model}")
+            redis_client.set("selected_dim_reduction_model", dim_reduction_model)
+            
+            # Also publish update notification
+            message = {
+                "model_type": "dimred",
+                "model_name": dim_reduction_model,
+                "timestamp": import_time_module().time()
+            }
+            redis_client.publish("model_updates", json.dumps(message))
+            
+        return (counter or 0) + 1
+    except Exception as e:
+        logger.error(f"Error storing sidebar models in Redis: {e}")
+        return counter
+
+
+def import_time_module():
+    """Import time module on demand to avoid circular imports"""
+    import time
+    return time
 
 @callback(
     Output(

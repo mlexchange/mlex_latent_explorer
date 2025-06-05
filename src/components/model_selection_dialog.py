@@ -9,7 +9,7 @@ def create_model_selection_dialog():
         [
             dbc.Modal(
                 [
-                    dbc.ModalHeader("Select Models for Live Mode"),
+                    dbc.ModalHeader("Select Models for Live Mode", close_button=False),
                     dbc.ModalBody(
                         [
                             html.P(

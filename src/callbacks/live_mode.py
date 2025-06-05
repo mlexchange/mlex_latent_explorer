@@ -3,11 +3,11 @@ import logging
 from urllib.parse import urlsplit, urlunsplit
 
 import numpy as np
-from dash import Input, Output, Patch, State, callback, no_update
+from dash import Input, Output, Patch, State, callback, no_update, callback_context
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
-from src.utils.plot_utils import generate_scatter_data, generate_notification, plot_empty_scatter
+from src.utils.plot_utils import generate_scatter_data, generate_notification, plot_empty_scatter, plot_empty_heatmap
 from src.utils.mlflow_utils import get_mlflow_models_live
 
 logging.getLogger("lse.live_mode")
@@ -16,10 +16,10 @@ logging.getLogger("lse.live_mode")
     Output("live-model-dialog", "is_open"),
     Output("live-autoencoder-dropdown", "options"),
     Output("live-dimred-dropdown", "options"),
-    Output("live-autoencoder-dropdown", "value"),  # Add output for default value
-    Output("live-dimred-dropdown", "value"),  # Add output for default value
+    Output("live-autoencoder-dropdown", "value"),
+    Output("live-dimred-dropdown", "value"),
     Input("go-live", "n_clicks"),
-    State("selected-live-models", "data"),  # Add state to access previous models
+    State("selected-live-models", "data"),
     prevent_initial_call=True,
 )
 def show_model_selection_dialog(n_clicks, last_selected_models):
@@ -47,11 +47,11 @@ def show_model_selection_dialog(n_clicks, last_selected_models):
     Output("dimension-reduction-controls", "style"),
     Output("clustering-controls", "style"),
     Output("data-overview-card", "style"),
-    Output("live-mode-models", "style"),  # Added this output
-    Output("live-mode-autoencoder-dropdown", "options"),  # Added this output
-    Output("live-mode-autoencoder-dropdown", "value"),  # Added this output
-    Output("live-mode-dimred-dropdown", "options"),  # Added this output
-    Output("live-mode-dimred-dropdown", "value"),  # Added this output
+    Output("live-mode-models", "style"),
+    Output("live-mode-autoencoder-dropdown", "options"),
+    Output("live-mode-autoencoder-dropdown", "value"),
+    Output("live-mode-dimred-dropdown", "options"),
+    Output("live-mode-dimred-dropdown", "value"),
     Output("sidebar", "active_item"),
     Output("image-card", "style"),
     Output("scatter", "style"),
@@ -59,6 +59,11 @@ def show_model_selection_dialog(n_clicks, last_selected_models):
     Output("go-live", "style"),
     Output("tooltip-go-live", "children"),
     Output("pause-button", "style"),
+    Output("scatter", "figure", allow_duplicate=True),
+    Output("heatmap", "figure", allow_duplicate=True),
+    Output("stats-div", "children", allow_duplicate=True),
+    Output("buffer", "data", allow_duplicate=True),
+    Output("live-indices", "data", allow_duplicate=True),
     Input("live-model-continue", "n_clicks"),
     State("live-autoencoder-dropdown", "value"),
     State("live-dimred-dropdown", "value"),
@@ -102,7 +107,12 @@ def handle_model_continue(continue_clicks, selected_autoencoder, selected_dimred
                 "display": "flex",
                 "font-size": "1.5rem",
                 "padding": "5px",
-            }
+            },
+            plot_empty_scatter(),  # Clear scatter when continuing
+            plot_empty_heatmap(),  # Clear heatmap when continuing
+            "Number of images selected: 0",  # Reset stats text
+            {},  # Clear buffer
+            [],  # Clear indices
         )
     raise PreventUpdate
 
@@ -110,13 +120,20 @@ def handle_model_continue(continue_clicks, selected_autoencoder, selected_dimred
 @callback(
     Output("live-model-dialog", "is_open", allow_duplicate=True),
     Output("go-live", "n_clicks"),
+    Output("live-mode-canceled", "data"),
     Input("live-model-cancel", "n_clicks"),
     State("go-live", "n_clicks"),
     prevent_initial_call=True,
 )
 def handle_model_cancel(cancel_clicks, go_live_clicks):
+    """
+    Handle the cancel button click in the model selection dialog.
+    Return to the state before "Go to Live Mode" was clicked.
+    """
     if cancel_clicks and go_live_clicks is not None and go_live_clicks % 2 == 1:
-        return False, go_live_clicks - 1
+        # Set n_clicks to an even number (as if we're in offline mode)
+        # Also set a flag to indicate cancellation occurred
+        return False, go_live_clicks - 1, True
     raise PreventUpdate
 
 
@@ -136,7 +153,7 @@ def toggle_continue_button(selected_autoencoder, selected_dimred):
     Output("dimension-reduction-controls", "style", allow_duplicate=True),
     Output("clustering-controls", "style", allow_duplicate=True),
     Output("data-overview-card", "style", allow_duplicate=True),
-    Output("live-mode-models", "style", allow_duplicate=True),  # Added this output
+    Output("live-mode-models", "style", allow_duplicate=True),
     Output("sidebar", "active_item", allow_duplicate=True),
     Output("image-card", "style", allow_duplicate=True),
     Output("scatter", "style", allow_duplicate=True),
@@ -145,14 +162,40 @@ def toggle_continue_button(selected_autoencoder, selected_dimred):
     Output("tooltip-go-live", "children", allow_duplicate=True),
     Output("pause-button", "style", allow_duplicate=True),
     Output("live-indices", "data", allow_duplicate=True),
+    Output("live-mode-canceled", "data", allow_duplicate=True),  # Output for cancellation flag
+    Output("selected-live-models", "data", allow_duplicate=True),
     Input("go-live", "n_clicks"),
     State("selected-live-models", "data"),
+    State("live-mode-canceled", "data"),  # State for cancellation flag
     prevent_initial_call=True,
 )
-def toggle_controls(n_clicks, selected_models):
+def toggle_controls(n_clicks, selected_models, mode_canceled):
     """
     Toggle the visibility of the sidebar, data overview card, image card, and go-live button
     """
+    # If cancel was clicked, just reset the cancel flag but don't make other changes
+    if n_clicks is not None and n_clicks % 2 == 0 and mode_canceled:
+        # Return no_update for all outputs except the last one (cancel flag)
+        return (
+            no_update,  # show-clusters value
+            no_update,  # show-feature-vectors value
+            no_update,  # data-selection-controls style
+            no_update,  # dimension-reduction-controls style
+            no_update,  # clustering-controls style
+            no_update,  # data-overview-card style
+            no_update,  # live-mode-models style
+            no_update,  # sidebar active_item
+            no_update,  # image-card style
+            no_update,  # scatter style
+            no_update,  # heatmap style
+            no_update,  # go-live style
+            no_update,  # tooltip-go-live children
+            no_update,  # pause-button style
+            no_update,  # live-indices data
+            False,       # Reset the cancel flag
+            None,
+        )
+    
     # Check if continue was already clicked (selected_models is not None)
     if n_clicks is not None and n_clicks % 2 == 0:
         # Going back to offline mode
@@ -181,6 +224,8 @@ def toggle_controls(n_clicks, selected_models):
                 "display": "none",
             },
             [],  # Clear live indices
+            False,  # Reset canceled flag
+            None,  # NEW: Reset selected_models to None
         )
     
     # First click or other odd clicks - going to live mode        
@@ -212,8 +257,34 @@ def toggle_controls(n_clicks, selected_models):
                 "padding": "5px",
             },
             [],  # Initialize empty live indices
+            False,  # Reset canceled flag
+            selected_models,  # NEW: Keep selected_models unchanged
         )
     
+    raise PreventUpdate
+
+
+# Removed all the code related to live-mode-canceled flag since it's no longer needed
+
+@callback(
+    Output("scatter", "figure", allow_duplicate=True),
+    Output("heatmap", "figure", allow_duplicate=True),
+    Output("stats-div", "children", allow_duplicate=True),
+    Output("buffer", "data", allow_duplicate=True),
+    Input("go-live", "n_clicks"),
+    State("selected-live-models", "data"),
+    prevent_initial_call=True,
+    
+)
+def reset_panels_on_exit_live_mode(n_clicks,selected_models):
+    """
+    Reset all the visualization panels when switching from live to offline mode
+    """
+    # Only reset when exiting live mode (even clicks)
+    if n_clicks is not None and n_clicks % 2 == 0 and selected_models is not None:
+        return plot_empty_scatter(), plot_empty_heatmap(), "Number of images selected: 0", {}
+        
+    # Don't reset panels when just opening the dialog
     raise PreventUpdate
 
 
@@ -223,30 +294,49 @@ def toggle_controls(n_clicks, selected_models):
         "data",
         allow_duplicate=True,
     ),
-    Input("selected-live-models", "data"),
-    State("go-live", "n_clicks"),
+    Input("go-live", "n_clicks"),
+    State("selected-live-models", "data"),
     prevent_initial_call=True,
 )
-def update_data_project_dict(selected_models, n_clicks):
-    if n_clicks is not None and n_clicks % 2 == 1 and selected_models is not None:
-        return {
-            "root_uri": "",
-            "data_type": "tiled",
-            "datasets": [],
-            "project_id": None,
-            "live_models": selected_models
-        }
-    else:
-        raise PreventUpdate
+def update_data_project_dict(n_clicks, selected_models):
+    """
+    Update the data project dictionary when toggling modes
+    """
+    if n_clicks is not None:
+        # Case 1: Entering live mode with models selected
+        if n_clicks % 2 == 1 and selected_models is not None:
+            return {
+                "root_uri": "",
+                "data_type": "tiled",
+                "datasets": [],
+                "project_id": None,
+                "live_models": selected_models
+            }
+        # Case 2: After cancel (even clicks but no models selected)
+        elif n_clicks % 2 == 0 and n_clicks > 0 and selected_models is None:
+            # Stay in offline mode if cancel was clicked (no model selected)
+            raise PreventUpdate
+        # Case 3: Exiting live mode (even clicks with models selected)
+        elif n_clicks % 2 == 0 and n_clicks > 0:
+            # Exiting live mode - completely reset to empty project
+            return {
+                "root_uri": "",
+                "data_type": "tiled",
+                "datasets": [],  # Empty datasets list is key
+                "project_id": None
+            }
+    raise PreventUpdate
 
 
 @callback(
     Output("selected-live-models", "data", allow_duplicate=True),
     Output({"base_id": "file-manager", "name": "data-project-dict"}, "data", allow_duplicate=True),
-    Output("update-live-models-button", "color"),  # Add output for button color
-    Output("update-live-models-button", "children"),  # Add output for button text
-    Output("scatter", "figure", allow_duplicate=True),  # Add output to reset scatter plot
-    Output("live-indices", "data", allow_duplicate=True),  # Reset indices when models change
+    Output("update-live-models-button", "color"),
+    Output("update-live-models-button", "children"),
+    Output("scatter", "figure", allow_duplicate=True),
+    Output("heatmap", "figure", allow_duplicate=True),
+    Output("stats-div", "children", allow_duplicate=True),
+    Output("live-indices", "data", allow_duplicate=True),
     Input("update-live-models-button", "n_clicks"),
     State("live-mode-autoencoder-dropdown", "value"),
     State("live-mode-dimred-dropdown", "value"),
@@ -262,7 +352,7 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
         
     if autoencoder_model is None or dimred_model is None:
         # Show error notification
-        return no_update, no_update, "danger", "Invalid Selection", no_update, no_update
+        return no_update, no_update, "danger", "Invalid Selection", no_update, no_update, no_update, no_update
     
     # Update the selected models
     selected_models = {"autoencoder": autoencoder_model, "dimred": dimred_model}
@@ -273,10 +363,16 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
     # Create empty figure to reset the scatter plot
     empty_figure = plot_empty_scatter()
     
+    # Create empty figure to reset the heatmap
+    empty_heatmap = plot_empty_heatmap()
+    
+    # Reset stats text
+    stats_text = "Number of images selected: 0"
+    
     # Reset live indices
     empty_indices = []
     
-    return selected_models, data_project_dict, "secondary", "Updated", empty_figure, empty_indices
+    return selected_models, data_project_dict, "secondary", "Updated", empty_figure, empty_heatmap, stats_text, empty_indices
 
 @callback(
     Output("update-live-models-button", "color", allow_duplicate=True),
@@ -322,42 +418,57 @@ def live_update_data_project_dict(message, selected_models, n_clicks, data_proje
     Update data project dict with the data uri from the live experiment
     """
     if n_clicks is not None and n_clicks % 2 == 1 and selected_models is not None:
-        message = json.loads(message["data"])
-        tiled_uri = message["tiled_uri"]
-        split_uri = urlsplit(tiled_uri)
-        path_parts = split_uri.path.rsplit("/", 1)
-        root_uri = urlunsplit(
-            (split_uri.scheme, split_uri.netloc, path_parts[0] + "/", "", "")
-        )
-        uri = path_parts[1]
+        try:
+            message_data = json.loads(message["data"])
+            
+            # Get tiled_url field (handle either tiled_url or tiled_uri)
+            tiled_uri = message_data.get("tiled_uri", "")
+            if not tiled_uri:
+                return data_project_dict, live_indices
+                
+            split_uri = urlsplit(tiled_uri)
+            path_parts = split_uri.path.rsplit("/", 1)
+            root_uri = urlunsplit(
+                (split_uri.scheme, split_uri.netloc, path_parts[0] + "/", "", "")
+            )
+            uri = path_parts[1]
 
-        index = message["index"]
+            index = message_data.get("index", 0)
 
-        live_indices.append(index)
+            # Make sure live_indices is a list
+            if live_indices is None:
+                live_indices = []
+                
+            live_indices.append(index)
 
-        # Update cum_size according to the received index
-        cum_size = max(live_indices) + 1
+            # Update cum_size according to the received index
+            cum_size = max(live_indices) + 1
 
-        # Update the data project dict
-        if data_project_dict["root_uri"] != root_uri:
-            data_project_dict["root_uri"] = root_uri
-            data_project_dict["data_type"] = "tiled"
-            if "live_models" not in data_project_dict:
-                data_project_dict["live_models"] = selected_models
+            # Update the data project dict
+            if data_project_dict.get("root_uri") != root_uri:
+                data_project_dict["root_uri"] = root_uri
+                data_project_dict["data_type"] = "tiled"
+                if "live_models" not in data_project_dict:
+                    data_project_dict["live_models"] = selected_models
 
-        if len(data_project_dict["datasets"]) == 0:
-            data_project_dict["datasets"] = [
-                {
+            if len(data_project_dict.get("datasets", [])) == 0:
+                data_project_dict["datasets"] = [
+                    {
+                        "uri": uri,
+                        "cumulative_data_count": cum_size,
+                    }
+                ]
+            else:
+                data_project_dict["datasets"][0] = {
                     "uri": uri,
                     "cumulative_data_count": cum_size,
                 }
-            ]
-        else:
-            data_project_dict["datasets"][0] = {
-                "uri": uri,
-                "cumulative_data_count": cum_size,
-            }
-
+                
+            return data_project_dict, live_indices
+        except Exception as e:
+            logging.error(f"Error in live_update_data_project_dict: {e}")
+            return data_project_dict, live_indices
+    
     return data_project_dict, live_indices
 
 
@@ -369,53 +480,65 @@ def live_update_data_project_dict(message, selected_models, n_clicks, data_proje
     State("pause-button", "n_clicks"),
     State("buffer", "data"),
     State("selected-live-models", "data"),
+    State("go-live", "n_clicks"),  # Add to check live mode
     prevent_initial_call=True,
 )
-def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data, selected_models):
-    if selected_models is None:
+def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data, selected_models, go_live_n_clicks):
+    # Only process if in live mode
+    if go_live_n_clicks is None or go_live_n_clicks % 2 == 0 or selected_models is None:
         raise PreventUpdate
         
-    data = json.loads(message["data"])
-    logging.debug(f"Received data: {data}")
-    latent_vectors = np.array(data["feature_vector"], dtype=float)
-
-    latent_vectors = (
-        latent_vectors.reshape(1, -1) if latent_vectors.ndim == 1 else latent_vectors
-    )
-    n_components = latent_vectors.shape[1]
-
-    # If the pause button is clicked, buffer the latent vectors
-    if pause_n_clicks is not None and pause_n_clicks % 2 == 1:
-        if not buffer_data:
-            # First time buffering
-            buffer_data["num_components"] = n_components
-            buffer_data["latent_vectors"] = latent_vectors
+    try:
+        data = json.loads(message["data"])
+        logging.debug(f"Received data: {data}")
+        
+        # Get feature_vector, handling it consistently
+        feature_vector = data.get("feature_vector")
+        if feature_vector is None:
             return buffer_data, no_update
-        else:
-            # Append to existing buffer
-            buffer_data["latent_vectors"] = np.vstack(
-                (buffer_data["latent_vectors"], latent_vectors)
-            )
-            return buffer_data, no_update
+            
+        latent_vectors = np.array(feature_vector, dtype=float)
 
-    # If figure is empty (no customdata yet), return a new figure.
-    if not current_figure["data"] or "customdata" not in current_figure["data"][0]:
-        new_fig = generate_scatter_data(latent_vectors, n_components)
-        return {}, new_fig
+        latent_vectors = (
+            latent_vectors.reshape(1, -1) if latent_vectors.ndim == 1 else latent_vectors
+        )
+        n_components = latent_vectors.shape[1]
 
-    # Otherwise, do a partial update of the existing figure using Patch
-    figure_patch = Patch()
+        # If the pause button is clicked, buffer the latent vectors
+        if pause_n_clicks is not None and pause_n_clicks % 2 == 1:
+            if not buffer_data:
+                # First time buffering
+                buffer_data["num_components"] = n_components
+                buffer_data["latent_vectors"] = latent_vectors
+                return buffer_data, no_update
+            else:
+                # Append to existing buffer
+                buffer_data["latent_vectors"] = np.vstack(
+                    (buffer_data["latent_vectors"], latent_vectors)
+                )
+                return buffer_data, no_update
 
-    # Build lists from the newly arriving latent vectors
-    xs_new = latent_vectors[:, 0].tolist()
-    ys_new = latent_vectors[:, 1].tolist()
-    customdata_new = [[0]] * len(xs_new)  # or adapt to your custom data usage
+        # If figure is empty (no customdata yet), return a new figure.
+        if not current_figure["data"] or "customdata" not in current_figure["data"][0]:
+            new_fig = generate_scatter_data(latent_vectors, n_components)
+            return {}, new_fig
 
-    figure_patch["data"][0]["x"].extend(xs_new)
-    figure_patch["data"][0]["y"].extend(ys_new)
-    figure_patch["data"][0]["customdata"].extend(customdata_new)
+        # Otherwise, do a partial update of the existing figure using Patch
+        figure_patch = Patch()
 
-    return {}, figure_patch
+        # Build lists from the newly arriving latent vectors
+        xs_new = latent_vectors[:, 0].tolist()
+        ys_new = latent_vectors[:, 1].tolist()
+        customdata_new = [[0]] * len(xs_new)  # or adapt to your custom data usage
+
+        figure_patch["data"][0]["x"].extend(xs_new)
+        figure_patch["data"][0]["y"].extend(ys_new)
+        figure_patch["data"][0]["customdata"].extend(customdata_new)
+
+        return {}, figure_patch
+    except Exception as e:
+        logging.error(f"Error in set_live_latent_vectors: {e}")
+        return buffer_data, no_update
 
 
 @callback(
@@ -423,26 +546,37 @@ def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data
     Input("pause-button", "n_clicks"),
     State("buffer", "data"),
     State("scatter", "figure"),
+    State("go-live", "n_clicks"),  # Add to check live mode
     prevent_initial_call=True,
 )
-def set_buffered_latent_vectors(n_clicks, buffer_data, current_figure):
+def set_buffered_latent_vectors(n_clicks, buffer_data, current_figure, go_live_n_clicks):
+    # Only process if in live mode
+    if go_live_n_clicks is None or go_live_n_clicks % 2 == 0:
+        raise PreventUpdate
+        
     if n_clicks is not None and n_clicks % 2 == 1 or buffer_data == {}:
         raise PreventUpdate
 
-    num_components = buffer_data["num_components"]
-    latent_vectors = buffer_data["latent_vectors"]
+    try:
+        num_components = buffer_data.get("num_components")
+        latent_vectors = buffer_data.get("latent_vectors")
+        
+        if num_components is None or latent_vectors is None:
+            raise PreventUpdate
 
-    # If the scatter plot is empty, generate new scatter data
-    if "customdata" not in current_figure["data"][0]:
-        return generate_scatter_data(latent_vectors, num_components)
+        # If the scatter plot is empty, generate new scatter data
+        if "customdata" not in current_figure["data"][0]:
+            return generate_scatter_data(latent_vectors, num_components)
 
-    # If the scatter plot is not empty, append the new latent vectors
-    else:
+        # If the scatter plot is not empty, append the new latent vectors
         for latent_vector in latent_vectors:
             current_figure["data"][0]["customdata"].append([0])
-            current_figure["data"][0]["x"].append(int(latent_vector[0]))
-            current_figure["data"][0]["y"].append(int(latent_vector[1]))
+            current_figure["data"][0]["x"].append(float(latent_vector[0]))
+            current_figure["data"][0]["y"].append(float(latent_vector[1]))
         return current_figure
+    except Exception as e:
+        logging.error(f"Error in set_buffered_latent_vectors: {e}")
+        return no_update
 
 
 @callback(
