@@ -11,7 +11,7 @@ import redis
 
 from arroyosas.schemas import RawFrameEvent
 
-from src.utils.mlflow_utils import load_model
+from src.utils.mlflow_utils import MLflowClient
 from .redis_model_store import RedisModelStore
 
 logger = logging.getLogger(__name__)
@@ -71,8 +71,10 @@ class LatentSpaceReducer(Reducer):
         self.device = device
         
         # Load models from MLflow
-        self.current_torch_model = load_model(self.autoencoder_model_name)
-        self.current_dim_reduction_model = load_model(self.dimred_model_name)
+        mlflow_client = MLflowClient()
+        self.mlflow_client = mlflow_client  # Store for later use
+        self.current_torch_model = mlflow_client.load_model(self.autoencoder_model_name)
+        self.current_dim_reduction_model = mlflow_client.load_model(self.dimred_model_name)
         self.current_transform = self.get_transform()
         
         # Subscribe to model update channel if supported

@@ -29,7 +29,7 @@ from src.utils.job_utils import (
     parse_job_params,
     parse_model_params,
 )
-from src.utils.mlflow_utils import get_mlflow_models
+from src.utils.mlflow_utils import MLflowClient
 from src.utils.plot_utils import generate_notification
 
 MODE = os.getenv("MODE", "")
@@ -44,9 +44,8 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 redis_client = None
 
 
-
 logger = logging.getLogger(__name__)
-
+mlflow_client = MLflowClient()
 try:
     redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 except Exception as e:
@@ -56,12 +55,12 @@ except Exception as e:
     Output("mlflow-model-dropdown", "options", allow_duplicate=True),
     Input(
         "sidebar", "active_item"
-    ),  # This will trigger when the sidebar is first rendered
-    prevent_initial_call="initial_duplicate",  # Allow initial call but handle duplicates properly
+    ),
+    prevent_initial_call="initial_duplicate",
 )
 def load_mlflow_models_on_render(active_item):
     """Load MLflow models when the page is first loaded"""
-    return get_mlflow_models()
+    return mlflow_client.get_mlflow_models()
 
 
 @callback(
@@ -73,7 +72,7 @@ def load_mlflow_models_on_render(active_item):
 def refresh_mlflow_models(n_clicks):
     """Refresh the MLflow models dropdown when the refresh button is clicked"""
     if n_clicks:
-        options = get_mlflow_models()
+        options = mlflow_client.get_mlflow_models()
         return options, options[0]["value"] if options else None
     return [], None
 
@@ -659,3 +658,59 @@ def allow_show_clusters(job_id, project_name):
     except Exception:
         logger.error(traceback.format_exc())
         return True
+
+
+@callback(
+    Output(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "run-dropdown",
+            "aio_id": "clustering-jobs",
+        },
+        "options",
+    ),
+    Input(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "run-dropdown",
+            "aio_id": "clustering-jobs",
+        },
+        "options",
+    ),
+    prevent_initial_call=True,
+)
+def filter_clustering_dropdown(options):
+    """
+    Filter the clustering job dropdown to only show true clustering jobs.
+    """
+    if not options:
+        return []
+    
+    # Get list of clustering model names for comparison
+    clustering_model_names = [model.lower() for model in clustering_models.modelname_list]
+    
+    # Filter job options
+    filtered_options = []
+    for job_option in options:
+        job_label = job_option.get("label", "").lower()
+        
+        # Check if this job was created by any of the clustering models
+        is_clustering_job = False
+        for model_name in clustering_model_names:
+            if model_name in job_label:
+                is_clustering_job = True
+                break
+        
+        # If no clustering model is mentioned, check if it has clustering-related terms
+        if not is_clustering_job:
+            clustering_terms = ["cluster", "kmeans", "dbscan", "hdbscan", "agglomerative", "hierarchical"]
+            for term in clustering_terms:
+                if term in job_label:
+                    is_clustering_job = True
+                    break
+        
+        # Add to filtered options if it's a clustering job
+        if is_clustering_job:
+            filtered_options.append(job_option)
+    
+    return filtered_options

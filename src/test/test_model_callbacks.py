@@ -15,6 +15,12 @@ class TestModelCallbacks:
             yield mock_client
     
     @pytest.fixture
+    def mock_mlflow_client(self):
+        """Mock the MLflowClient"""
+        with patch('src.callbacks.execute.mlflow_client') as mock_client:
+            yield mock_client
+    
+    @pytest.fixture
     def mock_time(self):
         """Mock the time module"""
         with patch('src.callbacks.execute.import_time_module') as mock_import_time:

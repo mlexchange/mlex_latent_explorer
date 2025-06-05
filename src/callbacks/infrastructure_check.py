@@ -6,7 +6,7 @@ from dash import Input, Output, callback, no_update
 
 from src.components.infrastructure import create_infra_state_details
 from src.utils.data_utils import tiled_results
-from src.utils.mlflow_utils import check_mlflow_ready
+from src.utils.mlflow_utils import MLflowClient
 from src.utils.prefect import check_prefect_ready, check_prefect_worker_ready
 
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
@@ -33,8 +33,10 @@ def check_infra_state(n_intervals):
 
     # MLFLOW: Check MLFlow is reachable
     try:
-        check_mlflow_ready()
-        infra_state["mlflow_ready"] = True
+        mlflow_client = MLflowClient()
+        infra_state["mlflow_ready"] = mlflow_client.check_mlflow_ready()
+        if not infra_state["mlflow_ready"]:
+            any_infra_down = True
     except Exception:
         any_infra_down = True
         infra_state["mlflow_ready"] = False

@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 
 # Create patches at the module level
 redis_mock_patch = patch('src.arroyo_reduction.redis_model_store.RedisModelStore')
-mlflow_mock_patch = patch('src.utils.mlflow_utils.load_model')
+mlflow_client_mock_patch = patch('src.utils.mlflow_utils.MLflowClient')
 pil_mock_patch = patch('PIL.Image.fromarray')
 
 class TestReducer:
@@ -23,7 +23,7 @@ class TestReducer:
         """Set up and start all the mocks"""
         # Start all the patches
         redis_mock = redis_mock_patch.start()
-        mlflow_mock = mlflow_mock_patch.start()
+        mlflow_client_mock = mlflow_client_mock_patch.start()
         pil_mock = pil_mock_patch.start()
         
         # Configure the Redis mock
@@ -33,26 +33,21 @@ class TestReducer:
         mock_store.get_dimred_model.return_value = "test_dimred"
         
         # Configure the MLFlow mock
-        mock_autoencoder = MagicMock()
-        mock_dimred = MagicMock()
+        mock_mlflow_client = MagicMock()
+        mlflow_client_mock.return_value = mock_mlflow_client
         
         # Configure models to return test data
         latent_features = np.random.rand(1, 512).astype(np.float32)
         umap_coords = np.random.rand(1, 2).astype(np.float32)
         
+        mock_autoencoder = MagicMock()
+        mock_dimred = MagicMock()
+        
         mock_autoencoder.predict.return_value = {"latent_features": latent_features}
         mock_dimred.predict.return_value = {"umap_coords": umap_coords}
         
-        # Use a dictionary to map model names to mock models
-        def get_model(model_name):
-            if model_name == "test_autoencoder":
-                return mock_autoencoder
-            elif model_name == "test_dimred":
-                return mock_dimred
-            else:
-                return MagicMock()
-        
-        mlflow_mock.side_effect = get_model
+        # Configure the load_model method to return appropriate models
+        mock_mlflow_client.load_model.side_effect = lambda model_name: mock_autoencoder if model_name == "test_autoencoder" else mock_dimred
         
         # Configure PIL mock
         mock_pil_image = MagicMock()
@@ -62,7 +57,7 @@ class TestReducer:
         mocks = {
             "redis": redis_mock,
             "store": mock_store,
-            "mlflow": mlflow_mock,
+            "mlflow_client": mock_mlflow_client,
             "autoencoder": mock_autoencoder,
             "dimred": mock_dimred,
             "pil": pil_mock,
@@ -75,7 +70,7 @@ class TestReducer:
         
         # Stop all patches after the test
         redis_mock_patch.stop()
-        mlflow_mock_patch.stop()
+        mlflow_client_mock_patch.stop()
         pil_mock_patch.stop()
     
     @pytest.fixture
@@ -154,7 +149,7 @@ class TestReducer:
         """Test that constructor loads models from Redis"""
         # Create mocks for dependencies
         with patch('src.arroyo_reduction.redis_model_store.RedisModelStore', autospec=True) as redis_class_mock, \
-             patch('src.utils.mlflow_utils.load_model') as mlflow_mock, \
+             patch('src.utils.mlflow_utils.MLflowClient') as mlflow_client_mock, \
              patch('src.arroyo_reduction.reducer.LatentSpaceReducer._subscribe_to_model_updates'):
             
             # Set up mock store - important to do this before importing
@@ -163,19 +158,16 @@ class TestReducer:
             mock_store.get_autoencoder_model.return_value = "test_autoencoder"
             mock_store.get_dimred_model.return_value = "test_dimred"
             
+            # Set up mock MLflowClient
+            mock_mlflow_client = MagicMock()
+            mlflow_client_mock.return_value = mock_mlflow_client
+            
             # Set up mock models
             mock_autoencoder = MagicMock()
             mock_dimred = MagicMock()
             
-            # Configure load_model to return different models based on name
-            def get_model(name):
-                if name == "test_autoencoder":
-                    return mock_autoencoder
-                elif name == "test_dimred":
-                    return mock_dimred
-                return MagicMock()
-                
-            mlflow_mock.side_effect = get_model
+            # Configure the load_model method
+            mock_mlflow_client.load_model.side_effect = lambda name: mock_autoencoder if name == "test_autoencoder" else mock_dimred
             
             # Import the real class - this needs to be done AFTER setting up the mocks
             # to ensure the imports in the module use our mocked objects
@@ -196,8 +188,12 @@ class TestReducer:
             mock_store.get_autoencoder_model.assert_called()
             mock_store.get_dimred_model.assert_called()
             
+            # Verify MLflowClient was instantiated
+            mlflow_client_mock.assert_called()
+            
             # Verify models were loaded
-            assert mlflow_mock.call_count >= 1
+            mock_mlflow_client.load_model.assert_any_call("test_autoencoder")
+            mock_mlflow_client.load_model.assert_any_call("test_dimred")
     
     def test_handle_model_update(self):
         """Test handling model update notifications"""
@@ -207,24 +203,24 @@ class TestReducer:
         mock_orig_dimred = MagicMock()
         mock_new_dimred = MagicMock()
         
-        # Create the patch for load_model and redis before importing anything
-        with patch('src.utils.mlflow_utils.load_model') as mlflow_mock, \
+        # Create the patch for MLflowClient and redis before importing anything
+        with patch('src.utils.mlflow_utils.MLflowClient') as mlflow_client_mock, \
              patch('src.arroyo_reduction.redis_model_store.RedisModelStore') as redis_mock, \
              patch('src.arroyo_reduction.reducer.LatentSpaceReducer._subscribe_to_model_updates'), \
              patch('src.arroyo_reduction.reducer.logger'):  # Add logger patch to suppress errors
                 
-            # Configure load_model to return different models based on name
-            def get_model(name):
-                models = {
-                    "test_autoencoder": mock_orig_autoencoder,
-                    "new_autoencoder": mock_new_autoencoder,
-                    "test_dimred": mock_orig_dimred,
-                    "new_dimred": mock_new_dimred
-                }
-                return models.get(name, MagicMock())
-                    
-            mlflow_mock.side_effect = get_model
+            # Configure MLflowClient mock
+            mock_mlflow_client = MagicMock()
+            mlflow_client_mock.return_value = mock_mlflow_client
             
+            # Configure load_model to return different models based on name
+            mock_mlflow_client.load_model.side_effect = lambda name: {
+                "test_autoencoder": mock_orig_autoencoder,
+                "new_autoencoder": mock_new_autoencoder,
+                "test_dimred": mock_orig_dimred,
+                "new_dimred": mock_new_dimred
+            }.get(name, MagicMock())
+                    
             # Set up mock store
             mock_store = MagicMock()
             redis_mock.return_value = mock_store
@@ -242,8 +238,6 @@ class TestReducer:
             reducer = LatentSpaceReducer()
             
             # Add mlflow_client attribute with load_model method
-            mock_mlflow_client = MagicMock()
-            mock_mlflow_client.load_model.side_effect = get_model
             reducer.mlflow_client = mock_mlflow_client
             
             # Verify initial models were loaded
@@ -299,7 +293,7 @@ class TestReducer:
         # Test with just the thread mocked
         with patch('threading.Thread', return_value=mock_thread) as mock_thread_class, \
              patch('src.arroyo_reduction.redis_model_store.RedisModelStore'), \
-             patch('src.utils.mlflow_utils.load_model'):
+             patch('src.utils.mlflow_utils.MLflowClient'):
             
             # Import the real class but patch the __init__ to avoid complex initialization
             from src.arroyo_reduction.reducer import LatentSpaceReducer

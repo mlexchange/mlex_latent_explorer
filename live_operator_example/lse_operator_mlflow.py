@@ -17,9 +17,11 @@ import logging
 import torch
 import torchvision.transforms as transforms
 import numpy as np
-import mlflow
 from tiled.client import from_uri
 from tiled_utils import write_results
+
+# Import the MLflowClient class
+from src.utils.mlflow_utils import MLflowClient
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -36,7 +38,6 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 MLFLOW_TRACKING_USERNAME = os.getenv("MLFLOW_TRACKING_USERNAME", "")
 MLFLOW_TRACKING_PASSWORD = os.getenv("MLFLOW_TRACKING_PASSWORD", "")
 
-
 # Add compatibility patch for torch if needed
 if not hasattr(torch, "get_default_device"):
     def get_default_device():
@@ -44,67 +45,26 @@ if not hasattr(torch, "get_default_device"):
     torch.get_default_device = get_default_device
 
 
-def get_model(model_name):
-    """
-    Load a model from MLflow by its name using PyFunc wrapper
-    
-    Parameters:
-    -----------
-    model_name : str
-        Name of the registered model in MLflow
-    
-    Returns:
-    --------
-    model : mlflow.pyfunc.PyFuncModel
-        The loaded model wrapper from MLflow
-    """
-    # Set MLflow tracking URI and credentials
-    os.environ['MLFLOW_TRACKING_USERNAME'] = MLFLOW_TRACKING_USERNAME
-    os.environ['MLFLOW_TRACKING_PASSWORD'] = MLFLOW_TRACKING_PASSWORD
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    
-    try:
-        # Get latest version
-        client = mlflow.tracking.MlflowClient()
-        versions = client.search_model_versions(f"name='{model_name}'")
-        if not versions:
-            logger.error(f"No versions found for model {model_name}")
-            return None
-            
-        latest_version = max([mv.version for mv in versions])
-        model_uri = f"models:/{model_name}/{latest_version}"
-        
-        # Get model info to check tags
-        model_info = client.get_model_version(model_name, latest_version)
-        model_tags = {}
-        if hasattr(model_info, "tags") and model_info.tags:
-            model_tags = model_info.tags
-            
-        # Show model type if available
-        model_type = model_tags.get("model_type", "unknown")
-        logger.info(f"Loading {model_type} model via PyFunc wrapper: {model_name}")
-        
-        # Load via PyFunc wrapper
-        wrapper = mlflow.pyfunc.load_model(model_uri)
-        logger.info(f"✓ Successfully loaded {model_type} model: {model_name}, version: {latest_version}")
-        
-        return wrapper
-        
-    except Exception as e:
-        logger.error(f"Error loading model {model_name}: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
-
-
 if __name__ == "__main__":
+    # Create MLflow client
+    mlflow_client = MLflowClient(
+        tracking_uri=MLFLOW_TRACKING_URI,
+        username=MLFLOW_TRACKING_USERNAME,
+        password=MLFLOW_TRACKING_PASSWORD
+    )
+    
+    # Check if MLflow is reachable
+    if not mlflow_client.check_mlflow_ready():
+        logger.error("MLflow server is not reachable. Exiting.")
+        sys.exit(1)
+    
     # Get model names from command line arguments or environment variables
     autoencoder_model_name = "smi_autoencoder_model_wrapper"
     dimred_model_name = "smi_umap_model_wrapper"
     
     # Load the autoencoder model with wrapper
     logger.info(f"Loading autoencoder model: {autoencoder_model_name}")
-    autoencoder_wrapper = get_model(autoencoder_model_name)
+    autoencoder_wrapper = mlflow_client.load_model(autoencoder_model_name)
     
     if autoencoder_wrapper is None:
         logger.error("Failed to load autoencoder model. Exiting.")
@@ -112,7 +72,7 @@ if __name__ == "__main__":
     
     # Load the umap model with wrapper
     logger.info(f"Loading UMAP model from MLflow: {dimred_model_name}")
-    umap_wrapper = get_model(dimred_model_name)
+    umap_wrapper = mlflow_client.load_model(dimred_model_name)
 
     if umap_wrapper is None:
         logger.error("Failed to load UMAP model. Exiting.")

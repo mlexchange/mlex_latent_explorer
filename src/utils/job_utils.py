@@ -3,7 +3,7 @@ import logging
 import os
 from urllib.parse import urljoin
 
-from src.utils.mlflow_utils import get_mlflow_params
+from src.utils.mlflow_utils import MLflowClient
 
 # I/O parameters for job execution
 READ_DIR_MOUNT = os.getenv("READ_DIR_MOUNT", None)
@@ -28,7 +28,7 @@ CONTAINER_NETWORK = os.getenv("CONTAINER_NETWORK", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
 
 logger = logging.getLogger(__name__)
-
+mlflow_client = MLflowClient()
 
 def parse_tiled_url(url, user, project_name, tiled_base_path="/api/v1/metadata"):
     """
@@ -76,7 +76,7 @@ def parse_job_params(
         "mlflow_model": mlflow_model_id,
     }
 
-    auto_params = get_mlflow_params(mlflow_model_id)
+    auto_params = mlflow_client.get_mlflow_params(mlflow_model_id)
     logger.info(f"Autoencoder parameters: {auto_params}")
 
     ls_python_file_name_inference = latent_space_params["python_file_name"]["inference"]

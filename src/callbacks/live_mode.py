@@ -8,9 +8,10 @@ from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
 from src.utils.plot_utils import generate_scatter_data, generate_notification, plot_empty_scatter, plot_empty_heatmap
-from src.utils.mlflow_utils import get_mlflow_models_live
+from src.utils.mlflow_utils import MLflowClient
 
 logging.getLogger("lse.live_mode")
+mlflow_client = MLflowClient()
 
 @callback(
     Output("live-model-dialog", "is_open"),
@@ -25,8 +26,8 @@ logging.getLogger("lse.live_mode")
 def show_model_selection_dialog(n_clicks, last_selected_models):
     if n_clicks is not None and n_clicks % 2 == 1:
         # Get model options filtered by type
-        autoencoder_options = get_mlflow_models_live(model_type=None)
-        dimred_options = get_mlflow_models_live(model_type=None)
+        autoencoder_options = mlflow_client.get_mlflow_models_live(model_type=None)
+        dimred_options = mlflow_client.get_mlflow_models_live(model_type=None)
         
         # Set default values from previous selection if available
         autoencoder_default = None
