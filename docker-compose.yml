@@ -155,6 +155,9 @@ services:
       MLFLOW_TRACKING_URI: '${MLFLOW_TRACKING_URI}'
       MLFLOW_TRACKING_USERNAME: '${MLFLOW_TRACKING_USERNAME}'
       MLFLOW_TRACKING_PASSWORD: '${MLFLOW_TRACKING_PASSWORD}'
+      # Redis
+      REDIS_HOST: '${REDIS_HOST}'
+      REDIS_PORT: '${REDIS_PORT}'
     volumes:
       - ${READ_DIR}:/tiled_storage
       - ./src:/app/work/src

@@ -39,8 +39,8 @@ PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]')
 RESULTS_DIR = os.getenv("RESULTS_DIR", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
 # Initialize Redis client
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
 redis_client = None
 
 

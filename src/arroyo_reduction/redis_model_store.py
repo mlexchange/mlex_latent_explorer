@@ -28,16 +28,15 @@ class RedisModelStore:
         decode_responses: bool = True
     ):
         """Initialize Redis client for key-value operations"""
-        self.host = host or os.getenv("REDIS_HOST", "redis")
-        self.port = port or int(os.getenv("REDIS_PORT", 6379))
-        self.password = password or os.getenv("REDIS_PASSWORD", None)
+        self.host = host or os.getenv("REDIS_HOST", "kvrocks")
+        self.port = port or int(os.getenv("REDIS_PORT", 6666))
+
         
         # Initialize Redis client
         try:
             self.redis_client = redis.Redis(
                 host=self.host, 
                 port=self.port,
-                password=self.password,
                 decode_responses=decode_responses
             )
             logger.info(f"Connected to Redis at {self.host}:{self.port}")
