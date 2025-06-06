@@ -16,6 +16,7 @@ test.py
 results/
 data/
 .DS_Store
+models/
 
 # mlflow auth details
 basic_auth.ini

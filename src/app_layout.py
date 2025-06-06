@@ -122,6 +122,7 @@ meta = [
             dcc.Store(id="model_id", data=None),
             dcc.Store(id="latent_vectors", data=None),
             dcc.Store(id="clusters", data=None),
+            dcc.Store(id="live-mode-canceled", data=False),
         ],
     )
 ]

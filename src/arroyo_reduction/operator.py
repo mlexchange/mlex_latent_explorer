@@ -74,5 +74,5 @@ class LatentSpaceOperator(Operator):
         socket.setsockopt(zmq.RCVHWM, 10000)
         # socket.connect(settings.zmq_broker.router_address)
         # logger.info(f"Connected to broker at {settings.zmq_broker.router_address}")
-        reducer = LatentSpaceReducer.from_settings(reducer_settings)
+        reducer = LatentSpaceReducer()
         return cls(socket, reducer)

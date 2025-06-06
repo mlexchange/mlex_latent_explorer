@@ -6,6 +6,7 @@ from dash import dcc, html
 from dash_extensions import WebSocket
 from dash_iconify import DashIconify
 
+from .model_selection_dialog import create_model_selection_dialog
 from ..utils.plot_utils import draw_rows, plot_empty_heatmap, plot_empty_scatter
 
 logging.basicConfig(level=logging.INFO)
@@ -212,6 +213,9 @@ def main_display():
                     ),
                 ],
             ),
+            # Add model selection dialog for live mode
+            create_model_selection_dialog(),
+            dcc.Store(id="selected-live-models", data=None),
             dcc.Store(id="buffer", data={}),
             dcc.Store(id="live-indices", data=[]),
             WebSocket(id="ws-live", url=WEBSOCKET_URL),

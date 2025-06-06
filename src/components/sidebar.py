@@ -79,6 +79,40 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                             ],
                         ),
                         dbc.AccordionItem(
+                            id="live-mode-models",
+                            title="Live Mode Models",
+                            children=[
+                                ControlItem(
+                                    "Autoencoder Model",
+                                    "live-mode-autoencoder-title",
+                                    dbc.Select(
+                                        id="live-mode-autoencoder-dropdown",
+                                        options=[],
+                                        placeholder="Select an autoencoder model...",
+                                    ),
+                                ),
+                                html.P(),
+                                ControlItem(
+                                    "Dimension Reduction Model",
+                                    "live-mode-dimred-title",
+                                    dbc.Select(
+                                        id="live-mode-dimred-dropdown",
+                                        options=[],
+                                        placeholder="Select a dimension reduction model...",
+                                    ),
+                                ),
+                                html.P(),
+                                dbc.Button(
+                                    "Update Models",
+                                    id="update-live-models-button",
+                                    color="primary",
+                                    className="w-100",
+                                    disabled=False,
+                                ),
+                            ],
+                            style={"display": "none"},  # Hidden by default (offline mode)
+                        ),
+                        dbc.AccordionItem(
                             id="dimension-reduction-controls",
                             children=[
                                 ControlItem(
