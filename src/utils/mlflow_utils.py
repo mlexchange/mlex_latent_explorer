@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 import hashlib
+import tempfile  
 
 import mlflow
 from mlex_utils.prefect_utils.core import get_flow_run_name
@@ -13,7 +14,7 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
 MLFLOW_TRACKING_USERNAME = os.getenv("MLFLOW_TRACKING_USERNAME", "")
 MLFLOW_TRACKING_PASSWORD = os.getenv("MLFLOW_TRACKING_PASSWORD", "")
 # Define a cache directory that will be mounted as a volume
-MLFLOW_CACHE_DIR = os.getenv("MLFLOW_CACHE_DIR", "/mlflow_cache")
+MLFLOW_CACHE_DIR = os.getenv("MLFLOW_CACHE_DIR", os.path.join(tempfile.gettempdir(), "mlflow_cache"))
 
 logger = logging.getLogger(__name__)
 
