@@ -85,6 +85,7 @@ services:
       - MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
       - MLFLOW_FLASK_SERVER_SECRET_KEY=${MLFLOW_FLASK_SERVER_SECRET_KEY}
       - MLFLOW_AUTH_CONFIG_PATH=/basic_auth.ini
+      - MLFLOW_CACHE_DIR=/mlflow_cache
     depends_on:
       - mlflow_db
     networks:
@@ -93,7 +94,7 @@ services:
       - ./data/mlflow_storage:/mlartifacts:rw  # Persist MLflow models, logs, and artifacts
       - ./data/mlflow_auth:/mlflow_auth:rw # Dedicated volume for auth database
       - ./basic_auth.ini:/basic_auth.ini
-      - ./data/artifact_download_tmp:/tmp:rw
+      - ./data/mlflow_cache:/mlflow_cache
 
   mlflow_db:
     image: postgres:14.5-alpine  # Lightweight PostgreSQL version
@@ -197,13 +198,14 @@ services:
       - arroyo
     volumes:
       - .:/app:Z
-      - ./data/artifact_download_tmp:/tmp:rw
+      - ./data/mlflow_cache:/mlflow_cache
     ports:
       - 127.0.0.1:8765:8765
     environment:
       - NUMBA_DISABLE_JIT=1       # Add 3 NUMBA vars to avoid umap illegal instruction errors
       - NUMBA_CPU_NAME=generic
       - NUMBA_CPU_FEATURES=+neon
+      - MLFLOW_CACHE_DIR=/mlflow_cache
     depends_on:
       - latent-space-explorer
     networks:

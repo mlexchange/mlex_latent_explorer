@@ -25,7 +25,7 @@ import joblib
 
 from dotenv import load_dotenv
 # Load environment variables from .env file
-load_dotenv() 
+load_dotenv(dotenv_path='../.env') 
 
 
 import torch
@@ -35,7 +35,7 @@ if not hasattr(torch, "get_default_device"):
     torch.get_default_device = get_default_device
 
 # MLflow Configuration from environment variables
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI_OUTSIDE", "http://localhost:5000")
 MLFLOW_TRACKING_USERNAME = os.getenv("MLFLOW_TRACKING_USERNAME", "")
 MLFLOW_TRACKING_PASSWORD = os.getenv("MLFLOW_TRACKING_PASSWORD", "")
 # Names for logging experiment and model
@@ -53,6 +53,7 @@ AUTOENCODER_CODE_PATH= os.getenv("AUTOENCODER_CODE_PATH")
 DR_WEIGHTS_PATH= os.getenv("DR_WEIGHTS_PATH")
 LATENT_DIM= os.getenv("LATENT_DIM")
 print("----------------------------------------------")
+print("MLFLOW_TRACKING_URI:",MLFLOW_TRACKING_URI)
 print("MLFLOW_EXPERIMENT_NAME:",MLFLOW_EXPERIMENT_NAME)
 print("MLFLOW_AUTO_MODEL_NAME:",MLFLOW_AUTO_MODEL_NAME)
 print("MLFLOW_DR_MODEL_NAME:",MLFLOW_DR_MODEL_NAME)

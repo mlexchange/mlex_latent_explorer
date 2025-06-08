@@ -1,17 +1,18 @@
-from abc import ABC, abstractmethod
 import logging
 import os
 import sys
+from abc import ABC, abstractmethod
 from pathlib import Path
+
 import numpy as np
+import redis
 import torch
 import torchvision.transforms as transforms
-from PIL import Image
-import redis
-
 from arroyosas.schemas import RawFrameEvent
+from PIL import Image
 
 from src.utils.mlflow_utils import MLflowClient
+
 from .redis_model_store import RedisModelStore
 
 logger = logging.getLogger("arroyo_reduction.reducer")

@@ -3,10 +3,10 @@ import logging
 import os
 import sys
 
+import redis
+import typer
 from arroyosas.zmq import ZMQFrameListener
 from dynaconf import Dynaconf
-import typer
-import redis
 
 from .operator import LatentSpaceOperator
 from .publisher import LSEWSResultPublisher

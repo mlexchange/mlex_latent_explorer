@@ -3,7 +3,6 @@ from arroyopy.schemas import Event
 from pydantic import BaseModel, field_serializer, field_validator
 
 
-
 class SerializableNumpyArrayModel(BaseModel):
     """
     Custom Pydantic model for serializing NumPy arrays.

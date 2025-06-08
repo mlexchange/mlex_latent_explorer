@@ -8,8 +8,8 @@ from typing import Union
 import websockets
 from arroyopy.publisher import Publisher
 from arroyosas.schemas import SASStart, SASStop
-from .schemas import LatentSpaceEvent
 
+from .schemas import LatentSpaceEvent
 
 logger = logging.getLogger("arroyo_reduction.publisher")
 

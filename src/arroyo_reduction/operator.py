@@ -1,13 +1,15 @@
 import asyncio
 import logging
+import os
 
 import msgpack
+import redis
 import zmq
 from arroyopy.operator import Operator
-from arroyopy.schemas import  Start, Stop
+from arroyopy.schemas import Start, Stop
 from arroyosas.schemas import RawFrameEvent, SASMessage
 
-from .reducer import Reducer, LatentSpaceReducer
+from .reducer import LatentSpaceReducer, Reducer
 from .schemas import LatentSpaceEvent
 
 logger = logging.getLogger("arroyo_reduction.operator")
@@ -37,11 +39,25 @@ class LatentSpaceOperator(Operator):
 
     async def dispatch(self, message: RawFrameEvent) -> LatentSpaceEvent:
         try:
-            # Check if models are being loaded
+            # Add a simple Redis check to see if we're in offline mode
+
+            # Create Redis client
+            REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
+            REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
+            redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+            
+            # Check if processing is disabled (by checking if models are set)
+            autoencoder_model = redis_client.get("selected_mlflow_model")
+            dimred_model = redis_client.get("selected_dim_reduction_model")
+            
+            if not autoencoder_model or not dimred_model:
+                logger.info(f"In offline mode - skipping frame {message.frame_number}")
+                return None
+                
+            # Existing loading check
             if hasattr(self.reducer, 'is_loading_model') and self.reducer.is_loading_model:
                 loading_type = self.reducer.loading_model_type or "unknown"
                 logger.info(f"Waiting for {loading_type} model to finish loading before processing frame {message.frame_number}...")
-                # Return None to indicate we should skip this frame
                 return None
                 
             feature_vector = await asyncio.to_thread(self.reducer.reduce, message)

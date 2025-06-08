@@ -1,16 +1,20 @@
 import json
 import logging
+import time
 from urllib.parse import urlsplit, urlunsplit
 
 import numpy as np
-from dash import Input, Output, Patch, State, callback, no_update, callback_context
+from dash import (Input, Output, Patch, State, callback, callback_context,
+                  no_update)
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
-from src.utils.plot_utils import generate_scatter_data, generate_notification, plot_empty_scatter, plot_empty_heatmap
+from src.callbacks.execute import redis_client
 from src.utils.mlflow_utils import MLflowClient
+from src.utils.plot_utils import (generate_notification, generate_scatter_data,
+                                  plot_empty_heatmap, plot_empty_scatter)
 
-logging.getLogger("lse.live_mode")
+logger = logging.getLogger("lse.live_mode")
 mlflow_client = MLflowClient()
 
 @callback(
@@ -163,17 +167,18 @@ def toggle_continue_button(selected_autoencoder, selected_dimred):
     Output("tooltip-go-live", "children", allow_duplicate=True),
     Output("pause-button", "style", allow_duplicate=True),
     Output("live-indices", "data", allow_duplicate=True),
-    Output("live-mode-canceled", "data", allow_duplicate=True),  # Output for cancellation flag
+    Output("live-mode-canceled", "data", allow_duplicate=True),
     Output("selected-live-models", "data", allow_duplicate=True),
     Input("go-live", "n_clicks"),
     State("selected-live-models", "data"),
-    State("live-mode-canceled", "data"),  # State for cancellation flag
+    State("live-mode-canceled", "data"),
     prevent_initial_call=True,
 )
 def toggle_controls(n_clicks, selected_models, mode_canceled):
     """
     Toggle the visibility of the sidebar, data overview card, image card, and go-live button
     """
+    
     # If cancel was clicked, just reset the cancel flag but don't make other changes
     if n_clicks is not None and n_clicks % 2 == 0 and mode_canceled:
         # Return no_update for all outputs except the last one (cancel flag)
@@ -199,6 +204,34 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
     
     # Check if continue was already clicked (selected_models is not None)
     if n_clicks is not None and n_clicks % 2 == 0:
+        # Going back to offline mode - send Redis messages to reset models
+        if redis_client is not None and selected_models is not None:
+            try:
+                # Reset autoencoder model to None
+                redis_client.set("selected_mlflow_model", "")
+                
+                # Reset dimension reduction model to None  
+                redis_client.set("selected_dim_reduction_model", "")
+                
+                # Also publish update notifications
+                message = {
+                    "model_type": "autoencoder",
+                    "model_name": None,
+                    "timestamp": time.time()
+                }
+                redis_client.publish("model_updates", json.dumps(message))
+                
+                message = {
+                    "model_type": "dimred",
+                    "model_name": None,
+                    "timestamp": time.time()
+                }
+                redis_client.publish("model_updates", json.dumps(message))
+                
+                logger.info("Published model reset messages to Redis")
+            except Exception as e:
+                logger.error(f"Error publishing model reset messages to Redis: {e}")
+        
         # Going back to offline mode
         return (
             False,
@@ -226,7 +259,7 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
             },
             [],  # Clear live indices
             False,  # Reset canceled flag
-            None,  # NEW: Reset selected_models to None
+            None,  # Reset selected_models to None
         )
     
     # First click or other odd clicks - going to live mode        
@@ -259,7 +292,7 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
             },
             [],  # Initialize empty live indices
             False,  # Reset canceled flag
-            selected_models,  # NEW: Keep selected_models unchanged
+            selected_models,  # Keep selected_models unchanged
         )
     
     raise PreventUpdate
