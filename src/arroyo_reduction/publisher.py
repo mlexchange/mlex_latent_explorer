@@ -24,7 +24,7 @@ class LSEWSResultPublisher(Publisher):
     connected_clients = set()
     current_start_message = None
 
-    def __init__(self, host: str = "localhost", port: int = 8001, path="/ws"):
+    def __init__(self, host: str = "localhost", port: int = 8765, path="/lse"):
 
         super().__init__()
         self.host = host

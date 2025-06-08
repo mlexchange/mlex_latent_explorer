@@ -66,7 +66,7 @@ services:
       mle_net:
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.22.0
+    image: ghcr.io/mlflow/mlflow:v2.14.3 # to be compatible with requests==2.26.0 (required by mlex_file_manager)
     container_name: mlflow-server
     command: >
       /bin/sh -c "pip install --no-cache-dir psycopg2-binary 'mlflow[auth]' &&
@@ -85,16 +85,15 @@ services:
       - MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
       - MLFLOW_FLASK_SERVER_SECRET_KEY=${MLFLOW_FLASK_SERVER_SECRET_KEY}
       - MLFLOW_AUTH_CONFIG_PATH=/basic_auth.ini
-      - TMPDIR=/mlflow_tmp  # Set temp directory to dedicated volume
     depends_on:
       - mlflow_db
     networks:
       - mle_net
     volumes:
       - ./data/mlflow_storage:/mlartifacts:rw  # Persist MLflow models, logs, and artifacts
-      - ./data/mlflow_tmp:/mlflow_tmp:rw      # Dedicated volume for temporary files
       - ./data/mlflow_auth:/mlflow_auth:rw # Dedicated volume for auth database
       - ./basic_auth.ini:/basic_auth.ini
+      - ./data/artifact_download_tmp:/tmp:rw
 
   mlflow_db:
     image: postgres:14.5-alpine  # Lightweight PostgreSQL version
@@ -150,7 +149,7 @@ services:
       MODE: "development"
       USER: ${USER}
       # Live mode
-      WEBSOCKET_URL:: ${WEBSOCKET_URL:-ws://localhost:8765/lse}
+      WEBSOCKET_URL: ${WEBSOCKET_URL:-ws://localhost:8765/lse}
       # MLflow
       MLFLOW_TRACKING_URI: '${MLFLOW_TRACKING_URI}'
       MLFLOW_TRACKING_USERNAME: '${MLFLOW_TRACKING_USERNAME}'
@@ -171,10 +170,13 @@ services:
       mle_net:
 
   kvrocks:  
-    image: docker.io/apache/kvrocks:latest  
+    image: docker.io/apache/kvrocks:latest 
+    container_name: kvrocks  # Added container name 
     volumes:  
       - ./conf/kvrocks/kvrocks.conf:/etc/kvrocks/kvrocks.conf  
       - ./persist/kvrocks/data:/data  
+    ports:
+      - "127.0.0.1:6666:6666"  # Added port mapping
     networks:  
       mle_net: 
 
@@ -195,23 +197,46 @@ services:
       - arroyo
     volumes:
       - .:/app:Z
+      - ./data/artifact_download_tmp:/tmp:rw
     ports:
       - 127.0.0.1:8765:8765
+    environment:
+      - NUMBA_DISABLE_JIT=1       # Add 3 NUMBA vars to avoid umap illegal instruction errors
+      - NUMBA_CPU_NAME=generic
+      - NUMBA_CPU_FEATURES=+neon
+    depends_on:
+      - latent-space-explorer
     networks:
       mle_net:
-  
-  arroyo_sim:
+
+  #Simulator 1: f_vec simulator service
+  arroyo_vec_sim:
     command: python -m simulator.websocket_simulator
     build:
       context: .
       dockerfile: Dockerfile_arroyo
-    container_name: arroyo_sim
+    container_name: arroyo_vec_sim
     profiles:
-      - sim
+      - vec_sim
     volumes:
       - .:/app:Z
     ports:
       - 127.0.0.1:8765:8765
+    networks:
+      mle_net:
+
+  # Simulator 2: real image simulator service
+  arroyo_sim:
+    image: ghcr.io/als-computing/arroyosas:main
+    container_name: arroyo_sim
+    command: python -m arroyosas.app.real_image_sim_cli
+    profiles:
+      - sim
+    volumes:
+      - ./data/test_sim_data:/data/test_data:ro # Mount test data repository containing TIFF images
+    environment:
+      - TILED_LIVE_API_KEY=${TILED_SINGLE_USER_API_KEY}
+      - DYNACONF_TILED_POLLER__PUBLISH_ADDRESS=tcp://0.0.0.0:5000 # Make sure ZMQ publisher address is correctly set
     networks:
       mle_net:
 

@@ -26,7 +26,8 @@ class LatentSpaceOperator(Operator):
             await self.publish(message)
         elif isinstance(message, RawFrameEvent):
             result = await self.dispatch(message)
-            await self.publish(result)
+            if result is not None:  # Only publish if we got a valid result
+                await self.publish(result)
         elif isinstance(message, Stop):
             logger.info("Received Stop Message")
             await self.publish(message)
@@ -36,7 +37,13 @@ class LatentSpaceOperator(Operator):
 
     async def dispatch(self, message: RawFrameEvent) -> LatentSpaceEvent:
         try:
-
+            # Check if models are being loaded
+            if hasattr(self.reducer, 'is_loading_model') and self.reducer.is_loading_model:
+                loading_type = self.reducer.loading_model_type or "unknown"
+                logger.info(f"Waiting for {loading_type} model to finish loading before processing frame {message.frame_number}...")
+                # Return None to indicate we should skip this frame
+                return None
+                
             feature_vector = await asyncio.to_thread(self.reducer.reduce, message)
             response = LatentSpaceEvent(
                 tiled_url=message.tiled_url,
@@ -46,6 +53,7 @@ class LatentSpaceOperator(Operator):
             return response
         except Exception as e:
             logger.error(f"Error sending message to broker {e}")
+            return None
 
     async def dispatch_workers(self, message: RawFrameEvent) -> LatentSpaceEvent:
         """Dispatch the message to the worker and return the response. This is applicable

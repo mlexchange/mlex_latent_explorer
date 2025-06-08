@@ -2,9 +2,9 @@
 """
 MLflow Model Saving Utility
 
-This script saves ViT and UMAP models to MLflow:
-- ViT model: Using PyFunc wrapper with get_latent_features functionality
-- UMAP model: Using PyFunc wrapper (as in the original script)
+This script saves autoencoder and dimensionality reduction models to MLflow:
+- Autoencoder model: Using PyFunc wrapper with get_latent_features functionality
+- Dimensionality reduction model: Using PyFunc wrapper (as in the original script)
 """
 
 import os
@@ -38,22 +38,29 @@ if not hasattr(torch, "get_default_device"):
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 MLFLOW_TRACKING_USERNAME = os.getenv("MLFLOW_TRACKING_USERNAME", "")
 MLFLOW_TRACKING_PASSWORD = os.getenv("MLFLOW_TRACKING_PASSWORD", "")
-EXPERIMENT_NAME = os.getenv("MLFLOW_EXPERIMENT_NAME", "vit_autoencoder_new")
-vit_model_name = os.getenv("MLFLOW_VIT_MODEL_NAME", "")
-umap_model_name = os.getenv("MLFLOW_UMAP_MODEL_NAME", "")
+# Names for logging experiment and model
+MLFLOW_EXPERIMENT_NAME = os.getenv("MLFLOW_EXPERIMENT_NAME", "smi_exp")
+MLFLOW_AUTO_MODEL_NAME = os.getenv("MLFLOW_AUTO_MODEL_NAME", "smi_auto")
+MLFLOW_DR_MODEL_NAME = os.getenv("MLFLOW_DR_MODEL_NAME", "smi_dr")
 
 # Set MLflow authentication
 os.environ["MLFLOW_TRACKING_USERNAME"] = MLFLOW_TRACKING_USERNAME
 os.environ["MLFLOW_TRACKING_PASSWORD"] = MLFLOW_TRACKING_PASSWORD
 
-# # Configure temporary directory to use mounted volume
-# os.environ["TMPDIR"] = "/mlflow_tmp"
-# os.environ["MLFLOW_HTTP_REQUEST_TIMEOUT"] = "600"  # 10 minutes timeout
-
 # Load source files
 AUTOENCODER_WEIGHTS_PATH= os.getenv("AUTOENCODER_WEIGHTS_PATH")
 AUTOENCODER_CODE_PATH= os.getenv("AUTOENCODER_CODE_PATH")
-UMAP_WEIGHTS_PATH= os.getenv("UMAP_WEIGHTS_PATH")
+DR_WEIGHTS_PATH= os.getenv("DR_WEIGHTS_PATH")
+LATENT_DIM= os.getenv("LATENT_DIM")
+print("----------------------------------------------")
+print("MLFLOW_EXPERIMENT_NAME:",MLFLOW_EXPERIMENT_NAME)
+print("MLFLOW_AUTO_MODEL_NAME:",MLFLOW_AUTO_MODEL_NAME)
+print("MLFLOW_DR_MODEL_NAME:",MLFLOW_DR_MODEL_NAME)
+print("AUTOENCODER_WEIGHTS_PATH:",AUTOENCODER_WEIGHTS_PATH)
+print("AUTOENCODER_CODE_PATH:",AUTOENCODER_CODE_PATH)
+print("DR_WEIGHTS_PATH:",DR_WEIGHTS_PATH)
+print("LATENT_DIM:",LATENT_DIM)
+print("----------------------------------------------")
 
 MODEL_CONFIG = {
     "name": "SMI_Autoencoder",
@@ -61,12 +68,12 @@ MODEL_CONFIG = {
     "python_class": "Autoencoder",
     "python_file": AUTOENCODER_CODE_PATH,
     "type": "torch",
-    "latent_dim": 512
+    "latent_dim": LATENT_DIM
 }
 
 JOBLIB_CONFIG = {
-    "name": "SMI_UMAP",
-    "file": UMAP_WEIGHTS_PATH,
+    "name": "SMI_DimRed",
+    "file": DR_WEIGHTS_PATH,
     "type": "joblib"
 }
 
@@ -78,7 +85,7 @@ def get_file_size_mb(filepath):
     return os.path.getsize(filepath) / (1024 * 1024)
 
 
-def load_vit_model_from_npz(npz_path, latent_dim=512):
+def load_vit_model_from_npz(npz_path, latent_dim=64):
     """Load the ViT model from an NPZ file"""
     if not os.path.exists(npz_path):
         raise FileNotFoundError(f"NPZ weights file not found: {npz_path}")
@@ -156,9 +163,10 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
     Wrapper for ViT Autoencoder with direct model access and latent features functionality
     """
     
-    def __init__(self, latent_dim=512):
+    def __init__(self, latent_dim=64):
         self.model = None
-        self.latent_dim = latent_dim
+        # Explicitly convert to integer to avoid type issues
+        self.latent_dim = int(latent_dim) if latent_dim is not None else 64
         
     def load_context(self, context):
         """Load ViT model from context artifacts"""
@@ -167,6 +175,14 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
         import sys
         import importlib.util
         import numpy as np
+        from torchvision import transforms
+        from PIL import Image
+
+        # Add compatibility patch for torch if needed
+        if not hasattr(torch, "get_default_device"):
+            def get_default_device():
+                return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            torch.get_default_device = get_default_device
         
         # Get the model code path
         model_code_path = context.artifacts.get("model_code")
@@ -186,20 +202,10 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
         
         # Get latent dimension
         latent_dim = self.latent_dim
+        print(f"Latent Dimension is: {latent_dim}")
         
-        # Try to get from run parameters if available (for deployed models)
-        try:
-            if context.model_config and 'run_id' in context.model_config:
-                client = mlflow.tracking.MlflowClient()
-                run_id = context.model_config['run_id']
-                run = client.get_run(run_id)
-                latent_dim = int(run.data.params.get("latent_dim", latent_dim))
-        except (AttributeError, TypeError, KeyError):
-            # If any error occurs, use the default latent_dim
-            pass
-        
-        # Create model instance
-        self.model = module.Autoencoder(latent_dim=latent_dim)
+        # Create model instance with explicit integer for latent_dim
+        self.model = module.Autoencoder(latent_dim=int(latent_dim))
         
         # Load weights from NPZ file
         weights_path = context.artifacts.get("weights_path")
@@ -237,8 +243,26 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
             if result.unexpected_keys:
                 print(f"Unexpected keys: {result.unexpected_keys[:5]}...")
         
-        # Set model to eval mode
+        # Check for CUDA availability and set device
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda")
+            print(f"Using CUDA: {torch.cuda.get_device_name(0)}")
+        else:
+            self.device = torch.device("cpu")
+            print("Using CPU")
+        
+        # Set model to eval mode and move to device
         self.model.eval()
+        self.model = self.model.to(self.device)
+        
+        # Define the image transformation pipeline
+        self.transform = transforms.Compose([
+            transforms.Resize((512, 512)),  # Resize to smaller dimensions to save memory
+            transforms.Grayscale(num_output_channels=1),
+            transforms.ToTensor(),  # Convert image to PyTorch tensor (0-1 range)
+            transforms.Normalize((0.0,), (1.0,)),  # Normalize tensor to have mean 0 and std 1
+        ])
+        
         print(f"✓ ViT model loaded successfully with latent_dim={latent_dim}")
     
     def predict(self, context, model_input):
@@ -247,92 +271,92 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
         
         This method processes the input through the autoencoder model and returns both
         the reconstruction and the latent features from the encoder.
+        
+        Args:
+            context: MLflow context
+            model_input: Input data as 2D/3D numpy array (H,W) or (H,W,C)
+            
+        Returns:
+            Dictionary with reconstruction and latent features
         """
         import numpy as np
         import torch
+        from PIL import Image
         
         if self.model is None:
             raise RuntimeError("ViT model not loaded. Call load_context first.")
         
-        # Set model to evaluation mode for inference
-        if hasattr(self.model, 'eval'):
-            self.model.eval()
+        # Validate input
+        if not isinstance(model_input, np.ndarray):
+            raise ValueError(f"Input must be a numpy array, got {type(model_input)}")
+            
+        # Check input dimensions
+        if not (len(model_input.shape) == 2 or len(model_input.shape) == 3):
+            raise ValueError(f"Input must be a 2D or 3D array (H,W) or (H,W,C), got shape {model_input.shape}")
         
-        # Check input type and convert accordingly
-        if isinstance(model_input, np.ndarray):
-            # Ensure input is 4D array (batch, channels, height, width)
-            if len(model_input.shape) == 2:  # Single image (height, width)
-                model_input = model_input.reshape(1, 1, model_input.shape[0], model_input.shape[1])
-            elif len(model_input.shape) == 3:  # Batch of images or single image with channels
-                if model_input.shape[0] == 1:  # Single image with channel dimension
-                    model_input = model_input.reshape(1, model_input.shape[0], model_input.shape[1], model_input.shape[2])
-                else:  # Batch of images without channel dimension
-                    model_input = model_input.reshape(model_input.shape[0], 1, model_input.shape[1], model_input.shape[2])
-        elif isinstance(model_input, dict):
-            # Dictionary input with image data
-            if "image" in model_input:
-                model_input = model_input["image"]
-                # Apply the same reshaping logic as above
-                if len(model_input.shape) == 2:
-                    model_input = model_input.reshape(1, 1, model_input.shape[0], model_input.shape[1])
-                elif len(model_input.shape) == 3:
-                    if model_input.shape[0] == 1:
-                        model_input = model_input.reshape(1, model_input.shape[0], model_input.shape[1], model_input.shape[2])
-                    else:
-                        model_input = model_input.reshape(model_input.shape[0], 1, model_input.shape[1], model_input.shape[2])
+        
+        # Check and handle input dtype
+        if model_input.dtype == np.uint8:
+            # uint8 is already the preferred format, no conversion needed
+            img_array = model_input
+        elif model_input.dtype == np.float32:
+            # Convert float32 to uint8 with appropriate scaling
+            if model_input.max() <= 1.0:
+                # Scale from 0-1 to 0-255
+                img_array = (model_input * 255).astype(np.uint8)
             else:
-                raise ValueError("Input dictionary must contain 'image' key")
+                # Clip to 0-255 range and convert
+                img_array = np.clip(model_input, 0, 255).astype(np.uint8)
         else:
-            raise ValueError(f"Unsupported input type: {type(model_input)}")
+            # Raise exception for unsupported dtypes
+            raise ValueError(f"Input must be uint8 or float32, got {model_input.dtype}")
         
-        # Check for CUDA availability
-        if torch.cuda.is_available():
-            device = torch.device("cuda")
-            print(f"Using CUDA: {torch.cuda.get_device_name(0)}")
-        else:
-            device = torch.device("cpu")
-            print("Using CPU")
+        try:
+            # Convert numpy array to PIL Image
+            # PIL.Image.fromarray handles both 2D and 3D arrays automatically
+            pil_image = Image.fromarray(img_array)
+
+            # Apply transformations (resize, convert to tensor, normalize)
+            tensor = self.transform(pil_image)
             
-        # Move model to the appropriate device
-        self.model = self.model.to(device)
-
-
-
-        # Convert to PyTorch tensor
+            # Add batch dimension and move to device
+            tensor = tensor.unsqueeze(0).to(self.device)
+            
+        except Exception as e:
+            raise ValueError(f"Failed to process input image: {e}")
+        
+        # Process with model
         with torch.no_grad():
-            input_tensor = torch.from_numpy(model_input).float()
-            
             # Get reconstruction
-            reconstruction = self.model(input_tensor)
+            reconstruction = self.model(tensor)
             reconstruction_np = reconstruction.cpu().numpy()
             
             # Get latent features directly from the encoder
-            latent, _ = self.model.encoder(input_tensor)
+            latent, _ = self.model.encoder(tensor)
             latent_features = latent.cpu().numpy()
-            
+        
         # Return results
         return {
             "reconstruction": reconstruction_np,
             "latent_features": latent_features
         }
 
-
 def save_vit_model_with_wrapper(model_name=None):
-    """Save ViT model using PyFunc wrapper with latent features functionality"""
+    """Save autoencoder model using PyFunc wrapper with latent features functionality"""
     
     # Set MLflow tracking
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    mlflow.set_experiment(EXPERIMENT_NAME)
+    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
     
     # Set model name
     if model_name is None:
         model_name = f"{MODEL_CONFIG['name']}_v{datetime.now().strftime('%Y%m%d')}"
     
-    print(f"\nSaving ViT model with PyFunc wrapper as: {model_name}")
+    print(f"\nSaving autoencoder model with PyFunc wrapper as: {model_name}")
     
     start_time = time.time()
     
-    with mlflow.start_run(run_name=f"vit_model_wrapper_{datetime.now().strftime('%Y%m%d_%H%M%S')}") as run:
+    with mlflow.start_run(run_name=f"auto_model_wrapper_{datetime.now().strftime('%Y%m%d_%H%M%S')}") as run:
         print(f"Run ID: {run.info.run_id}")
         print(f"MLflow tracking URI: {MLFLOW_TRACKING_URI}")
         
@@ -350,7 +374,7 @@ def save_vit_model_with_wrapper(model_name=None):
         
         try:
             # Get latent dimension
-            latent_dim = MODEL_CONFIG.get("latent_dim", 512)
+            latent_dim = MODEL_CONFIG.get("latent_dim", 64)
             
             # Create model wrapper with latent dimension
             vit_wrapper = VitAutoencoderWrapper(latent_dim=latent_dim)
@@ -377,10 +401,10 @@ def save_vit_model_with_wrapper(model_name=None):
             }
             
             # Define explicit requirements
-            pip_requirements = ["torch==2.2.2", "numpy", "mlflow==2.22.0"]
+            pip_requirements = ["torch==2.2.2", "numpy", "mlflow==2.14.3", "Pillow", "torchvision"]
             
-            # Log the ViT model with PyFunc wrapper
-            print("\nLogging ViT model with PyFunc wrapper to MLflow...")
+            # Log the autoencoder model with PyFunc wrapper
+            print("\nLogging autoencoder model with PyFunc wrapper to MLflow...")
             mlflow.pyfunc.log_model(
                 artifact_path="model",
                 python_model=vit_wrapper,
@@ -393,7 +417,7 @@ def save_vit_model_with_wrapper(model_name=None):
             total_time = time.time() - start_time
             mlflow.log_metric("upload_time_seconds", total_time)
             
-            print(f"\n✅ ViT model saved with PyFunc wrapper in {total_time:.1f}s!")
+            print(f"\n✅ Autoencoder model saved with PyFunc wrapper in {total_time:.1f}s!")
             print(f"Model name: {model_name}")
             print(f"Run ID: {run.info.run_id}")
             print(f"MLflow UI: {MLFLOW_TRACKING_URI}")
@@ -401,7 +425,7 @@ def save_vit_model_with_wrapper(model_name=None):
             return model_name, run.info.run_id
             
         except Exception as e:
-            print(f"\n❌ Error saving ViT model with wrapper: {e}")
+            print(f"\n❌ Error saving autoencoder model with wrapper: {e}")
             import traceback
             traceback.print_exc()
             return None, None
@@ -428,27 +452,28 @@ class UMAPModelWrapper(mlflow.pyfunc.PythonModel):
         print("✓ UMAP model loaded successfully")
     
     def predict(self, context, model_input):
-        """Standard predict method (required by MLflow)"""
+        """
+        Standard predict method for UMAP model
+        
+        Args:
+            context: MLflow context
+            model_input: Input data as numpy array
+            
+        Returns:
+            Dictionary with UMAP coordinates
+        """
         import numpy as np
         
         if self.model is None:
             raise RuntimeError("UMAP model not loaded. Call load_context first.")
         
-        # Check input type and convert accordingly
-        if isinstance(model_input, np.ndarray):
-            # Ensure input is 2D array (batch, features)
-            if len(model_input.shape) == 1:
-                model_input = model_input.reshape(1, -1)
-        elif isinstance(model_input, dict):
-            # Dictionary input with latent vector
-            if "latent" in model_input:
-                model_input = model_input["latent"]
-                if len(model_input.shape) == 1:
-                    model_input = model_input.reshape(1, -1)
-            else:
-                raise ValueError("Input dictionary must contain 'latent' key")
-        else:
-            raise ValueError(f"Unsupported input type: {type(model_input)}")
+        # Validate input
+        if not isinstance(model_input, np.ndarray):
+            raise ValueError(f"Input must be a numpy array, got {type(model_input)}")
+            
+        # Check input dimensions
+        if len(model_input.shape) != 2 or model_input.shape[0] != 1:
+            raise ValueError(f"Input must be a 2D array with shape (1, latent_dim), got shape {model_input.shape}")
         
         # Apply UMAP transformation
         umap_coords = self.model.transform(model_input)
@@ -460,27 +485,27 @@ class UMAPModelWrapper(mlflow.pyfunc.PythonModel):
 
 
 def save_umap_model(model_name=None):
-    """Save UMAP model with a direct access wrapper and a registered name"""
+    """Save dimensionality reduction model with a direct access wrapper and a registered name"""
     
     # Set MLflow tracking
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    mlflow.set_experiment(EXPERIMENT_NAME)
+    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
     
     # Set model name
     if model_name is None:
         model_name = f"{JOBLIB_CONFIG['name']}_v{datetime.now().strftime('%Y%m%d')}"
     
-    print(f"\nSaving UMAP model as: {model_name}")
+    print(f"\nSaving dimensionality reduction model as: {model_name}")
     
     start_time = time.time()
     
-    with mlflow.start_run(run_name=f"umap_model_{datetime.now().strftime('%Y%m%d_%H%M%S')}") as run:
+    with mlflow.start_run(run_name=f"dr_model_{datetime.now().strftime('%Y%m%d_%H%M%S')}") as run:
         print(f"Run ID: {run.info.run_id}")
         print(f"MLflow tracking URI: {MLFLOW_TRACKING_URI}")
         
         # Check file existence
         if not os.path.exists(JOBLIB_CONFIG["file"]):
-            print(f"⚠️ UMAP model file not found at {JOBLIB_CONFIG['file']}")
+            print(f"⚠️ Dimensionality reduction model file not found at {JOBLIB_CONFIG['file']}")
             return None, None
             
         # Check file size
@@ -510,11 +535,11 @@ def save_umap_model(model_name=None):
             }
             
             # Define explicit requirements
-            pip_requirements = ["numpy", "scikit-learn", "joblib", "mlflow==2.22.0", "umap-learn"]
+            pip_requirements = ["numpy", "scikit-learn", "joblib", "mlflow==2.14.3", "umap-learn"]
             
-            # Log the UMAP model wrapper
+            # Log the dimensionality reduction model wrapper
             try:
-                print("\nLogging UMAP ModelWrapper to MLflow...")
+                print("\nLogging dimensionality reduction model wrapper to MLflow...")
                 mlflow.pyfunc.log_model(
                     artifact_path="model",
                     python_model=umap_wrapper,
@@ -522,9 +547,9 @@ def save_umap_model(model_name=None):
                     registered_model_name=model_name,
                     pip_requirements=pip_requirements
                 )
-                print(f"✓ UMAP ModelWrapper registered as '{model_name}'")
+                print(f"✓ Dimensionality reduction model wrapper registered as '{model_name}'")
             except Exception as e:
-                print(f"⚠️ Error logging UMAP ModelWrapper: {e}")
+                print(f"⚠️ Error logging dimensionality reduction model wrapper: {e}")
                 import traceback
                 traceback.print_exc()
                 return None, None
@@ -533,7 +558,7 @@ def save_umap_model(model_name=None):
             total_time = time.time() - start_time
             mlflow.log_metric("upload_time_seconds", total_time)
             
-            print(f"\n✅ UMAP model saved successfully in {total_time:.1f}s!")
+            print(f"\n✅ Dimensionality reduction model saved successfully in {total_time:.1f}s!")
             print(f"Model name: {model_name}")
             print(f"Run ID: {run.info.run_id}")
             print(f"MLflow UI: {MLFLOW_TRACKING_URI}")
@@ -541,7 +566,7 @@ def save_umap_model(model_name=None):
             return model_name, run.info.run_id
             
         except Exception as e:
-            print(f"\n❌ Error saving UMAP model: {e}")
+            print(f"\n❌ Error saving dimensionality reduction model: {e}")
             import traceback
             traceback.print_exc()
             return None, None
@@ -559,23 +584,23 @@ if __name__ == "__main__":
             sys.exit(1)
         
         print(f"\nSaving both models with names:")
-        print(f"  ViT model: {vit_model_name}")
-        print(f"  UMAP model: {umap_model_name}")
+        print(f"  Autoencoder model: {MLFLOW_AUTO_MODEL_NAME}")
+        print(f"  Dimensionality reduction model: {MLFLOW_DR_MODEL_NAME}")
         
-        # Save ViT model with PyFunc wrapper (replacing direct log)
-        vit_name, vit_run_id = save_vit_model_with_wrapper(vit_model_name)
+        # Save autoencoder model with PyFunc wrapper (replacing direct log)
+        auto_name, auto_run_id = save_vit_model_with_wrapper(MLFLOW_AUTO_MODEL_NAME)
         
-        # Save UMAP model with wrapper (keep as original)
-        umap_name, umap_run_id = save_umap_model(umap_model_name)
+        # Save dimensionality reduction model with wrapper (keep as original)
+        dr_name, dr_run_id = save_umap_model(MLFLOW_DR_MODEL_NAME)
         
-        if vit_name and umap_name:
+        if auto_name and dr_name:
             print(f"\n✅ Both models saved successfully!")
-        elif vit_name:
-            print(f"\n✅ ViT model saved successfully!")
-            print(f"⚠️ UMAP model failed to save.")
-        elif umap_name:
-            print(f"\n✅ UMAP model saved successfully!")
-            print(f"⚠️ ViT model failed to save.")
+        elif auto_name:
+            print(f"\n✅ Autoencoder model saved successfully!")
+            print(f"⚠️ Dimensionality reduction model failed to save.")
+        elif dr_name:
+            print(f"\n✅ Dimensionality reduction model saved successfully!")
+            print(f"⚠️ Autoencoder model failed to save.")
         else:
             print(f"\n⚠️ Failed to save both models.")
         

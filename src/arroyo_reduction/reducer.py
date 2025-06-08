@@ -14,12 +14,17 @@ from arroyosas.schemas import RawFrameEvent
 from src.utils.mlflow_utils import MLflowClient
 from .redis_model_store import RedisModelStore
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("arroyo_reduction.reducer")
+# logger.propagate = False  # Add this line to prevent propagation to parent loggers
 
 # Environment variables
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
 
+# Set Numba environment variables to avoid umap illegal instruction error
+os.environ.setdefault("NUMBA_DISABLE_JIT", "1")
+os.environ.setdefault("NUMBA_CPU_NAME", "generic")
+os.environ.setdefault("NUMBA_CPU_FEATURES", "+neon")
 # message = {
 #     "tiled_uri": DATA_TILED_URI,
 #     "index": index,
@@ -48,6 +53,10 @@ class LatentSpaceReducer(Reducer):
 
     def __init__(self):
         """Initialize the reducer with models from Redis"""
+        # Initialize model loading status flags
+        self.is_loading_model = False
+        self.loading_model_type = None
+        
         # Initialize Redis model store
         self.model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
         
@@ -57,9 +66,6 @@ class LatentSpaceReducer(Reducer):
         
         logger.info(f"Using autoencoder model: {self.autoencoder_model_name}")
         logger.info(f"Using dimension reduction model: {self.dimred_model_name}")
-        
-        # # Initialize MLflow client
-        # self.mlflow_client = MLflowClient()
         
         # Check for CUDA else use CPU
         if torch.cuda.is_available():
@@ -73,54 +79,66 @@ class LatentSpaceReducer(Reducer):
         # Load models from MLflow
         mlflow_client = MLflowClient()
         self.mlflow_client = mlflow_client  # Store for later use
-        self.current_torch_model = mlflow_client.load_model(self.autoencoder_model_name)
-        self.current_dim_reduction_model = mlflow_client.load_model(self.dimred_model_name)
-        self.current_transform = self.get_transform()
+        
+        # Set loading flags before loading models
+        self.is_loading_model = True
+        self.loading_model_type = "initial"
+        
+        try:
+            self.current_torch_model = mlflow_client.load_model(self.autoencoder_model_name)
+            self.current_dim_reduction_model = mlflow_client.load_model(self.dimred_model_name)
+            logger.info("Initial models loaded successfully")
+        finally:
+            # Reset loading flags
+            self.is_loading_model = False
+            self.loading_model_type = None
         
         # Subscribe to model update channel if supported
         self._subscribe_to_model_updates()
 
     def reduce(self, message: RawFrameEvent) -> np.ndarray:
         """Process an image through the models to get feature vectors"""
-        # 1. Encode the image into a latent space
-        pil = Image.fromarray(message.image.array.astype(np.float32))
-        tensor = self.current_transform(pil)
-        logger.debug("Encoding image into latent space")
         
-        # Convert to numpy for PyFunc models
-        tensor_np = tensor.numpy()
-        
-        if self.current_torch_model is None:
-            logger.error("No autoencoder model loaded")
-            return np.zeros((1, 2))  # Return empty vector if model not loaded
-        
-        # Process with autoencoder to get latent features using wrapper
-        autoencoder_result = self.current_torch_model.predict({"image": tensor_np})
-        latent_features = autoencoder_result["latent_features"]
-        
-        if self.current_dim_reduction_model is None:
-            logger.error("No dimension reduction model loaded")
-            return latent_features  # Return latent features if no reduction model
-        
-        # Apply dimension reduction using wrapper
-        umap_result = self.current_dim_reduction_model.predict({"latent": latent_features})
-        f_vec = umap_result["umap_coords"]
-        
-        logger.debug(f"Reduced latent space to {f_vec.shape}")
-        return f_vec
+        # Check if models are currently being loaded
+        if self.is_loading_model:
+            logger.info(f"Waiting for {self.loading_model_type} model to finish loading...")
+            # Return a placeholder while models are loading
+            return np.zeros((1, 2))  # Return empty vector during loading
+            
+        try:
+            # Get numpy array from message
+            img_array = message.image.array.copy()  # Create a fresh copy
+            # Ensure array is properly formatted for model input
+            img_array = np.ascontiguousarray(img_array)
 
-    def get_transform(self):
-        return transforms.Compose(
-            [
-                transforms.Resize(
-                    (256, 256)
-                ),  # Resize to smaller dimensions to save memory
-                transforms.ToTensor(),  # Convert image to PyTorch tensor (0-1 range)
-                transforms.Normalize(
-                    (0.0,), (1.0,)
-                ),  # Normalize tensor to have mean 0 and std 1
-            ]
-        )
+            # Additional debugging for the image data
+            logger.info(f"Get input image shape: {img_array.shape}, dtype: {img_array.dtype}. Image min: {img_array.min()}, max: {img_array.max()}")
+            
+        except Exception as e:
+            logger.error(f"Error in image preparation: {e}")
+            return np.zeros((1, 2))  # Return empty vector on error
+        
+        # Process with autoencoder to get latent features
+        try:
+            # Pass numpy array directly to model, the predict() API will handle data preprocessing 
+            autoencoder_result = self.current_torch_model.predict(img_array)  
+            latent_features = autoencoder_result["latent_features"]
+            logger.info(f"Latent features shape: {latent_features.shape}")
+            
+        except Exception as e:
+            logger.error(f"Error in autoencoder processing: {e}")
+            return np.zeros((1, 2))  # Return empty vector on error
+        
+        # Apply dimension reduction directly with latent features
+        try:            
+            umap_result = self.current_dim_reduction_model.predict(latent_features)  
+            f_vec = umap_result["umap_coords"]
+            logger.info(f"Feature vector shape: {f_vec.shape}")
+            return f_vec
+        except Exception as e:
+            logger.error(f"Error in dimension reduction: {e}")
+            return np.zeros((1, 2))  # Return empty vector on error
+            
     
     def _subscribe_to_model_updates(self):
         """
@@ -173,17 +191,40 @@ class LatentSpaceReducer(Reducer):
                 logger.warning(f"Invalid model update: {update}")
                 return
             
+            # Check if this is a duplicate update for the same model
+            if (model_type == "autoencoder" and model_name == self.autoencoder_model_name) or \
+            (model_type == "dimred" and model_name == self.dimred_model_name):
+                logger.info(f"Ignoring duplicate model update: {model_type} = {model_name} (already loaded)")
+                return
+                
             logger.info(f"Received model update: {model_type} = {model_name}")
             
-            # Update the appropriate model
-            if model_type == "autoencoder":
-                self.autoencoder_model_name = model_name
-                self.current_torch_model = self.mlflow_client.load_model(model_name)
-            elif model_type == "dimred":
-                self.dimred_model_name = model_name
-                self.current_dim_reduction_model = self.mlflow_client.load_model(model_name)
-            else:
-                logger.warning(f"Unknown model type: {model_type}")
+            # Set loading flags before updating models
+            self.is_loading_model = True
+            self.loading_model_type = model_type
+            
+            try:
+                # Update the appropriate model
+                if model_type == "autoencoder":
+                    logger.info(f"Loading new autoencoder model: {model_name}...")
+                    self.autoencoder_model_name = model_name
+                    self.current_torch_model = self.mlflow_client.load_model(model_name)
+                    logger.info(f"Successfully loaded new autoencoder model: {model_name}")
+                elif model_type == "dimred":
+                    logger.info(f"Loading new dimension reduction model: {model_name}...")
+                    self.dimred_model_name = model_name
+                    self.current_dim_reduction_model = self.mlflow_client.load_model(model_name)
+                    logger.info(f"Successfully loaded new dimension reduction model: {model_name}")
+                else:
+                    logger.warning(f"Unknown model type: {model_type}")
+            finally:
+                # Reset loading flags
+                self.is_loading_model = False
+                self.loading_model_type = None
+                logger.info(f"Model update complete. Ready to process images.")
         except Exception as e:
+            # Ensure we reset flags even if there's an error
+            self.is_loading_model = False
+            self.loading_model_type = None
             logger.error(f"Error handling model update: {e}")
 

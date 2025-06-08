@@ -77,16 +77,19 @@ def refresh_mlflow_models(n_clicks):
     return [], None
 
 
-# Add this callback for dropdown model selection in dialog
 @callback(
     Output("run-counter", "data", allow_duplicate=True),
-    Input("live-autoencoder-dropdown", "value"),
-    Input("live-dimred-dropdown", "value"),
+    Input("live-model-continue", "n_clicks"),
+    State("live-autoencoder-dropdown", "value"),
+    State("live-dimred-dropdown", "value"),
     State("run-counter", "data"),
     prevent_initial_call=True
 )
-def store_dialog_models_in_redis(autoencoder_model, dim_reduction_model, counter):
-    """Store both model selections from dialog dropdowns in Redis"""
+def store_dialog_models_in_redis_on_continue(n_clicks, autoencoder_model, dim_reduction_model, counter):
+    """Store both model selections from dialog dropdowns in Redis when Continue is clicked"""
+    if not n_clicks:
+        raise PreventUpdate
+        
     if redis_client is None:
         return counter
     
@@ -121,16 +124,19 @@ def store_dialog_models_in_redis(autoencoder_model, dim_reduction_model, counter
         logger.error(f"Error storing dialog dropdown models in Redis: {e}")
         return counter
 
-# Add this callback for sidebar model selection
 @callback(
     Output("run-counter", "data", allow_duplicate=True),
-    Input("live-mode-autoencoder-dropdown", "value"),
-    Input("live-mode-dimred-dropdown", "value"),
+    Input("update-live-models-button", "n_clicks"),
+    State("live-mode-autoencoder-dropdown", "value"),
+    State("live-mode-dimred-dropdown", "value"),
     State("run-counter", "data"),
     prevent_initial_call=True
 )
-def store_sidebar_models_in_redis(autoencoder_model, dim_reduction_model, counter):
-    """Store both model selections from sidebar in Redis"""
+def store_sidebar_models_in_redis_on_update(n_clicks, autoencoder_model, dim_reduction_model, counter):
+    """Store both model selections from sidebar in Redis when Update button is clicked"""
+    if not n_clicks:
+        raise PreventUpdate
+        
     if redis_client is None:
         return counter
     

@@ -422,8 +422,8 @@ def live_update_data_project_dict(message, selected_models, n_clicks, data_proje
         try:
             message_data = json.loads(message["data"])
             
-            # Get tiled_url field (handle either tiled_url or tiled_uri)
-            tiled_uri = message_data.get("tiled_uri", "")
+            # use tiled_url to be compatible with LatentSpaceEvent
+            tiled_uri = message_data.get("tiled_url", "")
             if not tiled_uri:
                 return data_project_dict, live_indices
                 
