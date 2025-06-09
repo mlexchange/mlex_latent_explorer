@@ -123,6 +123,8 @@ meta = [
             dcc.Store(id="latent_vectors", data=None),
             dcc.Store(id="clusters", data=None),
             dcc.Store(id="live-mode-canceled", data=False),
+            # Add model transition tracker
+            dcc.Store(id="in-model-transition", data=False),
         ],
     )
 ]
@@ -131,6 +133,41 @@ meta = [
 # DEFINE LAYOUT
 app.layout = html.Div(
     [
+        # Add a separate overlay div for the loading indicator
+        html.Div(
+            [
+                html.Div(
+                    [
+                        dbc.Spinner(
+                            size="lg",
+                            color="white",
+                            spinner_style={"width": "4rem", "height": "4rem"},
+                        ),
+                        html.H2("Loading Models...", className="mt-3")
+                    ],
+                    style={
+                        "position": "absolute",
+                        "top": "50%",
+                        "left": "50%",
+                        "transform": "translate(-50%, -50%)",
+                        "textAlign": "center",
+                        "color": "white",
+                        "zIndex": 9999
+                    }
+                )
+            ],
+            id="model-loading-spinner",
+            style={
+                "position": "fixed",
+                "top": 0,
+                "left": 0,
+                "width": "100%",
+                "height": "100%",
+                "backgroundColor": "rgba(0, 0, 0, 0.7)",
+                "zIndex": 9998,
+                "display": "none"
+            }
+        ),
         header(
             "MLExchange | Latent Space Explorer",
             "https://github.com/mlexchange/mlex_latent_explorer",

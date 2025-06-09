@@ -61,10 +61,17 @@ class LatentSpaceOperator(Operator):
                 return None
                 
             feature_vector = await asyncio.to_thread(self.reducer.reduce, message)
+            
+            # Get the current model names from the reducer
+            current_autoencoder = self.reducer.autoencoder_model_name
+            current_dimred = self.reducer.dimred_model_name
+            
             response = LatentSpaceEvent(
                 tiled_url=message.tiled_url,
                 feature_vector=feature_vector[0].tolist(),
                 index=message.frame_number,
+                autoencoder_model=current_autoencoder,  # Add autoencoder model name
+                dimred_model=current_dimred,            # Add dimension reduction model name
             )
             return response
         except Exception as e:

@@ -69,6 +69,8 @@ def show_model_selection_dialog(n_clicks, last_selected_models):
     Output("stats-div", "children", allow_duplicate=True),
     Output("buffer", "data", allow_duplicate=True),
     Output("live-indices", "data", allow_duplicate=True),
+    Output("model-loading-spinner", "style", allow_duplicate=True),  # Add spinner output
+    Output("in-model-transition", "data", allow_duplicate=True),  # Add transition state output
     Input("live-model-continue", "n_clicks"),
     State("live-autoencoder-dropdown", "value"),
     State("live-dimred-dropdown", "value"),
@@ -81,6 +83,18 @@ def handle_model_continue(continue_clicks, selected_autoencoder, selected_dimred
     if continue_clicks:
         # Close dialog and save selected models
         selected_models = {"autoencoder": selected_autoencoder, "dimred": selected_dimred}
+        
+        # Show loading spinner and set transition state to True
+        spinner_style = {
+            "position": "fixed",
+            "top": 0,
+            "left": 0,
+            "width": "100%",
+            "height": "100%",
+            "backgroundColor": "rgba(0, 0, 0, 0.7)",
+            "zIndex": 9998,
+            "display": "block"  # Show the spinner
+        }
         
         # Transition to live mode UI
         return (
@@ -118,6 +132,8 @@ def handle_model_continue(continue_clicks, selected_autoencoder, selected_dimred
             "Number of images selected: 0",  # Reset stats text
             {},  # Clear buffer
             [],  # Clear indices
+            spinner_style,  # Show the loading spinner
+            True,  # Set transition state to True
         )
     raise PreventUpdate
 
@@ -298,8 +314,6 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
     raise PreventUpdate
 
 
-# Removed all the code related to live-mode-canceled flag since it's no longer needed
-
 @callback(
     Output("scatter", "figure", allow_duplicate=True),
     Output("heatmap", "figure", allow_duplicate=True),
@@ -371,6 +385,8 @@ def update_data_project_dict(n_clicks, selected_models):
     Output("heatmap", "figure", allow_duplicate=True),
     Output("stats-div", "children", allow_duplicate=True),
     Output("live-indices", "data", allow_duplicate=True),
+    Output("model-loading-spinner", "style", allow_duplicate=True),  # Add spinner output
+    Output("in-model-transition", "data", allow_duplicate=True),  # Add transition state output
     Input("update-live-models-button", "n_clicks"),
     State("live-mode-autoencoder-dropdown", "value"),
     State("live-mode-dimred-dropdown", "value"),
@@ -386,7 +402,7 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
         
     if autoencoder_model is None or dimred_model is None:
         # Show error notification
-        return no_update, no_update, "danger", "Invalid Selection", no_update, no_update, no_update, no_update
+        return no_update, no_update, "danger", "Invalid Selection", no_update, no_update, no_update, no_update, no_update, no_update
     
     # Update the selected models
     selected_models = {"autoencoder": autoencoder_model, "dimred": dimred_model}
@@ -406,7 +422,19 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
     # Reset live indices
     empty_indices = []
     
-    return selected_models, data_project_dict, "secondary", "Updated", empty_figure, empty_heatmap, stats_text, empty_indices
+    # Show loading spinner
+    spinner_style = {
+        "position": "fixed",
+        "top": 0,
+        "left": 0,
+        "width": "100%",
+        "height": "100%",
+        "backgroundColor": "rgba(0, 0, 0, 0.7)",
+        "zIndex": 9998,
+        "display": "block"  # Show the spinner
+    }
+    
+    return selected_models, data_project_dict, "secondary", "Updated", empty_figure, empty_heatmap, stats_text, empty_indices, spinner_style, True
 
 @callback(
     Output("update-live-models-button", "color", allow_duplicate=True),
@@ -445,15 +473,33 @@ def reset_update_button(autoencoder_model, dimred_model, selected_models):
     State("go-live", "n_clicks"),
     State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
     State("live-indices", "data"),
+    State("in-model-transition", "data"),
     prevent_initial_call=True,
 )
-def live_update_data_project_dict(message, selected_models, n_clicks, data_project_dict, live_indices):
+def live_update_data_project_dict(message, selected_models, n_clicks, data_project_dict, live_indices, in_transition):
     """
     Update data project dict with the data uri from the live experiment
     """
     if n_clicks is not None and n_clicks % 2 == 1 and selected_models is not None:
         try:
             message_data = json.loads(message["data"])
+            
+            # Check if model names match currently selected models
+            autoencoder_model = message_data.get("autoencoder_model")
+            dimred_model = message_data.get("dimred_model")
+            
+            if selected_models is not None:
+                current_autoencoder = selected_models.get("autoencoder")
+                current_dimred = selected_models.get("dimred")
+                
+                # Skip messages from different models
+                if (autoencoder_model and autoencoder_model != current_autoencoder) or \
+                   (dimred_model and dimred_model != current_dimred):
+                    logging.info(f"Skipping data project update from different models: got {autoencoder_model}/{dimred_model}, expected {current_autoencoder}/{current_dimred}")
+                    # Return a reset data_project_dict with empty datasets
+                    updated_dict = data_project_dict.copy()
+                    updated_dict["datasets"] = []
+                    return updated_dict, []
             
             # use tiled_url to be compatible with LatentSpaceEvent
             tiled_uri = message_data.get("tiled_url", "")
@@ -509,15 +555,18 @@ def live_update_data_project_dict(message, selected_models, n_clicks, data_proje
 @callback(
     Output("buffer", "data"),
     Output("scatter", "figure", allow_duplicate=True),
+    Output("model-loading-spinner", "style", allow_duplicate=True),  # Add spinner output
+    Output("in-model-transition", "data", allow_duplicate=True),  # Add transition state output
     Input("ws-live", "message"),
     State("scatter", "figure"),
     State("pause-button", "n_clicks"),
     State("buffer", "data"),
     State("selected-live-models", "data"),
     State("go-live", "n_clicks"),  # Add to check live mode
+    State("in-model-transition", "data"),  # Add transition state
     prevent_initial_call=True,
 )
-def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data, selected_models, go_live_n_clicks):
+def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data, selected_models, go_live_n_clicks, in_transition):
     # Only process if in live mode
     if go_live_n_clicks is None or go_live_n_clicks % 2 == 0 or selected_models is None:
         raise PreventUpdate
@@ -526,10 +575,45 @@ def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data
         data = json.loads(message["data"])
         logging.debug(f"Received data: {data}")
         
+        # Get model names from message
+        autoencoder_model = data.get("autoencoder_model")
+        dimred_model = data.get("dimred_model")
+        
+        # Check if model names match currently selected models
+        if selected_models is not None:
+            current_autoencoder = selected_models.get("autoencoder")
+            current_dimred = selected_models.get("dimred")
+            
+            # Skip messages from different models
+            if (autoencoder_model and autoencoder_model != current_autoencoder) or \
+               (dimred_model and dimred_model != current_dimred):
+                logging.info(f"Skipping message from different models: got {autoencoder_model}/{dimred_model}, expected {current_autoencoder}/{current_dimred}")
+                # Return an empty buffer and empty figure when models don't match
+                empty_fig = plot_empty_scatter()
+                return {}, empty_fig, no_update, no_update
+                
+            # If we're in transition and got a matching model message, hide the spinner
+            if in_transition:
+                spinner_style = {
+                    "position": "fixed",
+                    "top": 0,
+                    "left": 0,
+                    "width": "100%",
+                    "height": "100%",
+                    "backgroundColor": "rgba(0, 0, 0, 0.7)",
+                    "zIndex": 9998,
+                    "display": "none"  # Hide the spinner
+                }
+                transition_state = False
+            else:
+                # Keep the current spinner state
+                spinner_style = no_update
+                transition_state = no_update
+        
         # Get feature_vector, handling it consistently
         feature_vector = data.get("feature_vector")
         if feature_vector is None:
-            return buffer_data, no_update
+            return buffer_data, no_update, spinner_style, transition_state
             
         latent_vectors = np.array(feature_vector, dtype=float)
 
@@ -544,36 +628,55 @@ def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data
                 # First time buffering
                 buffer_data["num_components"] = n_components
                 buffer_data["latent_vectors"] = latent_vectors
-                return buffer_data, no_update
+                return buffer_data, no_update, spinner_style, transition_state
             else:
                 # Append to existing buffer
                 buffer_data["latent_vectors"] = np.vstack(
                     (buffer_data["latent_vectors"], latent_vectors)
                 )
-                return buffer_data, no_update
+                return buffer_data, no_update, spinner_style, transition_state
 
         # If figure is empty (no customdata yet), return a new figure.
-        if not current_figure["data"] or "customdata" not in current_figure["data"][0]:
+        if not current_figure["data"] or len(current_figure["data"]) == 0 or "customdata" not in current_figure["data"][0]:
             new_fig = generate_scatter_data(latent_vectors, n_components)
-            return {}, new_fig
+            return {}, new_fig, spinner_style, transition_state
 
         # Otherwise, do a partial update of the existing figure using Patch
-        figure_patch = Patch()
+        try:
+            # Use the Patch approach, but with try-except to handle potential errors
+            figure_patch = Patch()
+    
+            # Build lists from the newly arriving latent vectors
+            xs_new = latent_vectors[:, 0].tolist()
+            ys_new = latent_vectors[:, 1].tolist()
+            customdata_new = [[0]] * len(xs_new)  # or adapt to your custom data usage
+    
+            # Check if the arrays exist before extending them
+            if "x" in current_figure["data"][0] and current_figure["data"][0]["x"] is not None:
+                figure_patch["data"][0]["x"] = current_figure["data"][0]["x"] + xs_new
+            else:
+                figure_patch["data"][0]["x"] = xs_new
+                
+            if "y" in current_figure["data"][0] and current_figure["data"][0]["y"] is not None:
+                figure_patch["data"][0]["y"] = current_figure["data"][0]["y"] + ys_new
+            else:
+                figure_patch["data"][0]["y"] = ys_new
+                
+            if "customdata" in current_figure["data"][0] and current_figure["data"][0]["customdata"] is not None:
+                figure_patch["data"][0]["customdata"] = current_figure["data"][0]["customdata"] + customdata_new
+            else:
+                figure_patch["data"][0]["customdata"] = customdata_new
+                
+            return {}, figure_patch, spinner_style, transition_state
+        except Exception as e:
+            # If patching fails, create a new figure instead
+            logging.warning(f"Error patching figure: {e}, creating new figure")
+            new_fig = generate_scatter_data(latent_vectors, n_components)
+            return {}, new_fig, spinner_style, transition_state
 
-        # Build lists from the newly arriving latent vectors
-        xs_new = latent_vectors[:, 0].tolist()
-        ys_new = latent_vectors[:, 1].tolist()
-        customdata_new = [[0]] * len(xs_new)  # or adapt to your custom data usage
-
-        figure_patch["data"][0]["x"].extend(xs_new)
-        figure_patch["data"][0]["y"].extend(ys_new)
-        figure_patch["data"][0]["customdata"].extend(customdata_new)
-
-        return {}, figure_patch
     except Exception as e:
         logging.error(f"Error in set_live_latent_vectors: {e}")
-        return buffer_data, no_update
-
+        return buffer_data, no_update, no_update, no_update
 
 @callback(
     Output("scatter", "figure", allow_duplicate=True),

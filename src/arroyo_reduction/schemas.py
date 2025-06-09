@@ -36,3 +36,5 @@ class LatentSpaceEvent(Event):
     tiled_url: str
     feature_vector: list[float]
     index: int
+    autoencoder_model: str = None  # Add autoencoder model name
+    dimred_model: str = None       # Add dimension reduction model name
