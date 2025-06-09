@@ -64,7 +64,7 @@ async def stream():
 
     for index, latent_vector in zip(range(num_messages), feature_vector_list):
         message = {
-            "tiled_uri": DATA_TILED_URI,
+            "tiled_url": DATA_TILED_URI, # be compatible with LatentSpaceEvent
             "index": index,
             "feature_vector": latent_vector.tolist(),
         }

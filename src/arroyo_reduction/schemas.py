@@ -3,7 +3,6 @@ from arroyopy.schemas import Event
 from pydantic import BaseModel, field_serializer, field_validator
 
 
-
 class SerializableNumpyArrayModel(BaseModel):
     """
     Custom Pydantic model for serializing NumPy arrays.
@@ -37,3 +36,5 @@ class LatentSpaceEvent(Event):
     tiled_url: str
     feature_vector: list[float]
     index: int
+    autoencoder_model: str = None  # Add autoencoder model name
+    dimred_model: str = None       # Add dimension reduction model name
