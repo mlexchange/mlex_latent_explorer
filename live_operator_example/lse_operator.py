@@ -1,67 +1,112 @@
 import os
-
+import sys
+import logging
+import numpy as np
 import torch
-import torchvision.transforms as transforms
-from joblib import load
-from model_simple_auto import CNNAutoencoder
 from tiled.client import from_uri
 from tiled_utils import write_results
 
+# Import the MLflowClient class
+from src.utils.mlflow_utils import MLflowClient
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Environment variables
 DATA_TILED_URI = os.getenv("DATA_TILED_URI", "")
 DATA_TILED_KEY = os.getenv("DATA_TILED_KEY", None)
 RESULTS_TILED_URI = os.getenv("RESULTS_TILED_URI", "")
 RESULTS_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", None)
 
-MODEL_CHECKPOINT_DIR = os.getenv("MODEL_CHECKPOINT_DIR", "")
-DIM_REDUCTION_MODEL_DIR = os.getenv("DIM_REDUCTION_MODEL_DIR", "")
+# MLflow Configuration
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
+MLFLOW_TRACKING_USERNAME = os.getenv("MLFLOW_TRACKING_USERNAME", "")
+MLFLOW_TRACKING_PASSWORD = os.getenv("MLFLOW_TRACKING_PASSWORD", "")
+
+# Add compatibility patch for torch if needed
+if not hasattr(torch, "get_default_device"):
+    def get_default_device():
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    torch.get_default_device = get_default_device
 
 if __name__ == "__main__":
-    model = CNNAutoencoder()
-    checkpoint = torch.load(MODEL_CHECKPOINT_DIR)
-    model.load_state_dict(checkpoint["model_state_dict"], strict=False)
-
-    dim_reduction_model = load(DIM_REDUCTION_MODEL_DIR)
-
-    # Check for CUDA else use CPU
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-        print(f"Using CUDA: {torch.cuda.get_device_name(0)}")
-    else:
-        device = torch.device("cpu")
-        print("Using CPU")
-    model = model.to(device)
-
-    # Define the transformation to apply to the data
-    transform = transforms.Compose(
-        [
-            transforms.Resize(
-                (128, 128)
-            ),  # Resize to smaller dimensions to save memory
-            transforms.ToTensor(),  # Convert image to PyTorch tensor (0-1 range)
-            transforms.Normalize(
-                (0.0,), (1.0,)
-            ),  # Normalize tensor to have mean 0 and std 1
-        ]
+    # Create MLflow client
+    mlflow_client = MLflowClient(
+        tracking_uri=MLFLOW_TRACKING_URI,
+        username=MLFLOW_TRACKING_USERNAME,
+        password=MLFLOW_TRACKING_PASSWORD
     )
+    
+    # Check if MLflow is reachable
+    if not mlflow_client.check_mlflow_ready():
+        logger.error("MLflow server is not reachable. Exiting.")
+        sys.exit(1)
+    
+    # Get model names from environment variables or command line arguments
+    autoencoder_model_name = os.getenv("MLFLOW_AUTO_MODEL_NAME", "smi_autoencoder_model_wrapper")
+    dimred_model_name = os.getenv("MLFLOW_DR_MODEL_NAME", "smi_umap_model_wrapper")
+    
+    # Load the autoencoder model with wrapper
+    logger.info(f"Loading autoencoder model: {autoencoder_model_name}")
+    autoencoder_wrapper = mlflow_client.load_model(autoencoder_model_name)
+    
+    if autoencoder_wrapper is None:
+        logger.error("Failed to load autoencoder model. Exiting.")
+        sys.exit(1)
+    
+    # Load the dimension reduction model with wrapper
+    logger.info(f"Loading dimension reduction model from MLflow: {dimred_model_name}")
+    umap_wrapper = mlflow_client.load_model(dimred_model_name)
 
-    # Set base tiled client
+    if umap_wrapper is None:
+        logger.error("Failed to load dimension reduction model. Exiting.")
+        sys.exit(1)
+    
+    # The PyFunc wrappers handle device management internally
+    
+    # No need for custom transforms as the PyFunc wrapper handles preprocessing
+
+    # Set up Tiled clients
     data_client = from_uri(DATA_TILED_URI, api_key=DATA_TILED_KEY)
     write_client = from_uri(RESULTS_TILED_URI, api_key=RESULTS_TILED_API_KEY)
 
+    # Processing loop
+    logger.info("Starting processing loop...")
     for i in range(1000):  # TODO: Change to long running loop that detects new data
-        # Assuming we get a "relative" tiled_uri (e.g. container): sub_uri
-        datapoint = data_client[indx]  # noqa: F821
-        tensor = transform(datapoint)  # Add batch and channel dimensions
-        f_vec_nn = model.module.encoder(tensor)
-
-        # 2. Dimension Reduction (PCA)
-        f_vec = dim_reduction_model.transform(f_vec_nn)
-
-        # 3. Save results to tiled with metadata
-        write_results(
-            write_client,
-            f_vec,
-            io_parameters,  # noqa: F821
-            latent_vectors_path,  # noqa: F821
-            metadata=None,  # noqa: F821
-        )
+        try:
+            # Get datapoint from Tiled
+            datapoint = data_client[indx]  # noqa: F821
+            
+            # Convert to numpy array (the wrapper expects numpy input)
+            img_array = np.array(datapoint)
+            
+            # Log information about the image
+            logger.info(f"Processing image {i}: shape={img_array.shape}, dtype={img_array.dtype}")
+            
+            # Process with autoencoder to get latent features
+            # Pass the numpy array directly to the model wrapper
+            autoencoder_result = autoencoder_wrapper.predict(img_array)
+            latent_features = autoencoder_result["latent_features"]
+            logger.info(f"Extracted latent features: shape={latent_features.shape}")
+            
+            # Apply dimension reduction using the UMAP wrapper
+            umap_result = umap_wrapper.predict(latent_features)
+            f_vec = umap_result["umap_coords"]
+            logger.info(f"UMAP coordinates: shape={f_vec.shape}")
+            
+            # Save results to Tiled
+            write_results(
+                write_client,
+                f_vec,
+                io_parameters,  # noqa: F821
+                latent_vectors_path,  # noqa: F821
+                metadata=None,
+            )
+            
+            logger.info(f"Processed datapoint {i} successfully")
+            
+        except Exception as e:
+            logger.error(f"Error processing datapoint {i}: {e}")
+            import traceback
+            traceback.print_exc()
