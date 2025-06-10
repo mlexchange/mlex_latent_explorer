@@ -15,6 +15,7 @@ NUM_IMGS_OVERVIEW = 6
 WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://localhost:8765/lse")
 logger.info(f"WebSocket URL: {WEBSOCKET_URL}")
 
+
 def main_display():
     main_display = html.Div(
         id="main-display",
@@ -214,6 +215,7 @@ def main_display():
             ),
             dcc.Store(id="buffer", data={}),
             dcc.Store(id="live-indices", data=[]),
+            dcc.Interval(id="buffer-debounce", interval=100, n_intervals=0),  # 100ms
             WebSocket(id="ws-live", url=WEBSOCKET_URL),
         ],
     )

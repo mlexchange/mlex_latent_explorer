@@ -1,15 +1,23 @@
-import json
 import logging
-from urllib.parse import urlsplit, urlunsplit
 
 import numpy as np
-from dash import Input, Output, Patch, State, callback, no_update
+from dash import (
+    ClientsideFunction,
+    Input,
+    Output,
+    Patch,
+    State,
+    callback,
+    clientside_callback,
+    no_update,
+)
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
 from src.utils.plot_utils import generate_scatter_data
 
 logging.getLogger("lse.live_mode")
+
 
 @callback(
     Output("show-clusters", "value", allow_duplicate=True),
@@ -111,98 +119,32 @@ def update_data_project_dict(n_clicks):
 
 
 @callback(
-    Output(
-        {"base_id": "file-manager", "name": "data-project-dict"},
-        "data",
-        allow_duplicate=True,
-    ),
-    Output("live-indices", "data", allow_duplicate=True),
-    Input("ws-live", "message"),
-    State("go-live", "n_clicks"),
-    State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
-    State("live-indices", "data"),
-    prevent_initial_call=True,
-)
-def live_update_data_project_dict(message, n_clicks, data_project_dict, live_indices):
-    """
-    Update data project dict with the data uri from the live experiment
-    """
-    if n_clicks is not None and n_clicks % 2 == 1:
-        message = json.loads(message["data"])
-        tiled_uri = message["tiled_uri"]
-        split_uri = urlsplit(tiled_uri)
-        path_parts = split_uri.path.rsplit("/", 1)
-        root_uri = urlunsplit(
-            (split_uri.scheme, split_uri.netloc, path_parts[0] + "/", "", "")
-        )
-        uri = path_parts[1]
-
-        index = message["index"]
-
-        live_indices.append(index)
-
-        # Update cum_size according to the received index
-        cum_size = max(live_indices) + 1
-
-        # Update the data project dict
-        if data_project_dict["root_uri"] != root_uri:
-            data_project_dict["root_uri"] = root_uri
-            data_project_dict["data_type"] = "tiled"
-
-
-        if len(data_project_dict["datasets"]) == 0:
-            data_project_dict["datasets"] = [
-                {
-                    "uri": uri,
-                    "cumulative_data_count": cum_size,
-                }
-            ]
-        else:
-            data_project_dict["datasets"][0] = {
-                "uri": uri,
-                "cumulative_data_count": cum_size,
-            }
-
-    return data_project_dict, live_indices
-
-
-@callback(
-    Output("buffer", "data"),
     Output("scatter", "figure", allow_duplicate=True),
-    Input("ws-live", "message"),
+    Input("buffer-debounce", "n_intervals"),
+    State("buffer", "data"),
     State("scatter", "figure"),
     State("pause-button", "n_clicks"),
-    State("buffer", "data"),
     prevent_initial_call=True,
 )
-def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data):
-    data = json.loads(message["data"])
-    logging.debug(f"Received data: {data}")
-    latent_vectors = np.array(data["feature_vector"], dtype=float)
+def set_live_latent_vectors(n_intervals, buffer_data, current_figure, pause_n_clicks):
+    logging.debug(f"Received data: {buffer_data}")
+    if buffer_data == {}:
+        logging.debug("No data received in buffer.")
+        raise PreventUpdate
+    latent_vectors = np.zeros((0, 2), dtype=float)
+    for buffer_entry in buffer_data:
+        partial_latent_vectors = np.array(buffer_entry["feature_vector"], dtype=float)
+        latent_vectors = np.vstack((latent_vectors, partial_latent_vectors))
 
     latent_vectors = (
         latent_vectors.reshape(1, -1) if latent_vectors.ndim == 1 else latent_vectors
     )
     n_components = latent_vectors.shape[1]
 
-    # If the pause button is clicked, buffer the latent vectors
-    if pause_n_clicks is not None and pause_n_clicks % 2 == 1:
-        if not buffer_data:
-            # First time buffering
-            buffer_data["num_components"] = n_components
-            buffer_data["latent_vectors"] = latent_vectors
-            return buffer_data, no_update
-        else:
-            # Append to existing buffer
-            buffer_data["latent_vectors"] = np.vstack(
-                (buffer_data["latent_vectors"], latent_vectors)
-            )
-            return buffer_data, no_update
-
     # If figure is empty (no customdata yet), return a new figure.
     if not current_figure["data"] or "customdata" not in current_figure["data"][0]:
         new_fig = generate_scatter_data(latent_vectors, n_components)
-        return {}, new_fig
+        return new_fig
 
     # Otherwise, do a partial update of the existing figure using Patch
     figure_patch = Patch()
@@ -216,7 +158,7 @@ def set_live_latent_vectors(message, current_figure, pause_n_clicks, buffer_data
     figure_patch["data"][0]["y"].extend(ys_new)
     figure_patch["data"][0]["customdata"].extend(customdata_new)
 
-    return {}, figure_patch
+    return figure_patch
 
 
 @callback(
@@ -231,7 +173,7 @@ def set_buffered_latent_vectors(n_clicks, buffer_data, current_figure):
         raise PreventUpdate
 
     num_components = buffer_data["num_components"]
-    latent_vectors = buffer_data["latent_vectors"]
+    latent_vectors = buffer_data["feature_vector"]
 
     # If the scatter plot is empty, generate new scatter data
     if "customdata" not in current_figure["data"][0]:
@@ -273,3 +215,25 @@ def toggle_pause_button_go_live(go_live_n_clicks):
         DashIconify(icon="lucide:circle-pause", style={"padding": "0px"}),
         "Pause live display",
     )
+
+
+clientside_callback(
+    ClientsideFunction(namespace="liveWS", function_name="updateLiveData"),
+    output=[
+        Output("buffer", "data"),
+        Output(
+            {"base_id": "file-manager", "name": "data-project-dict"},
+            "data",
+            allow_duplicate=True,
+        ),
+        Output("live-indices", "data", allow_duplicate=True),
+    ],
+    inputs=[Input("ws-live", "message")],
+    state=[
+        State("buffer", "data"),
+        State("go-live", "n_clicks"),
+        State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
+        State("live-indices", "data"),
+    ],
+    prevent_initial_call=True,
+)
