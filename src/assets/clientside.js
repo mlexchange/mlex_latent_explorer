@@ -7,12 +7,14 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                     console.log("Current buffer_data:", buffer_data, "Type:", typeof buffer_data);
 
                     if (!Array.isArray(buffer_data)) buffer_data = [];
-                    if (!data_project_dict || typeof data_project_dict !== 'object') {
+                    if (data_project_dict = {}) {
                         data_project_dict = {
                             "root_uri": "",
                             "data_type": "",
-                            "datasets": []
+                            "datasets": [],
+                            "project_id": "live",
                         };
+                        console.log("Initialized data_project_dict:", data_project_dict);
                     }
                     if (!Array.isArray(live_indices)) live_indices = [];
 
@@ -42,13 +44,13 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                         buffer_data = [...buffer_data, new_entry];
                         console.log("Updated buffer_data:", buffer_data);
 
-                        let tiled_uri = data.tiled_uri;
+                        let tiled_url = data.tiled_url;
                         let index = parseInt(data.index);
-                        console.log("Tiled URI:", tiled_uri, "Index:", index);
+                        console.log("Tiled URI:", tiled_url, "Index:", index);
 
-                        let url = new URL(tiled_uri);
+                        let url = new URL(tiled_url);
                         let path_parts = url.pathname.split('/');
-                        let root_uri = tiled_uri;
+                        let root_uri = tiled_url;
                         let uri = "";
 
                         if (path_parts.length > 1 && path_parts[path_parts.length - 1] !== '') {
