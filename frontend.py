@@ -5,7 +5,7 @@ from uuid import uuid4
 from dash import Input, Output, html
 from dotenv import load_dotenv
 
-from src.app_layout import app, clustering_models, dim_reduction_models, mlex_components,latent_space_models
+from src.app_layout import app, clustering_models, dim_reduction_models, mlex_components
 from src.callbacks.display import (  # noqa: F401
     clear_selections,
     disable_buttons,
@@ -23,18 +23,16 @@ from src.callbacks.execute import (  # noqa: F401
     allow_run_clustering,
     allow_show_clusters,
     allow_show_feature_vectors,
+    load_mlflow_models_on_render,
+    refresh_mlflow_models,
     run_clustering,
     run_latent_space,
-    refresh_mlflow_models,
-    load_mlflow_models_on_render
 )
 from src.callbacks.infrastructure_check import (  # noqa: F401
     check_infra_state,
     update_infra_state,
 )
 from src.callbacks.live_mode import (  # noqa: F401
-    live_update_data_project_dict,
-    set_buffered_latent_vectors,
     set_live_latent_vectors,
     toggle_controls,
     toggle_pause_button,
