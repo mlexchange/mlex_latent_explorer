@@ -127,10 +127,15 @@ def update_data_project_dict(n_clicks):
     prevent_initial_call=True,
 )
 def set_live_latent_vectors(n_intervals, buffer_data, current_figure, pause_n_clicks):
+    if pause_n_clicks is not None and pause_n_clicks % 2 == 1:
+        raise PreventUpdate
+
     logging.debug(f"Received data: {buffer_data}")
     if buffer_data == {}:
         logging.debug("No data received in buffer.")
         raise PreventUpdate
+
+    # Rebuild the latent vector array from the buffer
     latent_vectors = np.zeros((0, 2), dtype=float)
     for buffer_entry in buffer_data:
         partial_latent_vectors = np.array(buffer_entry["feature_vector"], dtype=float)
@@ -139,53 +144,37 @@ def set_live_latent_vectors(n_intervals, buffer_data, current_figure, pause_n_cl
     latent_vectors = (
         latent_vectors.reshape(1, -1) if latent_vectors.ndim == 1 else latent_vectors
     )
+
     n_components = latent_vectors.shape[1]
 
-    # If figure is empty (no customdata yet), return a new figure.
+    # If figure is empty (no customdata yet), return a new figure
     if not current_figure["data"] or "customdata" not in current_figure["data"][0]:
         new_fig = generate_scatter_data(latent_vectors, n_components)
         return new_fig
 
-    # Otherwise, do a partial update of the existing figure using Patch
+    # Count how many points are already in the plot
+    current_n_points = len(current_figure["data"][0]["x"])
+    total_n_vectors = latent_vectors.shape[0]
+
+    # If no new data, skip
+    if total_n_vectors <= current_n_points:
+        logging.debug("No new latent vectors to append.")
+        raise PreventUpdate
+
+    # Slice to get only new data
+    new_vectors = latent_vectors[current_n_points:]
+
+    xs_new = new_vectors[:, 0].tolist()
+    ys_new = new_vectors[:, 1].tolist()
+    customdata_new = [[0]] * len(xs_new)  # or adjust as needed
+
+    # Patch the figure to append new points
     figure_patch = Patch()
-
-    # Build lists from the newly arriving latent vectors
-    xs_new = latent_vectors[:, 0].tolist()
-    ys_new = latent_vectors[:, 1].tolist()
-    customdata_new = [[0]] * len(xs_new)  # or adapt to your custom data usage
-
     figure_patch["data"][0]["x"].extend(xs_new)
     figure_patch["data"][0]["y"].extend(ys_new)
     figure_patch["data"][0]["customdata"].extend(customdata_new)
 
     return figure_patch
-
-
-@callback(
-    Output("scatter", "figure", allow_duplicate=True),
-    Input("pause-button", "n_clicks"),
-    State("buffer", "data"),
-    State("scatter", "figure"),
-    prevent_initial_call=True,
-)
-def set_buffered_latent_vectors(n_clicks, buffer_data, current_figure):
-    if n_clicks is not None and n_clicks % 2 == 1 or buffer_data == {}:
-        raise PreventUpdate
-
-    num_components = buffer_data["num_components"]
-    latent_vectors = buffer_data["feature_vector"]
-
-    # If the scatter plot is empty, generate new scatter data
-    if "customdata" not in current_figure["data"][0]:
-        return generate_scatter_data(latent_vectors, num_components)
-
-    # If the scatter plot is not empty, append the new latent vectors
-    else:
-        for latent_vector in latent_vectors:
-            current_figure["data"][0]["customdata"].append([0])
-            current_figure["data"][0]["x"].append(int(latent_vector[0]))
-            current_figure["data"][0]["y"].append(int(latent_vector[1]))
-        return current_figure
 
 
 @callback(

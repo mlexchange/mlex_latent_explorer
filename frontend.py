@@ -33,7 +33,6 @@ from src.callbacks.infrastructure_check import (  # noqa: F401
     update_infra_state,
 )
 from src.callbacks.live_mode import (  # noqa: F401
-    set_buffered_latent_vectors,
     set_live_latent_vectors,
     toggle_controls,
     toggle_pause_button,
