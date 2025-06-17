@@ -61,52 +61,20 @@ class MLflowClient:
 
     def check_mlflow_ready(self):
         """
-        Check if MLflow is reachable.
-
-        Raises:
-            Exception: If MLflow is not reachable
+        Check if MLflow server is reachable by performing a lightweight API call.
+        
+        Returns:
+            bool: True if MLflow server is reachable, False otherwise
         """
         try:
-            # Use the existing client
-            _ = self.client
+            # Perform a lightweight API call to verify connectivity
+            # search_experiments() is a simple call that requires minimal server resources
+            self.client.search_experiments(max_results=1)
+            logger.info("MLflow server is reachable")
             return True
         except Exception as e:
-            logger.warning(f"MLflow is not reachable: {e}")
+            logger.warning(f"MLflow server is not reachable: {e}")
             return False
-
-    def get_mlflow_models(self):
-        """
-        Retrieve available MLflow models and create dropdown options.
-        Models are sorted by creation timestamp, from newest to oldest.
-
-        Returns:
-            list: Dropdown options for MLflow models
-        """
-        try:
-            # Search for registered models using existing client
-            registered_models = self.client.search_registered_models()
-
-            # Filter out models with "smi" in the name
-            filtered_models = [model for model in registered_models if "smi" not in model.name.lower()]
-
-            # Sort models by creation timestamp (newest first)
-            filtered_models = sorted(
-                filtered_models, key=lambda model: model.creation_timestamp, reverse=True
-            )
-
-            # Create dropdown options
-            model_options = [
-                {
-                    "label": get_flow_run_name(get_flow_run_parent_id(model.name)),
-                    "value": model.name,
-                }
-                for model in filtered_models
-            ]
-
-            return model_options
-        except Exception as e:
-            logger.warning(f"Error retrieving MLflow models: {e}")
-            return [{"label": "No models found", "value": None}]
 
     def get_mlflow_params(self, mlflow_model_id):
         model_version_details = self.client.get_model_version(
@@ -119,59 +87,67 @@ class MLflowClient:
         params = run_info.data.params
         return params
 
-    def get_mlflow_models_live(self, model_type=None):
+    def get_mlflow_models(self, livemode=False, model_type=None):
         """
-        Retrieve available MLflow models and create dropdown options
-        
+        Retrieve available MLflow models and create dropdown options.
+
         Args:
-            model_type (str, optional): Filter models by type tag. Possible values: 
-                                        'autoencoder', 'dimension_reduction', or None to return all models
-        
+            livemode (bool): If True, only include models where exp_type == "live_mode".
+                            If False, exclude models where exp_type == "live_mode" and use custom labels.
+            model_type (str, optional): Filter by run tag 'model_type'.
+
         Returns:
-            list: Dropdown options for MLflow models filtered by type if specified
+            list: Dropdown options for MLflow models matching the tag filters.
         """
         try:
-            # Get all registered models using existing client
-            models = self.client.search_registered_models()
-            
-            # Filter models with "smi" in the name as a basic filter
-            models = [model for model in models if "smi" in model.name.lower()]
-            
-            # Since MLflow doesn't support searching by tags directly,
-            # we need to manually filter the models by checking their tags
-            if model_type:
-                filtered_models = []
-                for model in models:
-                    # Get the latest version of the model
-                    latest_versions = self.client.search_model_versions(f"name='{model.name}'")
-                    if not latest_versions:
+            all_versions = self.client.search_model_versions()
+
+            model_map = {}  # model name -> latest version info
+
+            for v in all_versions:
+                try:
+                    current = model_map.get(v.name)
+                    if current and int(v.version) <= int(current.version):
                         continue
-                        
-                    latest_version = max(latest_versions, key=lambda mv: int(mv.version))
-                    
-                    # Get run ID associated with the model version
-                    run_id = latest_version.run_id
-                    if not run_id:
+
+                    run = self.client.get_run(v.run_id)
+                    run_tags = run.data.tags
+
+                    # Tag-based filtering
+                    exp_type = run_tags.get("exp_type")
+                    if livemode:
+                        if exp_type != "live_mode":
+                            continue
+                    else:
+                        if exp_type == "live_mode":
+                            continue
+
+                    if model_type is not None and run_tags.get("model_type") != model_type:
                         continue
-                        
-                    # Get the run and check its tags
+
+                    model_map[v.name] = v
+
+                except Exception as e:
+                    logger.warning(f"Error processing model version {v.name} v{v.version}: {e}")
+                    continue
+
+            # Build dropdown options
+            model_options = []
+            for name in sorted(model_map.keys()):
+                if livemode:
+                    label = name
+                else:
                     try:
-                        run = self.client.get_run(run_id)
-                        if run.data.tags.get("model_type") == model_type:
-                            filtered_models.append(model)
+                        parent_id = get_flow_run_parent_id(name)
+                        label = get_flow_run_name(parent_id)
                     except Exception as e:
-                        logger.warning(f"Error retrieving run {run_id}: {e}")
-                        continue
-                
-                models = filtered_models
-            
-            # Format as dropdown options
-            model_options = [
-                {"label": model.name, "value": model.name}
-                for model in models
-            ]
-            
+                        logger.warning(f"Failed to get label for model '{name}': {e}")
+                        label = name  # fallback
+
+                model_options.append({"label": label, "value": name})
+
             return model_options
+
         except Exception as e:
             logger.warning(f"Error retrieving MLflow models: {e}")
             return [{"label": "Error loading models", "value": None}]

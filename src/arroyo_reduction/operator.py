@@ -20,6 +20,20 @@ class LatentSpaceOperator(Operator):
         super().__init__()
         self.proxy_socket = proxy_socket
         self.reducer = reducer
+        
+        # Initialize Redis client once during initialization
+        try:
+            self.redis_host = os.getenv("REDIS_HOST", "kvrocks")
+            self.redis_port = int(os.getenv("REDIS_PORT", 6666))
+            self.redis_client = redis.Redis(
+                host=self.redis_host, 
+                port=self.redis_port, 
+                decode_responses=True
+            )
+            logger.info(f"Connected to Redis at {self.redis_host}:{self.redis_port}")
+        except Exception as e:
+            logger.warning(f"Could not connect to Redis: {e}")
+            self.redis_client = None
 
     async def process(self, message: SASMessage) -> None:
         # logger.debug("message recvd")
@@ -39,20 +53,18 @@ class LatentSpaceOperator(Operator):
 
     async def dispatch(self, message: RawFrameEvent) -> LatentSpaceEvent:
         try:
-            # Add a simple Redis check to see if we're in offline mode
-
-            # Create Redis client
-            REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
-            REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
-            redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
-            
-            # Check if processing is disabled (by checking if models are set)
-            autoencoder_model = redis_client.get("selected_mlflow_model")
-            dimred_model = redis_client.get("selected_dim_reduction_model")
-            
-            if not autoencoder_model or not dimred_model:
-                logger.info(f"In offline mode - skipping frame {message.frame_number}")
-                return None
+            # Use the instance's Redis client instead of creating a new one each time
+            if self.redis_client is not None:
+                # Check if processing is disabled (by checking if models are set)
+                autoencoder_model = self.redis_client.get("selected_mlflow_model")
+                dimred_model = self.redis_client.get("selected_dim_reduction_model")
+                
+                if not autoencoder_model or not dimred_model:
+                    logger.info(f"In offline mode - skipping frame {message.frame_number}")
+                    return None
+            else:
+                # Redis client couldn't be initialized, log a warning but continue processing
+                logger.debug("Redis client not available, proceeding with processing")
                 
             # Existing loading check
             if hasattr(self.reducer, 'is_loading_model') and self.reducer.is_loading_model:

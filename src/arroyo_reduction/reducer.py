@@ -23,9 +23,15 @@ REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
 
 # Set Numba environment variables to avoid umap illegal instruction error
-os.environ.setdefault("NUMBA_DISABLE_JIT", "1")
-os.environ.setdefault("NUMBA_CPU_NAME", "generic")
-os.environ.setdefault("NUMBA_CPU_FEATURES", "+neon")
+os.environ.setdefault("NUMBA_DISABLE_JIT", "0")
+# Check if JIT is disabled (set by user)
+if os.environ.get("NUMBA_DISABLE_JIT") == "1":
+    # Apply conservative CPU settings for compatibility
+    os.environ.setdefault("NUMBA_CPU_NAME", "generic")
+    os.environ.setdefault("NUMBA_CPU_FEATURES", "+neon")
+    logger.info("Numba JIT disabled - using conservative CPU settings for compatibility")
+# Else let Numba detect CPU features automatically
+
 # message = {
 #     "tiled_uri": DATA_TILED_URI,
 #     "index": index,
@@ -108,9 +114,7 @@ class LatentSpaceReducer(Reducer):
             
         try:
             # Get numpy array from message
-            img_array = message.image.array.copy()  # Create a fresh copy
-            # Ensure array is properly formatted for model input
-            img_array = np.ascontiguousarray(img_array)
+            img_array = message.image.array
 
             # Additional debugging for the image data
             logger.info(f"Get input image shape: {img_array.shape}, dtype: {img_array.dtype}. Image min: {img_array.min()}, max: {img_array.max()}")

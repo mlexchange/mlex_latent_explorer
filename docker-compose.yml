@@ -66,7 +66,7 @@ services:
       mle_net:
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.14.3 # to be compatible with requests==2.26.0 (required by mlex_file_manager)
+    image: ghcr.io/mlflow/mlflow:v2.22.0 
     container_name: mlflow-server
     command: >
       /bin/sh -c "pip install --no-cache-dir psycopg2-binary 'mlflow[auth]' &&
@@ -85,7 +85,6 @@ services:
       - MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
       - MLFLOW_FLASK_SERVER_SECRET_KEY=${MLFLOW_FLASK_SERVER_SECRET_KEY}
       - MLFLOW_AUTH_CONFIG_PATH=/basic_auth.ini
-      - MLFLOW_CACHE_DIR=/mlflow_cache
     depends_on:
       - mlflow_db
     networks:
@@ -94,7 +93,6 @@ services:
       - ./data/mlflow_storage:/mlartifacts:rw  # Persist MLflow models, logs, and artifacts
       - ./data/mlflow_auth:/mlflow_auth:rw # Dedicated volume for auth database
       - ./basic_auth.ini:/basic_auth.ini
-      - ./data/mlflow_cache:/mlflow_cache
 
   mlflow_db:
     image: postgres:14.5-alpine  # Lightweight PostgreSQL version
@@ -106,7 +104,6 @@ services:
       - POSTGRES_DB=${MLFLOW_DB_NAME}
     volumes:
       - ./data/mlflow_db:/var/lib/postgresql/data:rw
-      - ./data/mlflow_storage:/mlartifacts:rw  # Persist PostgreSQL database
     networks:
       - mle_net
 
@@ -202,10 +199,11 @@ services:
     ports:
       - 127.0.0.1:8765:8765
     environment:
-      - NUMBA_DISABLE_JIT=1       # Add 3 NUMBA vars to avoid umap illegal instruction errors
-      - NUMBA_CPU_NAME=generic
-      - NUMBA_CPU_FEATURES=+neon
-      - MLFLOW_CACHE_DIR=/mlflow_cache
+      NUMBA_DISABLE_JIT: ${NUMBA_DISABLE_JIT:-0}  # Default to enabled (0)
+      NUMBA_CPU_NAME: ${NUMBA_CPU_NAME:-generic}
+      NUMBA_CPU_FEATURES: ${NUMBA_CPU_FEATURES:-+neon}
+      MLFLOW_CACHE_DIR: "/mlflow_cache"
+      PYTHONUNBUFFERED: 1
     depends_on:
       - latent-space-explorer
     networks:

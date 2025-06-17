@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import time
 from urllib.parse import urlsplit, urlunsplit
 
@@ -9,10 +10,15 @@ from dash import (Input, Output, Patch, State, callback, callback_context,
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
-from src.callbacks.execute import redis_client
 from src.utils.mlflow_utils import MLflowClient
 from src.utils.plot_utils import (generate_notification, generate_scatter_data,
                                   plot_empty_heatmap, plot_empty_scatter)
+from src.arroyo_reduction.redis_model_store import RedisModelStore  # Import the RedisModelStore class
+
+# Initialize Redis model store instead of direct Redis client
+REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
+redis_model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
 
 logger = logging.getLogger("lse.live_mode")
 mlflow_client = MLflowClient()
@@ -30,8 +36,8 @@ mlflow_client = MLflowClient()
 def show_model_selection_dialog(n_clicks, last_selected_models):
     if n_clicks is not None and n_clicks % 2 == 1:
         # Get model options filtered by type
-        autoencoder_options = mlflow_client.get_mlflow_models_live(model_type=None)
-        dimred_options = mlflow_client.get_mlflow_models_live(model_type=None)
+        autoencoder_options = mlflow_client.get_mlflow_models(livemode=True,model_type="autoencoder")
+        dimred_options = mlflow_client.get_mlflow_models(livemode=True, model_type="dimension_reduction")
         
         # Set default values from previous selection if available
         autoencoder_default = None
@@ -221,28 +227,13 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
     # Check if continue was already clicked (selected_models is not None)
     if n_clicks is not None and n_clicks % 2 == 0:
         # Going back to offline mode - send Redis messages to reset models
-        if redis_client is not None and selected_models is not None:
+        if selected_models is not None:
             try:
-                # Reset autoencoder model to None
-                redis_client.set("selected_mlflow_model", "")
+                # Reset autoencoder model to empty string
+                redis_model_store.store_autoencoder_model("")
                 
-                # Reset dimension reduction model to None  
-                redis_client.set("selected_dim_reduction_model", "")
-                
-                # Also publish update notifications
-                message = {
-                    "model_type": "autoencoder",
-                    "model_name": None,
-                    "timestamp": time.time()
-                }
-                redis_client.publish("model_updates", json.dumps(message))
-                
-                message = {
-                    "model_type": "dimred",
-                    "model_name": None,
-                    "timestamp": time.time()
-                }
-                redis_client.publish("model_updates", json.dumps(message))
+                # Reset dimension reduction model to empty string
+                redis_model_store.store_dimred_model("")
                 
                 logger.info("Published model reset messages to Redis")
             except Exception as e:

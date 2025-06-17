@@ -1,10 +1,10 @@
 import json
 import logging
 import os
+import time
 import traceback
 import uuid
 from datetime import datetime
-import redis
 
 import pytz
 from dash import Input, Output, State, callback
@@ -31,6 +31,7 @@ from src.utils.job_utils import (
 )
 from src.utils.mlflow_utils import MLflowClient
 from src.utils.plot_utils import generate_notification
+from src.arroyo_reduction.redis_model_store import RedisModelStore  # Import the RedisModelStore class
 
 MODE = os.getenv("MODE", "")
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
@@ -38,18 +39,14 @@ FLOW_NAME = os.getenv("FLOW_NAME", "")
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 RESULTS_DIR = os.getenv("RESULTS_DIR", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
-# Initialize Redis client
+
+# Initialize Redis model store instead of direct Redis client
 REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
-redis_client = None
-
+redis_model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
 
 logger = logging.getLogger(__name__)
 mlflow_client = MLflowClient()
-try:
-    redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
-except Exception as e:
-    logger.warning(f"Could not connect to Redis: {e}")
 
 @callback(
     Output("mlflow-model-dropdown", "options", allow_duplicate=True),
@@ -89,40 +86,21 @@ def store_dialog_models_in_redis_on_continue(n_clicks, autoencoder_model, dim_re
     """Store both model selections from dialog dropdowns in Redis when Continue is clicked"""
     if not n_clicks:
         raise PreventUpdate
-        
-    if redis_client is None:
-        return counter
     
-    try:
-        # Store both models from dialog dropdowns
-        if autoencoder_model:
-            logger.info(f"Storing autoencoder model from dialog: {autoencoder_model}")
-            redis_client.set("selected_mlflow_model", autoencoder_model)
-            
-            # Also publish update notification
-            message = {
-                "model_type": "autoencoder",
-                "model_name": autoencoder_model,
-                "timestamp": import_time_module().time()
-            }
-            redis_client.publish("model_updates", json.dumps(message))
-            
-        if dim_reduction_model:
-            logger.info(f"Storing dimension reduction model from dialog: {dim_reduction_model}")
-            redis_client.set("selected_dim_reduction_model", dim_reduction_model)
-            
-            # Also publish update notification
-            message = {
-                "model_type": "dimred",
-                "model_name": dim_reduction_model,
-                "timestamp": import_time_module().time()
-            }
-            redis_client.publish("model_updates", json.dumps(message))
-            
-        return (counter or 0) + 1
-    except Exception as e:
-        logger.error(f"Error storing dialog dropdown models in Redis: {e}")
-        return counter
+    success = True
+    
+    # Store autoencoder model if provided
+    if autoencoder_model:
+        logger.info(f"Storing autoencoder model from dialog: {autoencoder_model}")
+        success = success and redis_model_store.store_autoencoder_model(autoencoder_model)
+    
+    # Store dimension reduction model if provided    
+    if dim_reduction_model:
+        logger.info(f"Storing dimension reduction model from dialog: {dim_reduction_model}")
+        success = success and redis_model_store.store_dimred_model(dim_reduction_model)
+    
+    # Increment counter if successful
+    return (counter or 0) + 1 if success else counter
 
 @callback(
     Output("run-counter", "data", allow_duplicate=True),
@@ -136,46 +114,22 @@ def store_sidebar_models_in_redis_on_update(n_clicks, autoencoder_model, dim_red
     """Store both model selections from sidebar in Redis when Update button is clicked"""
     if not n_clicks:
         raise PreventUpdate
-        
-    if redis_client is None:
-        return counter
     
-    try:
-        # Store both models from sidebar
-        if autoencoder_model:
-            logger.info(f"Storing autoencoder model from sidebar: {autoencoder_model}")
-            redis_client.set("selected_mlflow_model", autoencoder_model)
-            
-            # Also publish update notification
-            message = {
-                "model_type": "autoencoder",
-                "model_name": autoencoder_model,
-                "timestamp": import_time_module().time()
-            }
-            redis_client.publish("model_updates", json.dumps(message))
-            
-        if dim_reduction_model:
-            logger.info(f"Storing dimension reduction model from sidebar: {dim_reduction_model}")
-            redis_client.set("selected_dim_reduction_model", dim_reduction_model)
-            
-            # Also publish update notification
-            message = {
-                "model_type": "dimred",
-                "model_name": dim_reduction_model,
-                "timestamp": import_time_module().time()
-            }
-            redis_client.publish("model_updates", json.dumps(message))
-            
-        return (counter or 0) + 1
-    except Exception as e:
-        logger.error(f"Error storing sidebar models in Redis: {e}")
-        return counter
+    success = True
+    
+    # Store autoencoder model if provided
+    if autoencoder_model:
+        logger.info(f"Storing autoencoder model from sidebar: {autoencoder_model}")
+        success = success and redis_model_store.store_autoencoder_model(autoencoder_model)
+    
+    # Store dimension reduction model if provided
+    if dim_reduction_model:
+        logger.info(f"Storing dimension reduction model from sidebar: {dim_reduction_model}")
+        success = success and redis_model_store.store_dimred_model(dim_reduction_model)
+    
+    # Increment counter if successful
+    return (counter or 0) + 1 if success else counter
 
-
-def import_time_module():
-    """Import time module on demand to avoid circular imports"""
-    import time
-    return time
 
 @callback(
     Output(
@@ -303,7 +257,7 @@ def run_latent_space(
         if MODE == "dev":
             job_uid = str(uuid.uuid4())
             job_message = (
-                f"Dev Mode: Job has been succesfully submitted with uid: {job_uid}"
+                f"Dev Mode: Job has been successfully submitted with uid: {job_uid}"
             )
             notification_color = "primary"
         else:
@@ -320,7 +274,7 @@ def run_latent_space(
                     flow_run_name=f"{job_name} {current_time}",
                     tags=PREFECT_TAGS + [project_name, "latent-space"],
                 )
-                job_message = f"Job has been succesfully submitted with uid: {job_uid}"
+                job_message = f"Job has been successfully submitted with uid: {job_uid}"
                 notification_color = "indigo"
             except Exception as e:
                 # Log the traceback
@@ -580,7 +534,7 @@ def run_clustering(
         if MODE == "dev":
             job_uid = str(uuid.uuid4())
             job_message = (
-                f"Dev Mode: Job has been succesfully submitted with uid: {job_uid}"
+                f"Dev Mode: Job has been successfully submitted with uid: {job_uid}"
             )
             notification_color = "primary"
         else:
@@ -598,7 +552,7 @@ def run_clustering(
                     flow_run_name=f"{dimension_reduction_name} {job_name} {current_time}",
                     tags=PREFECT_TAGS + [project_name, "clustering"],
                 )
-                job_message = f"Job has been succesfully submitted with uid: {job_uid}"
+                job_message = f"Job has been successfully submitted with uid: {job_uid}"
                 notification_color = "indigo"
             except Exception as e:
                 logger.error(traceback.format_exc())

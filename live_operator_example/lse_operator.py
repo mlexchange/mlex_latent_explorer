@@ -57,9 +57,9 @@ if __name__ == "__main__":
     
     # Load the dimension reduction model with wrapper
     logger.info(f"Loading dimension reduction model from MLflow: {dimred_model_name}")
-    umap_wrapper = mlflow_client.load_model(dimred_model_name)
+    dimred_wrapper = mlflow_client.load_model(dimred_model_name)
 
-    if umap_wrapper is None:
+    if dimred_wrapper is None:
         logger.error("Failed to load dimension reduction model. Exiting.")
         sys.exit(1)
     
@@ -78,8 +78,8 @@ if __name__ == "__main__":
             # Get datapoint from Tiled
             datapoint = data_client[indx]  # noqa: F821
             
-            # Convert to numpy array (the wrapper expects numpy input)
-            img_array = np.array(datapoint)
+            # datapoint is a numpy array (the wrapper expects numpy input)
+            img_array = datapoint
             
             # Log information about the image
             logger.info(f"Processing image {i}: shape={img_array.shape}, dtype={img_array.dtype}")
@@ -91,7 +91,7 @@ if __name__ == "__main__":
             logger.info(f"Extracted latent features: shape={latent_features.shape}")
             
             # Apply dimension reduction using the UMAP wrapper
-            umap_result = umap_wrapper.predict(latent_features)
+            umap_result = dimred_wrapper.predict(latent_features)
             f_vec = umap_result["umap_coords"]
             logger.info(f"UMAP coordinates: shape={f_vec.shape}")
             

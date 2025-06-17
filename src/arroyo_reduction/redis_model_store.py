@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import threading
+import time
 
 import redis
 
@@ -137,7 +138,7 @@ class RedisModelStore:
             message = {
                 "model_type": model_type,
                 "model_name": model_name,
-                "timestamp": import_time_module().time()
+                "timestamp": time.time()
             }
             
             # Publish to Redis channel
@@ -162,42 +163,46 @@ class RedisModelStore:
         
         # Create a new thread for listening to Redis Pub/Sub
         def listener_thread():
-            try:
-                # Create a new Redis connection for Pub/Sub
-                redis_client = redis.Redis(
-                    host=self.host, 
-                    port=self.port,
-                    password=self.password,
-                    decode_responses=True
-                )
-                pubsub = redis_client.pubsub()
-                pubsub.subscribe(self.CHANNEL_MODEL_UPDATES)
-                logger.info(f"Subscribed to channel: {self.CHANNEL_MODEL_UPDATES}")
+            while True:
+                try:
+                    # Create a new Redis connection for Pub/Sub
+                    redis_client = redis.Redis(
+                        host=self.host, 
+                        port=self.port,
+                        decode_responses=True
+                    )
+                    pubsub = redis_client.pubsub()
+                    pubsub.subscribe(self.CHANNEL_MODEL_UPDATES)
+                    logger.info(f"Subscribed to channel: {self.CHANNEL_MODEL_UPDATES}")
+                    
+                    # Listen for messages
+                    for message in pubsub.listen():
+                        if message["type"] == "message":
+                            try:
+                                data = message.get("data")
+                                if isinstance(data, str):
+                                    payload = json.loads(data)
+                                    logger.debug(f"Received model update: {payload}")
+                                    callback(payload)
+                            except json.JSONDecodeError:
+                                logger.warning(f"Received invalid JSON in model update: {message}")
+                            except Exception as e:
+                                logger.error(f"Error processing model update: {e}")
+                                # Continue processing other messages even if one fails
                 
-                # Listen for messages
-                for message in pubsub.listen():
-                    if message["type"] == "message":
-                        try:
-                            data = message.get("data")
-                            if isinstance(data, str):
-                                payload = json.loads(data)
-                                logger.debug(f"Received model update: {payload}")
-                                callback(payload)
-                        except json.JSONDecodeError:
-                            logger.warning(f"Received invalid JSON in model update: {message}")
-                        except Exception as e:
-                            logger.error(f"Error processing model update: {e}")
-            except Exception as e:
-                logger.error(f"Error in model update listener: {e}")
+                except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
+                    logger.warning(f"Redis connection error in listener: {e}. Retrying in 5 seconds...")
+                    import time
+                    time.sleep(5)
+                    
+                except Exception as e:
+                    logger.error(f"Unexpected error in model update listener: {e}")
+                    # For unexpected errors, wait a bit longer before retrying
+                    time.sleep(10)
+                    # Don't break out of the loop - keep trying to reconnect
         
         # Start the listener thread
         thread = threading.Thread(target=listener_thread, daemon=True)
         thread.start()
         logger.info("Started model update listener thread")
-
-
-def import_time_module():
-    """Import time module on demand to avoid circular imports"""
-    import time
-    return time
 
