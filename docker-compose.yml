@@ -178,13 +178,11 @@ services:
     networks:  
       mle_net: 
 
-  # arroyo and arroyo_sim are made optional via profiles
-  # To run them, use 
-  #  `docker-compose --profile arroyo up`
-  #  or
-  #  `docker-compose --profile sim up
-  # or set the profile in the environment variable
-  #  `export COMPOSE_PROFILES=arroyo, arroyo_sim`
+  # arroyo, arroyo_vec_sim and arroyo_sim are made optional via profiles
+  # To run vector simulator, use
+  # docker compose --profile vec_sim up
+  # To run real image simulator, use
+  # docker compose --profile arroyo --profile sim up
 
   arroyo:
     build:
@@ -236,6 +234,7 @@ services:
       - ./data/test_sim_data:/data/test_data:ro # Mount test data repository containing TIFF images
     environment:
       - TILED_LIVE_API_KEY=${TILED_SINGLE_USER_API_KEY}
+      - DATA_TILED_KEY=${DATA_TILED_KEY}
       - DYNACONF_TILED_POLLER__PUBLISH_ADDRESS=tcp://0.0.0.0:5000 # Make sure ZMQ publisher address is correctly set
     networks:
       mle_net:
