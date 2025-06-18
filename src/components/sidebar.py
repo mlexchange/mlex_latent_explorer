@@ -102,12 +102,37 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                     ),
                                 ),
                                 html.P(),
-                                dbc.Button(
-                                    "Update Models",
-                                    id="update-live-models-button",
-                                    color="primary",
-                                    className="w-100",
-                                    disabled=False,
+                                # Add warning text before the button with gray color and circle icon
+                                html.Div(
+                                    [
+                                        html.Div(
+                                            [
+                                                DashIconify(
+                                                    icon="lucide:alert-circle", 
+                                                    width=20, 
+                                                    height=20,
+                                                    style={"marginRight": "5px"}
+                                                ),
+                                                html.Span(
+                                                    "Updating models will refresh panels and data will be lost.",
+                                                    style={"fontSize": "0.9rem"}
+                                                ),
+                                            ],
+                                            style={
+                                                "display": "flex", 
+                                                "alignItems": "center", 
+                                                "color": "#6c757d",  # Gray color (Bootstrap secondary)
+                                                "marginBottom": "10px"
+                                            }
+                                        ),
+                                        dbc.Button(
+                                            "Update Models",
+                                            id="update-live-models-button",
+                                            color="primary",
+                                            className="w-100",
+                                            disabled=False,
+                                        ),
+                                    ]
                                 ),
                             ],
                             style={"display": "none"},  # Hidden by default (offline mode)
