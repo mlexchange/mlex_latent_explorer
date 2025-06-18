@@ -11,6 +11,7 @@ from arroyosas.schemas import RawFrameEvent, SASMessage
 
 from .reducer import LatentSpaceReducer, Reducer
 from .schemas import LatentSpaceEvent
+from .redis_model_store import RedisModelStore  # Import the RedisModelStore class
 
 logger = logging.getLogger("arroyo_reduction.operator")
 
@@ -21,19 +22,15 @@ class LatentSpaceOperator(Operator):
         self.proxy_socket = proxy_socket
         self.reducer = reducer
         
-        # Initialize Redis client once during initialization
+        # Initialize RedisModelStore instead of direct Redis client
         try:
             self.redis_host = os.getenv("REDIS_HOST", "kvrocks")
             self.redis_port = int(os.getenv("REDIS_PORT", 6666))
-            self.redis_client = redis.Redis(
-                host=self.redis_host, 
-                port=self.redis_port, 
-                decode_responses=True
-            )
-            logger.info(f"Connected to Redis at {self.redis_host}:{self.redis_port}")
+            self.redis_model_store = RedisModelStore(host=self.redis_host, port=self.redis_port)
+            logger.info(f"Connected to Redis Model Store at {self.redis_host}:{self.redis_port}")
         except Exception as e:
-            logger.warning(f"Could not connect to Redis: {e}")
-            self.redis_client = None
+            logger.warning(f"Could not connect to Redis Model Store: {e}")
+            self.redis_model_store = None
 
     async def process(self, message: SASMessage) -> None:
         # logger.debug("message recvd")
@@ -53,18 +50,18 @@ class LatentSpaceOperator(Operator):
 
     async def dispatch(self, message: RawFrameEvent) -> LatentSpaceEvent:
         try:
-            # Use the instance's Redis client instead of creating a new one each time
-            if self.redis_client is not None:
+            # Use the RedisModelStore instead of direct Redis client
+            if self.redis_model_store is not None:
                 # Check if processing is disabled (by checking if models are set)
-                autoencoder_model = self.redis_client.get("selected_mlflow_model")
-                dimred_model = self.redis_client.get("selected_dim_reduction_model")
+                autoencoder_model = self.redis_model_store.get_autoencoder_model()
+                dimred_model = self.redis_model_store.get_dimred_model()
                 
                 if not autoencoder_model or not dimred_model:
                     logger.info(f"In offline mode - skipping frame {message.frame_number}")
                     return None
             else:
-                # Redis client couldn't be initialized, log a warning but continue processing
-                logger.debug("Redis client not available, proceeding with processing")
+                # Model store couldn't be initialized, log a warning but continue processing
+                logger.debug("Redis Model Store not available, proceeding with processing")
                 
             # Existing loading check
             if hasattr(self.reducer, 'is_loading_model') and self.reducer.is_loading_model:

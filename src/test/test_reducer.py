@@ -3,78 +3,12 @@ import numpy as np
 import torch
 from unittest.mock import patch, MagicMock
 
-# Create patches at the module level
-redis_mock_patch = patch('src.arroyo_reduction.redis_model_store.RedisModelStore')
-mlflow_client_mock_patch = patch('src.utils.mlflow_utils.MLflowClient')
-pil_mock_patch = patch('PIL.Image.fromarray')
+from src.test.test_utils import mock_event, redis_mlflow_mocks
 
 class TestReducer:
     
     @pytest.fixture
-    def mock_event(self):
-        """Create a mock event with image data"""
-        event = MagicMock()
-        # Create test image array with proper shape and dtype
-        event.image.array = np.random.randint(0, 255, (512, 512, 3), dtype=np.uint8)
-        return event
-    
-    @pytest.fixture
-    def setup_mocks(self):
-        """Set up and start all the mocks"""
-        # Start all the patches
-        redis_mock = redis_mock_patch.start()
-        mlflow_client_mock = mlflow_client_mock_patch.start()
-        pil_mock = pil_mock_patch.start()
-        
-        # Configure the Redis mock
-        mock_store = MagicMock()
-        redis_mock.return_value = mock_store
-        mock_store.get_autoencoder_model.return_value = "test_autoencoder"
-        mock_store.get_dimred_model.return_value = "test_dimred"
-        
-        # Configure the MLFlow mock
-        mock_mlflow_client = MagicMock()
-        mlflow_client_mock.return_value = mock_mlflow_client
-        
-        # Configure models to return test data
-        latent_features = np.random.rand(1, 64).astype(np.float32)
-        umap_coords = np.random.rand(1, 2).astype(np.float32)
-        
-        mock_autoencoder = MagicMock()
-        mock_dimred = MagicMock()
-        
-        mock_autoencoder.predict.return_value = {"latent_features": latent_features}
-        mock_dimred.predict.return_value = {"umap_coords": umap_coords}
-        
-        # Configure the load_model method to return appropriate models
-        mock_mlflow_client.load_model.side_effect = lambda model_name: mock_autoencoder if model_name == "test_autoencoder" else mock_dimred
-        
-        # Configure PIL mock
-        mock_pil_image = MagicMock()
-        pil_mock.return_value = mock_pil_image
-        
-        # Store all mocks and test data
-        mocks = {
-            "redis": redis_mock,
-            "store": mock_store,
-            "mlflow_client": mock_mlflow_client,
-            "autoencoder": mock_autoencoder,
-            "dimred": mock_dimred,
-            "pil": pil_mock,
-            "pil_image": mock_pil_image,
-            "latent_features": latent_features,
-            "umap_coords": umap_coords
-        }
-        
-        yield mocks
-        
-        # Stop all patches after the test
-        redis_mock_patch.stop()
-        mlflow_client_mock_patch.stop()
-        pil_mock_patch.stop()
-    
-    @pytest.fixture
-    def reducer(self, setup_mocks):
+    def reducer(self, redis_mlflow_mocks):
         """Create a LatentSpaceReducer with all dependencies mocked"""
         # Patch _subscribe_to_model_updates to avoid threading issues
         with patch('src.arroyo_reduction.reducer.LatentSpaceReducer._subscribe_to_model_updates'):
@@ -85,20 +19,20 @@ class TestReducer:
             reducer = LatentSpaceReducer()
             
             # Set references to the mock models
-            reducer.current_torch_model = setup_mocks["autoencoder"]
-            reducer.current_dim_reduction_model = setup_mocks["dimred"]
+            reducer.current_torch_model = redis_mlflow_mocks["autoencoder"]
+            reducer.current_dim_reduction_model = redis_mlflow_mocks["dimred"]
             
             # Store test data
             reducer._test_data = {
-                "mocks": setup_mocks
+                "mocks": redis_mlflow_mocks
             }
             
             return reducer
     
-    def test_reduce(self, reducer, mock_event, setup_mocks):
+    def test_reduce(self, reducer, mock_event, redis_mlflow_mocks):
         """Test that reduce() correctly processes an image through models"""
         # Get the mocks
-        mocks = setup_mocks
+        mocks = redis_mlflow_mocks
         
         # Create real numpy arrays with proper dimensions and types
         latent_features = np.random.rand(1, 64).astype(np.float32)

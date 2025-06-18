@@ -75,61 +75,56 @@ def refresh_mlflow_models(n_clicks):
 
 
 @callback(
-    Output("run-counter", "data", allow_duplicate=True),
+    # Output to the button's n_clicks property
+    Output("live-model-continue", "n_clicks"),
     Input("live-model-continue", "n_clicks"),
     State("live-autoencoder-dropdown", "value"),
     State("live-dimred-dropdown", "value"),
-    State("run-counter", "data"),
     prevent_initial_call=True
 )
-def store_dialog_models_in_redis_on_continue(n_clicks, autoencoder_model, dim_reduction_model, counter):
+def store_dialog_models_in_redis_on_continue(n_clicks, autoencoder_model, dim_reduction_model):
     """Store both model selections from dialog dropdowns in Redis when Continue is clicked"""
     if not n_clicks:
         raise PreventUpdate
     
-    success = True
-    
     # Store autoencoder model if provided
     if autoencoder_model:
         logger.info(f"Storing autoencoder model from dialog: {autoencoder_model}")
-        success = success and redis_model_store.store_autoencoder_model(autoencoder_model)
+        redis_model_store.store_autoencoder_model(autoencoder_model)
     
     # Store dimension reduction model if provided    
     if dim_reduction_model:
         logger.info(f"Storing dimension reduction model from dialog: {dim_reduction_model}")
-        success = success and redis_model_store.store_dimred_model(dim_reduction_model)
+        redis_model_store.store_dimred_model(dim_reduction_model)
     
-    # Increment counter if successful
-    return (counter or 0) + 1 if success else counter
+    # Return the same n_clicks value (this won't change the button state)
+    return n_clicks
 
 @callback(
-    Output("run-counter", "data", allow_duplicate=True),
+    # Output to the button's color property
+    Output("update-live-models-button", "color", allow_duplicate=True),
     Input("update-live-models-button", "n_clicks"),
     State("live-mode-autoencoder-dropdown", "value"),
     State("live-mode-dimred-dropdown", "value"),
-    State("run-counter", "data"),
     prevent_initial_call=True
 )
-def store_sidebar_models_in_redis_on_update(n_clicks, autoencoder_model, dim_reduction_model, counter):
+def store_sidebar_models_in_redis_on_update(n_clicks, autoencoder_model, dim_reduction_model):
     """Store both model selections from sidebar in Redis when Update button is clicked"""
     if not n_clicks:
         raise PreventUpdate
     
-    success = True
-    
     # Store autoencoder model if provided
     if autoencoder_model:
         logger.info(f"Storing autoencoder model from sidebar: {autoencoder_model}")
-        success = success and redis_model_store.store_autoencoder_model(autoencoder_model)
+        redis_model_store.store_autoencoder_model(autoencoder_model)
     
     # Store dimension reduction model if provided
     if dim_reduction_model:
         logger.info(f"Storing dimension reduction model from sidebar: {dim_reduction_model}")
-        success = success and redis_model_store.store_dimred_model(dim_reduction_model)
+        redis_model_store.store_dimred_model(dim_reduction_model)
     
-    # Increment counter if successful
-    return (counter or 0) + 1 if success else counter
-
+    # Return "secondary" color to indicate success
+    return "secondary"
 
 @callback(
     Output(

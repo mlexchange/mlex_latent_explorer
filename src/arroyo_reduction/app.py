@@ -3,13 +3,13 @@ import logging
 import os
 import sys
 
-import redis
 import typer
 from arroyosas.zmq import ZMQFrameListener
 from dynaconf import Dynaconf
 
 from .operator import LatentSpaceOperator
 from .publisher import LSEWSResultPublisher
+from .redis_model_store import RedisModelStore  # Import the RedisModelStore class
 
 settings = Dynaconf(
     envvar_prefix="",
@@ -49,18 +49,19 @@ async def start() -> None:
         ws_publisher = LSEWSResultPublisher.from_settings(app_settings.ws_publisher)
         publisher_task = asyncio.create_task(ws_publisher.start())
         
+        # Initialize Redis model store instead of direct Redis client
+        logger.info("Initializing Redis Model Store")
+        redis_model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
+        
         # Wait for model selection in Redis before starting listener
         logger.info("Waiting for models to be selected in the UI...")
         
-        # Create Redis client
-        redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
-        
-        # Poll Redis for model selections
+        # Poll Redis for model selections using the model store
         while True:
             try:
-                # Check if both models are selected
-                autoencoder_model = redis_client.get("selected_mlflow_model")
-                dimred_model = redis_client.get("selected_dim_reduction_model")
+                # Check if both models are selected using the model store
+                autoencoder_model = redis_model_store.get_autoencoder_model()
+                dimred_model = redis_model_store.get_dimred_model()
                 
                 if autoencoder_model and dimred_model:
                     logger.info(f"Models selected - starting processing:")

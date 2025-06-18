@@ -65,11 +65,11 @@ class LatentSpaceReducer(Reducer):
         self.loading_model_type = None
         
         # Initialize Redis model store
-        self.model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
+        self.redis_model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
         
         # Get model selections from Redis
-        self.autoencoder_model_name = self.model_store.get_autoencoder_model()
-        self.dimred_model_name = self.model_store.get_dimred_model()
+        self.autoencoder_model_name = self.redis_model_store.get_autoencoder_model()
+        self.dimred_model_name = self.redis_model_store.get_dimred_model()
         
         logger.info(f"Using autoencoder model: {self.autoencoder_model_name}")
         logger.info(f"Using dimension reduction model: {self.dimred_model_name}")

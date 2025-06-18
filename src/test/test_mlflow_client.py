@@ -3,6 +3,12 @@ from unittest.mock import patch, MagicMock, call
 import os
 import hashlib
 import mlflow
+
+from src.test.test_utils import (
+    mock_mlflow_client, 
+    mock_os_makedirs,
+    mlflow_test_client
+)
 from src.utils.mlflow_utils import MLflowClient
 
 class TestMLflowClient:
@@ -21,34 +27,9 @@ class TestMLflowClient:
         # Restore original cache after test
         MLflowClient._model_cache = original_cache
     
-    @pytest.fixture
-    def mock_mlflow_client(self):
-        """Mock MlflowClient class"""
-        with patch('src.utils.mlflow_utils.MlflowClient') as mock_client_class:
-            mock_client = MagicMock()
-            mock_client_class.return_value = mock_client
-            yield mock_client
-    
-    @pytest.fixture
-    def mock_os_makedirs(self):
-        """Mock os.makedirs to avoid file system errors"""
-        with patch('os.makedirs') as mock_makedirs:
-            yield mock_makedirs
-    
-    @pytest.fixture
-    def client(self, mock_mlflow_client, mock_os_makedirs):
-        """Create a MLflowClient instance with mocked dependencies"""
-        with patch('mlflow.set_tracking_uri'):  # Avoid actually setting tracking URI
-            client = MLflowClient(
-                tracking_uri="http://mock-mlflow:5000",
-                username="test-user",
-                password="test-password",
-                cache_dir="/tmp/test_mlflow_cache"
-            )
-            return client
-    
-    def test_init(self, client, mock_os_makedirs):
+    def test_init(self, mlflow_test_client, mock_os_makedirs):
         """Test initialization of MLflowClient"""
+        client = mlflow_test_client
         # Verify environment variables were set
         assert os.environ['MLFLOW_TRACKING_USERNAME'] == "test-user"
         assert os.environ['MLFLOW_TRACKING_PASSWORD'] == "test-password"
@@ -56,8 +37,9 @@ class TestMLflowClient:
         # Verify cache directory creation was attempted
         mock_os_makedirs.assert_called_with(client.cache_dir, exist_ok=True)
     
-    def test_check_mlflow_ready_success(self, client, mock_mlflow_client):
+    def test_check_mlflow_ready_success(self, mlflow_test_client, mock_mlflow_client):
         """Test check_mlflow_ready when MLflow is reachable"""
+        client = mlflow_test_client
         # Configure the mock to return a result
         mock_mlflow_client.search_experiments.return_value = []
         
@@ -68,8 +50,9 @@ class TestMLflowClient:
         assert result is True
         mock_mlflow_client.search_experiments.assert_called_once_with(max_results=1)
     
-    def test_check_mlflow_ready_failure(self, client, mock_mlflow_client):
+    def test_check_mlflow_ready_failure(self, mlflow_test_client, mock_mlflow_client):
         """Test check_mlflow_ready when MLflow is not reachable"""
+        client = mlflow_test_client
         # Configure the mock to raise an exception
         mock_mlflow_client.search_experiments.side_effect = Exception("Connection error")
         
@@ -80,8 +63,9 @@ class TestMLflowClient:
         assert result is False
         mock_mlflow_client.search_experiments.assert_called_once_with(max_results=1)
         
-    def test_get_mlflow_params(self, client, mock_mlflow_client):
+    def test_get_mlflow_params(self, mlflow_test_client, mock_mlflow_client):
         """Test retrieving MLflow model parameters"""
+        client = mlflow_test_client
         # Configure mock for get_model_version
         mock_model_version = MagicMock()
         mock_model_version.run_id = "run-123"
@@ -106,8 +90,9 @@ class TestMLflowClient:
         # Verify the result contains the expected parameters
         assert result == {"param1": "value1", "param2": "value2"}
     
-    def test_get_mlflow_models(self, client, mock_mlflow_client):
+    def test_get_mlflow_models(self, mlflow_test_client, mock_mlflow_client):
         """Test retrieving MLflow models"""
+        client = mlflow_test_client
         # Create mock model versions
         mock_version1 = MagicMock()
         mock_version1.name = "model1"
@@ -150,8 +135,9 @@ class TestMLflowClient:
         assert result[1]["label"] == "Flow Run 1"
         assert result[1]["value"] == "model2"
     
-    def test_get_mlflow_models_with_livemode(self, client, mock_mlflow_client):
+    def test_get_mlflow_models_with_livemode(self, mlflow_test_client, mock_mlflow_client):
         """Test retrieving MLflow models with livemode=True"""
+        client = mlflow_test_client
         # Create mock model versions
         mock_version1 = MagicMock()
         mock_version1.name = "model1"
@@ -188,8 +174,9 @@ class TestMLflowClient:
         assert result[0]["label"] == "model1"
         assert result[0]["value"] == "model1"
     
-    def test_get_mlflow_models_with_model_type(self, client, mock_mlflow_client):
+    def test_get_mlflow_models_with_model_type(self, mlflow_test_client, mock_mlflow_client):
         """Test retrieving MLflow models with model_type filter"""
+        client = mlflow_test_client
         # Create mock model versions
         mock_version1 = MagicMock()
         mock_version1.name = "model1"
@@ -227,8 +214,9 @@ class TestMLflowClient:
         assert result[0]["label"] == "Flow Run 1"
         assert result[0]["value"] == "model1"
     
-    def test_get_cache_path(self, client):
+    def test_get_cache_path(self, mlflow_test_client):
         """Test the _get_cache_path method"""
+        client = mlflow_test_client
         # Test with just model name
         cache_path = client._get_cache_path("test-model")
         expected_hash = hashlib.md5("test-model".encode()).hexdigest()
@@ -238,8 +226,9 @@ class TestMLflowClient:
         cache_path = client._get_cache_path("test-model", 2)
         assert cache_path == "/tmp/test_mlflow_cache/test-model_v2"
     
-    def test_load_model_from_memory_cache(self, client):
+    def test_load_model_from_memory_cache(self, mlflow_test_client):
         """Test loading a model from memory cache"""
+        client = mlflow_test_client
         # Set up memory cache
         mock_model = MagicMock(name="memory_model")
         MLflowClient._model_cache = {"test-model": mock_model}
@@ -250,8 +239,9 @@ class TestMLflowClient:
         # Verify result is from cache
         assert result is mock_model
     
-    def test_load_model_from_disk_cache(self, client, mock_mlflow_client):
+    def test_load_model_from_disk_cache(self, mlflow_test_client, mock_mlflow_client):
         """Test loading a model from disk cache"""
+        client = mlflow_test_client
         # Setup mocks
         mock_version = MagicMock()
         mock_version.version = "1"
@@ -270,8 +260,9 @@ class TestMLflowClient:
             # Verify result is the mock model
             assert result is mock_model
     
-    def test_load_model_download_artifacts(self, client, mock_mlflow_client):
+    def test_load_model_download_artifacts(self, mlflow_test_client, mock_mlflow_client):
         """Test loading a model by downloading artifacts"""
+        client = mlflow_test_client
         # Setup mocks
         mock_version = MagicMock()
         mock_version.version = "1"
@@ -293,8 +284,9 @@ class TestMLflowClient:
             # Verify result is the mock model
             assert result is mock_model
     
-    def test_load_model_fallback(self, client, mock_mlflow_client):
+    def test_load_model_fallback(self, mlflow_test_client, mock_mlflow_client):
         """Test load_model fallback when download fails"""
+        client = mlflow_test_client
         # Setup mocks
         mock_version = MagicMock()
         mock_version.version = "1"
@@ -315,8 +307,9 @@ class TestMLflowClient:
             # Verify result is the mock model
             assert result is mock_model
     
-    def test_load_model_no_versions(self, client, mock_mlflow_client):
+    def test_load_model_no_versions(self, mlflow_test_client, mock_mlflow_client):
         """Test loading a model when no versions are found"""
+        client = mlflow_test_client
         # Configure client to return no versions
         mock_mlflow_client.search_model_versions.return_value = []
         
@@ -327,8 +320,9 @@ class TestMLflowClient:
         # Verify result is None
         assert result is None
     
-    def test_load_model_error(self, client, mock_mlflow_client):
+    def test_load_model_error(self, mlflow_test_client, mock_mlflow_client):
         """Test error handling in load_model"""
+        client = mlflow_test_client
         # Configure client to raise an exception
         mock_mlflow_client.search_model_versions.side_effect = Exception("Test error")
         
@@ -350,8 +344,9 @@ class TestMLflowClient:
         # Verify memory cache is empty
         assert len(MLflowClient._model_cache) == 0
     
-    def test_clear_disk_cache(self, client):
+    def test_clear_disk_cache(self, mlflow_test_client):
         """Test clearing the disk cache"""
+        client = mlflow_test_client
         # Mock shutil.rmtree and os.makedirs
         with patch('shutil.rmtree') as mock_rmtree, \
              patch('os.makedirs') as mock_makedirs:
