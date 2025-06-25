@@ -224,9 +224,9 @@ services:
       mle_net:
 
   # Simulator 2: real image simulator service
-  arroyo_sim:
+  sim_realistic:
     image: ghcr.io/als-computing/arroyosas:main
-    container_name: arroyo_sim
+    container_name: sim_realistic
     command: python -m arroyosas.app.real_image_sim_cli
     profiles:
       - sim
