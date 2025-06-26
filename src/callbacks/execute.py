@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 import traceback
 import uuid
 from datetime import datetime
@@ -28,8 +29,9 @@ from src.utils.job_utils import (
     parse_job_params,
     parse_model_params,
 )
-from src.utils.mlflow_utils import get_mlflow_models
+from src.utils.mlflow_utils import MLflowClient
 from src.utils.plot_utils import generate_notification
+from src.arroyo_reduction.redis_model_store import RedisModelStore  # Import the RedisModelStore class
 
 MODE = os.getenv("MODE", "")
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
@@ -38,20 +40,24 @@ PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]')
 RESULTS_DIR = os.getenv("RESULTS_DIR", "")
 FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
 
+# Initialize Redis model store instead of direct Redis client
+REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
+redis_model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
 
 logger = logging.getLogger(__name__)
-
+mlflow_client = MLflowClient()
 
 @callback(
     Output("mlflow-model-dropdown", "options", allow_duplicate=True),
     Input(
         "sidebar", "active_item"
-    ),  # This will trigger when the sidebar is first rendered
-    prevent_initial_call="initial_duplicate",  # Allow initial call but handle duplicates properly
+    ),
+    prevent_initial_call="initial_duplicate",
 )
 def load_mlflow_models_on_render(active_item):
     """Load MLflow models when the page is first loaded"""
-    return get_mlflow_models()
+    return mlflow_client.get_mlflow_models()
 
 
 @callback(
@@ -63,10 +69,62 @@ def load_mlflow_models_on_render(active_item):
 def refresh_mlflow_models(n_clicks):
     """Refresh the MLflow models dropdown when the refresh button is clicked"""
     if n_clicks:
-        options = get_mlflow_models()
+        options = mlflow_client.get_mlflow_models()
         return options, options[0]["value"] if options else None
     return [], None
 
+
+@callback(
+    # Output to the button's n_clicks property
+    Output("live-model-continue", "n_clicks"),
+    Input("live-model-continue", "n_clicks"),
+    State("live-autoencoder-dropdown", "value"),
+    State("live-dimred-dropdown", "value"),
+    prevent_initial_call=True
+)
+def store_dialog_models_in_redis_on_continue(n_clicks, autoencoder_model, dim_reduction_model):
+    """Store both model selections from dialog dropdowns in Redis when Continue is clicked"""
+    if not n_clicks:
+        raise PreventUpdate
+    
+    # Store autoencoder model if provided
+    if autoencoder_model:
+        logger.info(f"Storing autoencoder model from dialog: {autoencoder_model}")
+        redis_model_store.store_autoencoder_model(autoencoder_model)
+    
+    # Store dimension reduction model if provided    
+    if dim_reduction_model:
+        logger.info(f"Storing dimension reduction model from dialog: {dim_reduction_model}")
+        redis_model_store.store_dimred_model(dim_reduction_model)
+    
+    # Return the same n_clicks value (this won't change the button state)
+    return n_clicks
+
+@callback(
+    # Output to the button's color property
+    Output("update-live-models-button", "color", allow_duplicate=True),
+    Input("update-live-models-button", "n_clicks"),
+    State("live-mode-autoencoder-dropdown", "value"),
+    State("live-mode-dimred-dropdown", "value"),
+    prevent_initial_call=True
+)
+def store_sidebar_models_in_redis_on_update(n_clicks, autoencoder_model, dim_reduction_model):
+    """Store both model selections from sidebar in Redis when Update button is clicked"""
+    if not n_clicks:
+        raise PreventUpdate
+    
+    # Store autoencoder model if provided
+    if autoencoder_model:
+        logger.info(f"Storing autoencoder model from sidebar: {autoencoder_model}")
+        redis_model_store.store_autoencoder_model(autoencoder_model)
+    
+    # Store dimension reduction model if provided
+    if dim_reduction_model:
+        logger.info(f"Storing dimension reduction model from sidebar: {dim_reduction_model}")
+        redis_model_store.store_dimred_model(dim_reduction_model)
+    
+    # Return "secondary" color to indicate success
+    return "secondary"
 
 @callback(
     Output(
@@ -194,7 +252,7 @@ def run_latent_space(
         if MODE == "dev":
             job_uid = str(uuid.uuid4())
             job_message = (
-                f"Dev Mode: Job has been succesfully submitted with uid: {job_uid}"
+                f"Dev Mode: Job has been successfully submitted with uid: {job_uid}"
             )
             notification_color = "primary"
         else:
@@ -211,7 +269,7 @@ def run_latent_space(
                     flow_run_name=f"{job_name} {current_time}",
                     tags=PREFECT_TAGS + [project_name, "latent-space"],
                 )
-                job_message = f"Job has been succesfully submitted with uid: {job_uid}"
+                job_message = f"Job has been successfully submitted with uid: {job_uid}"
                 notification_color = "indigo"
             except Exception as e:
                 # Log the traceback
@@ -471,7 +529,7 @@ def run_clustering(
         if MODE == "dev":
             job_uid = str(uuid.uuid4())
             job_message = (
-                f"Dev Mode: Job has been succesfully submitted with uid: {job_uid}"
+                f"Dev Mode: Job has been successfully submitted with uid: {job_uid}"
             )
             notification_color = "primary"
         else:
@@ -489,7 +547,7 @@ def run_clustering(
                     flow_run_name=f"{dimension_reduction_name} {job_name} {current_time}",
                     tags=PREFECT_TAGS + [project_name, "clustering"],
                 )
-                job_message = f"Job has been succesfully submitted with uid: {job_uid}"
+                job_message = f"Job has been successfully submitted with uid: {job_uid}"
                 notification_color = "indigo"
             except Exception as e:
                 logger.error(traceback.format_exc())
@@ -555,3 +613,59 @@ def allow_show_clusters(job_id, project_name):
     except Exception:
         logger.error(traceback.format_exc())
         return True
+
+
+@callback(
+    Output(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "run-dropdown",
+            "aio_id": "clustering-jobs",
+        },
+        "options",
+    ),
+    Input(
+        {
+            "component": "DbcJobManagerAIO",
+            "subcomponent": "run-dropdown",
+            "aio_id": "clustering-jobs",
+        },
+        "options",
+    ),
+    prevent_initial_call=True,
+)
+def filter_clustering_dropdown(options):
+    """
+    Filter the clustering job dropdown to only show true clustering jobs.
+    """
+    if not options:
+        return []
+    
+    # Get list of clustering model names for comparison
+    clustering_model_names = [model.lower() for model in clustering_models.modelname_list]
+    
+    # Filter job options
+    filtered_options = []
+    for job_option in options:
+        job_label = job_option.get("label", "").lower()
+        
+        # Check if this job was created by any of the clustering models
+        is_clustering_job = False
+        for model_name in clustering_model_names:
+            if model_name in job_label:
+                is_clustering_job = True
+                break
+        
+        # If no clustering model is mentioned, check if it has clustering-related terms
+        if not is_clustering_job:
+            clustering_terms = ["cluster", "kmeans", "dbscan", "hdbscan", "agglomerative", "hierarchical"]
+            for term in clustering_terms:
+                if term in job_label:
+                    is_clustering_job = True
+                    break
+        
+        # Add to filtered options if it's a clustering job
+        if is_clustering_job:
+            filtered_options.append(job_option)
+    
+    return filtered_options

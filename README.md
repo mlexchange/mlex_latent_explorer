@@ -48,6 +48,14 @@ When setting `MLFLOW_TRACKING_URI` in the `.env` file:
   MLFLOW_TRACKING_URI="http://host.docker.internal:5000"
   ```
 
+You also need to set  `MLFLOW_TRACKING_USERNAME` and `MLFLOW_TRACKING_PASSWORD` in the `.env` file and modify the admin_username and admin_password in `basic_auth.ini` as well.
+
+Create a `basic_auth.ini` file using `basic_auth.ini.example` as a reference:
+
+```sh
+cp basic_auth.ini.example basic_auth.ini
+```
+
 ### 3 Build and Start the Application
 
 ```sh
@@ -81,6 +89,38 @@ docker compose down
 ```
 
 This will **shut down all services** but **retain data** if volumes are used.
+
+### 8. Test Live Mode
+
+1. Download model checkpoints from Google Drive.
+
+2. Configure environment variables in `.env`:
+
+```
+MLFLOW_EXPERIMENT_NAME="smi_experiment"
+MLFLOW_VIT_MODEL_NAME="smi_auto_vit"
+MLFLOW_UMAP_MODEL_NAME="smi_dr_umap"
+AUTOENCODER_WEIGHTS_PATH="./models/vit/vit_model_weights.npz"
+AUTOENCODER_CODE_PATH="./models/vit/vit.py"
+UMAP_WEIGHTS_PATH="./models/vit/vit_joblib_test.joblib"
+LATENT_DIM=64
+```
+
+3. Start the services:
+```
+docker compose --profile arroyo --profile sim up
+```
+
+4. Register models with MLflow:
+```sh
+source .env
+cd live_operator_example
+python save_mlflow_wrapper.py
+```
+
+5. Open the app, click "Go to Live Mode" and select the registered models in the dialog to begin processing the live data stream.
+
+If models don't appear in the dropdown, verify the MLflow server is running and models were registered successfully.
 
 ## Model Description
 

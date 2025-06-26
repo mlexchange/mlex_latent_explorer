@@ -79,6 +79,65 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                             ],
                         ),
                         dbc.AccordionItem(
+                            id="live-mode-models",
+                            title="Live Mode Models",
+                            children=[
+                                ControlItem(
+                                    "Autoencoder Model",
+                                    "live-mode-autoencoder-title",
+                                    dbc.Select(
+                                        id="live-mode-autoencoder-dropdown",
+                                        options=[],
+                                        placeholder="Select an autoencoder model...",
+                                    ),
+                                ),
+                                html.P(),
+                                ControlItem(
+                                    "Dimension Reduction Model",
+                                    "live-mode-dimred-title",
+                                    dbc.Select(
+                                        id="live-mode-dimred-dropdown",
+                                        options=[],
+                                        placeholder="Select a dimension reduction model...",
+                                    ),
+                                ),
+                                html.P(),
+                                # Add warning text before the button with gray color and circle icon
+                                html.Div(
+                                    [
+                                        html.Div(
+                                            [
+                                                DashIconify(
+                                                    icon="lucide:alert-circle", 
+                                                    width=20, 
+                                                    height=20,
+                                                    style={"marginRight": "5px"}
+                                                ),
+                                                html.Span(
+                                                    "Updating models will refresh panels and data will be lost.",
+                                                    style={"fontSize": "0.9rem"}
+                                                ),
+                                            ],
+                                            style={
+                                                "display": "flex", 
+                                                "alignItems": "center", 
+                                                "color": "#6c757d",  # Gray color (Bootstrap secondary)
+                                                "marginBottom": "10px"
+                                            }
+                                        ),
+                                        dbc.Button(
+                                            "Update Models",
+                                            id="update-live-models-button",
+                                            color="primary",
+                                            className="w-100",
+                                            disabled=False,
+                                        ),
+                                    ]
+                                ),
+                            ],
+                            style={"display": "none"},  # Hidden by default (offline mode)
+                        ),
+                        dbc.AccordionItem(
                             id="dimension-reduction-controls",
                             children=[
                                 ControlItem(
