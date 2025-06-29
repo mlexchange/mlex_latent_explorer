@@ -90,29 +90,33 @@ class MLflowClient:
     def get_mlflow_models(self, livemode=False, model_type=None):
         """
         Retrieve available MLflow models and create dropdown options.
-
+        
         Args:
             livemode (bool): If True, only include models where exp_type == "live_mode".
                             If False, exclude models where exp_type == "live_mode" and use custom labels.
             model_type (str, optional): Filter by run tag 'model_type'.
-
+        
         Returns:
             list: Dropdown options for MLflow models matching the tag filters.
         """
         try:
             all_versions = self.client.search_model_versions()
-
+            
             model_map = {}  # model name -> latest version info
-
+            
             for v in all_versions:
                 try:
                     current = model_map.get(v.name)
                     if current and int(v.version) <= int(current.version):
                         continue
-
+                    
                     run = self.client.get_run(v.run_id)
                     run_tags = run.data.tags
-
+                    
+                    # Skip models that are algorithm definitions
+                    if run_tags.get("entity_type") == "algorithm_definition":
+                        continue
+                    
                     # Tag-based filtering
                     exp_type = run_tags.get("exp_type")
                     if livemode:
@@ -121,16 +125,16 @@ class MLflowClient:
                     else:
                         if exp_type == "live_mode":
                             continue
-
+                    
                     if model_type is not None and run_tags.get("model_type") != model_type:
                         continue
-
+                    
                     model_map[v.name] = v
-
+                
                 except Exception as e:
                     logger.warning(f"Error processing model version {v.name} v{v.version}: {e}")
                     continue
-
+            
             # Build dropdown options
             model_options = []
             for name in sorted(model_map.keys()):
@@ -143,11 +147,11 @@ class MLflowClient:
                     except Exception as e:
                         logger.warning(f"Failed to get label for model '{name}': {e}")
                         label = name  # fallback
-
+                
                 model_options.append({"label": label, "value": name})
-
+            
             return model_options
-
+        
         except Exception as e:
             logger.warning(f"Error retrieving MLflow models: {e}")
             return [{"label": "Error loading models", "value": None}]
