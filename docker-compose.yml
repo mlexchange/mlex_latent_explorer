@@ -132,7 +132,6 @@ services:
       FLOW_NAME: '${FLOW_NAME}'
       TIMEZONE: "${TIMEZONE}"
       PREFECT_TAGS: "${PREFECT_TAGS}"
-      FLOW_TYPE: "${FLOW_TYPE}"
       CONTAINER_NETWORK: "${CONTAINER_NETWORK}"
       # Slurm jobs
       PARTITIONS_CPU: "${PARTITIONS_CPU}"
@@ -243,3 +242,8 @@ networks:
   mle_net:
     name: mle_net
     driver: bridge
+
+# If services are already running on a different docker compose, use the following network definition
+# networks:
+#   mle_net:
+#     external: true
