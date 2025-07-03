@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 import time
@@ -64,7 +63,7 @@ async def stream():
 
     for index, latent_vector in zip(range(num_messages), feature_vector_list):
         message = {
-            "tiled_url": DATA_TILED_URI, # be compatible with LatentSpaceEvent
+            "tiled_url": DATA_TILED_URI,  # be compatible with LatentSpaceEvent
             "index": index,
             "feature_vector": latent_vector.tolist(),
         }
@@ -73,7 +72,6 @@ async def stream():
         # Send the message (as JSON) to the server
         yield message
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.05)
 
     logger.info("All messages sent; connection closed.")
-
