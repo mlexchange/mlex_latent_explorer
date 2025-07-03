@@ -6,8 +6,8 @@ from dash import dcc, html
 from dash_extensions import WebSocket
 from dash_iconify import DashIconify
 
-from .model_selection_dialog import create_model_selection_dialog
 from ..utils.plot_utils import draw_rows, plot_empty_heatmap, plot_empty_scatter
+from .model_selection_dialog import create_model_selection_dialog
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 NUM_IMGS_OVERVIEW = 6
 WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://localhost:8765/lse")
 logger.info(f"WebSocket URL: {WEBSOCKET_URL}")
+
 
 def main_display():
     main_display = html.Div(
@@ -217,6 +218,7 @@ def main_display():
             create_model_selection_dialog(),
             dcc.Store(id="selected-live-models", data=None),
             dcc.Store(id="buffer", data={}),
+            dcc.Interval(id="buffer-debounce", interval=100, n_intervals=0),  # 100ms
             dcc.Store(id="live-indices", data=[]),
             WebSocket(id="ws-live", url=WEBSOCKET_URL),
         ],
