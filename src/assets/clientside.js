@@ -138,17 +138,49 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                         log.debug("Tiled URI:", tiled_url, "Index:", index);
 
                         let url = new URL(tiled_url);
-                        let path_parts = url.pathname.split('/');
-                        let root_uri = tiled_url;
+                        const path_parts = url.pathname.split('/').filter(p => p !== '');
+                        let root_uri = url.origin;
                         let uri = "";
 
-                        if (path_parts.length > 1 && path_parts[path_parts.length - 1] !== '') {
-                            let root_path = path_parts.slice(0, -1).join('/') + '/';
-                            root_uri = url.protocol + '//' + url.host + root_path;
-                            uri = path_parts[path_parts.length - 1];
+                        // Find base URI (e.g., api/v1/metadata or api/v1/array/full)
+                        const apiIndex = path_parts.findIndex((p, i) =>
+                            p === 'api' &&
+                            path_parts[i + 1] === 'v1' &&
+                            ['metadata', 'array'].includes(path_parts[i + 2])
+                        );
+
+                        if (apiIndex !== -1) {
+                            const base_root_parts = path_parts.slice(0, apiIndex + 3);
+                            root_uri = `${url.protocol}//${url.host}/${base_root_parts.join('/')}`;
+
+                            // Extract internal Tiled URI (everything after the base root)
+                            uri = decodeURIComponent(path_parts.slice(apiIndex + 3).join('/'));
+                        } else {
+                            console.warn("Unexpected Tiled URL format:", tiled_url);
                         }
 
-                        log.debug("Root URI:", root_uri, "URI:", uri);
+                        // Check for slice index in the query string
+                        const params = new URLSearchParams(url.search);
+                        const sliceParam = params.get('slice');
+
+                        if (sliceParam) {
+                            // Expecting format like "0,0,:,:"
+                            const sliceParts = sliceParam.split(',');
+                            const parsedIndex = parseInt(sliceParts[0], 10);
+                            if (!isNaN(parsedIndex)) {
+                                index = parsedIndex;
+                            }
+                        } else {
+                            // No slice param, fallback to dataset match
+                            const match = data_project_dict.datasets.find(d => d.uri === uri);
+                            if (match) {
+                                index = match.cumulative_data_count;
+                            } else {
+                                console.warn(`No matching dataset entry for uri: ${uri}`);
+                            }
+                        }
+
+                        log.debug("Root URI:", root_uri, "URI:", uri, "Index:", index);
 
                         if (index >= 0) {
                             live_indices = [...live_indices, index];
