@@ -566,16 +566,35 @@ def set_live_latent_vectors(n_intervals, current_figure, pause_n_clicks, buffer_
             logging.debug("No new latent vectors to append.")
             raise PreventUpdate
 
-        # Slice to get only new data
-        new_vectors = latent_vectors[current_n_points:]
+        # Use Patch for incremental update
+        try:
+            # Get only new vectors
+            new_vectors = latent_vectors[current_n_points:]
+            
+            # Create patch
+            figure_patch = Patch()
+            
+            # Update data arrays
+            if "x" in current_figure["data"][0]:
+                figure_patch["data"][0]["x"] = current_figure["data"][0]["x"] + new_vectors[:, 0].tolist()
+            else:
+                figure_patch["data"][0]["x"] = new_vectors[:, 0].tolist()
+                
+            if "y" in current_figure["data"][0]:
+                figure_patch["data"][0]["y"] = current_figure["data"][0]["y"] + new_vectors[:, 1].tolist()
+            else:
+                figure_patch["data"][0]["y"] = new_vectors[:, 1].tolist()
+                
+            if "customdata" in current_figure["data"][0]:
+                figure_patch["data"][0]["customdata"] = current_figure["data"][0]["customdata"] + [[0]] * len(new_vectors)
+            else:
+                figure_patch["data"][0]["customdata"] = [[0]] * len(new_vectors)
 
-        # Create patch
-        figure_patch = Patch()
-        figure_patch["data"][0]["x"].extend(new_vectors[:, 0].tolist())
-        figure_patch["data"][0]["y"].extend(new_vectors[:, 1].tolist())
-        figure_patch["data"][0]["customdata"].extend([[0]] * len(new_vectors))
-
-        return figure_patch
+            return figure_patch
+            
+        except Exception as e:
+            logging.warning(f"Error patching scatter plot: {e}, preserving current figure")
+            return current_figure
 
     except Exception as e:
         logging.error(f"Error updating scatter plot: {e}")
