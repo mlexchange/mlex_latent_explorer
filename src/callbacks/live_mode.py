@@ -595,7 +595,9 @@ def set_live_latent_vectors(n_intervals, current_figure, pause_n_clicks, buffer_
         except Exception as e:
             logging.warning(f"Error patching scatter plot: {e}, preserving current figure")
             return current_figure
-
+    except PreventUpdate:
+        # This is expected behavior, just re-raise
+        raise
     except Exception as e:
         logging.error(f"Error updating scatter plot: {e}")
         raise PreventUpdate
