@@ -456,7 +456,12 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
     selected_models = {"autoencoder": autoencoder_model, "dimred": dimred_model}
 
     # Update data project dict with new models
-    data_project_dict["live_models"] = selected_models
+    data_project_dict = {
+        **data_project_dict,  # Preserve all existing fields
+        "root_uri": "",  # Reset root_uri
+        "datasets": [],  # Reset datasets to empty list
+        "live_models": selected_models,  # Update models
+    }
 
     # Create empty figure to reset the scatter plot
     empty_figure = plot_empty_scatter()
@@ -570,30 +575,38 @@ def set_live_latent_vectors(n_intervals, current_figure, pause_n_clicks, buffer_
         try:
             # Get only new vectors
             new_vectors = latent_vectors[current_n_points:]
-            
+
             # Create patch
             figure_patch = Patch()
-            
+
             # Update data arrays
             if "x" in current_figure["data"][0]:
-                figure_patch["data"][0]["x"] = current_figure["data"][0]["x"] + new_vectors[:, 0].tolist()
+                figure_patch["data"][0]["x"] = (
+                    current_figure["data"][0]["x"] + new_vectors[:, 0].tolist()
+                )
             else:
                 figure_patch["data"][0]["x"] = new_vectors[:, 0].tolist()
-                
+
             if "y" in current_figure["data"][0]:
-                figure_patch["data"][0]["y"] = current_figure["data"][0]["y"] + new_vectors[:, 1].tolist()
+                figure_patch["data"][0]["y"] = (
+                    current_figure["data"][0]["y"] + new_vectors[:, 1].tolist()
+                )
             else:
                 figure_patch["data"][0]["y"] = new_vectors[:, 1].tolist()
-                
+
             if "customdata" in current_figure["data"][0]:
-                figure_patch["data"][0]["customdata"] = current_figure["data"][0]["customdata"] + [[0]] * len(new_vectors)
+                figure_patch["data"][0]["customdata"] = current_figure["data"][0][
+                    "customdata"
+                ] + [[0]] * len(new_vectors)
             else:
                 figure_patch["data"][0]["customdata"] = [[0]] * len(new_vectors)
 
             return figure_patch
-            
+
         except Exception as e:
-            logging.warning(f"Error patching scatter plot: {e}, preserving current figure")
+            logging.warning(
+                f"Error patching scatter plot: {e}, preserving current figure"
+            )
             return current_figure
     except PreventUpdate:
         # This is expected behavior, just re-raise
