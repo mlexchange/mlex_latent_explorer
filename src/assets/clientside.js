@@ -146,15 +146,22 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                         const apiIndex = path_parts.findIndex((p, i) =>
                             p === 'api' &&
                             path_parts[i + 1] === 'v1' &&
-                            ['metadata', 'array'].includes(path_parts[i + 2])
+                            (
+                                path_parts[i + 2] === 'metadata' ||
+                                (path_parts[i + 2] === 'array' && ['full', 'block'].includes(path_parts[i + 3]))
+                            )
                         );
 
                         if (apiIndex !== -1) {
-                            const base_root_parts = path_parts.slice(0, apiIndex + 3);
-                            root_uri = `${url.protocol}//${url.host}/${base_root_parts.join('/')}`;
+                            let base_root_parts;
+                            if (path_parts[apiIndex + 2] === 'metadata') {
+                                base_root_parts = path_parts.slice(0, apiIndex + 3);
+                            } else {
+                                base_root_parts = path_parts.slice(0, apiIndex + 4);
+                            }
 
-                            // Extract internal Tiled URI (everything after the base root)
-                            uri = decodeURIComponent(path_parts.slice(apiIndex + 3).join('/'));
+                            root_uri = `${url.protocol}//${url.host}/${base_root_parts.join('/')}`;
+                            uri = decodeURIComponent(path_parts.slice(base_root_parts.length).join('/'));
                         } else {
                             console.warn("Unexpected Tiled URL format:", tiled_url);
                         }
