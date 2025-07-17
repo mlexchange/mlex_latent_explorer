@@ -171,12 +171,13 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                                 index = parsedIndex;
                             }
                         } else {
-                            // No slice param, fallback to dataset match
-                            const match = data_project_dict.datasets.find(d => d.uri === uri);
-                            if (match) {
-                                index = match.cumulative_data_count;
+                            // No slice param, fallback to last dataset entry
+                            if (data_project_dict.datasets.length > 0) {
+                                const lastEntry = data_project_dict.datasets[data_project_dict.datasets.length - 1];
+                                index = lastEntry.cumulative_data_count;
                             } else {
-                                console.warn(`No matching dataset entry for uri: ${uri}`);
+                                index = 0;
+                                console.warn(`No dataset entries available for uri: ${uri}`);
                             }
                         }
 
