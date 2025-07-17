@@ -134,8 +134,6 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                         log.debug("Updated buffer_data:", buffer_data);
 
                         let tiled_url = data.tiled_url;
-                        let index = parseInt(data.index);
-                        log.debug("Tiled URI:", tiled_url, "Index:", index);
 
                         let url = new URL(tiled_url);
                         const path_parts = url.pathname.split('/').filter(p => p !== '');
