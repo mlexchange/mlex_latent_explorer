@@ -183,10 +183,19 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
 
                         log.debug("Root URI:", root_uri, "URI:", uri, "Index:", index);
 
-                        if (index >= 0) {
-                            live_indices = [...live_indices, index];
-                            log.debug("Updated live_indices:", live_indices);
+                        if (index < 0) {
+                            log.warn("Received negative index; skipping update");
+                            return [
+                                window.dash_clientside.no_update,
+                                window.dash_clientside.no_update,
+                                window.dash_clientside.no_update,
+                                window.dash_clientside.no_update,
+                                window.dash_clientside.no_update
+                            ];
                         }
+
+                        live_indices = [...live_indices, index];
+                        log.debug("Updated live_indices:", live_indices);
 
                         let cum_size = Math.max(...live_indices) + 1;
                         log.debug("Cumulative size:", cum_size);
