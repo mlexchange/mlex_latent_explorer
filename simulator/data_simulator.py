@@ -24,10 +24,6 @@ if "/api/v1/metadata/" not in RESULTS_TILED_URI:
 
 RESULTS_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", None)
 
-WEBSOCKET_PORT = os.getenv("WEBSOCKET_PORT", "8765")
-WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "localhost")
-
-
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -53,17 +49,13 @@ async def stream():
     num_messages, c, x, y = get_num_frames(DATA_TILED_URI, DATA_TILED_API_KEY)
     feature_vector_list = get_feature_vectors(num_messages)
 
-    # Construct the WebSocket URI (e.g., ws://localhost:8765)
-    uri = f"ws://{WEBSOCKET_URL}:{WEBSOCKET_PORT}"
-    logger.info(f"Connecting to {uri}...")
-
     # Connect to the server
 
     logger.info("Successfully connected to the server!")
 
     for index, latent_vector in zip(range(num_messages), feature_vector_list):
         message = {
-            "tiled_url": DATA_TILED_URI,  # be compatible with LatentSpaceEvent
+            "tiled_url": f"{DATA_TILED_URI}?slice={index}",  # be compatible with LatentSpaceEvent
             "index": index,
             "feature_vector": latent_vector.tolist(),
         }

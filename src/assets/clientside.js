@@ -134,26 +134,73 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                         log.debug("Updated buffer_data:", buffer_data);
 
                         let tiled_url = data.tiled_url;
-                        let index = parseInt(data.index);
-                        log.debug("Tiled URI:", tiled_url, "Index:", index);
 
                         let url = new URL(tiled_url);
-                        let path_parts = url.pathname.split('/');
-                        let root_uri = tiled_url;
+                        const path_parts = url.pathname.split('/').filter(p => p !== '');
+                        let root_uri = url.origin;
                         let uri = "";
 
-                        if (path_parts.length > 1 && path_parts[path_parts.length - 1] !== '') {
-                            let root_path = path_parts.slice(0, -1).join('/') + '/';
-                            root_uri = url.protocol + '//' + url.host + root_path;
-                            uri = path_parts[path_parts.length - 1];
+                        // Find base URI (e.g., api/v1/metadata or api/v1/array/full)
+                        const apiIndex = path_parts.findIndex((p, i) =>
+                            p === 'api' &&
+                            path_parts[i + 1] === 'v1' &&
+                            (
+                                path_parts[i + 2] === 'metadata' ||
+                                (path_parts[i + 2] === 'array' && ['full', 'block'].includes(path_parts[i + 3]))
+                            )
+                        );
+
+                        if (apiIndex !== -1) {
+                            let base_root_parts;
+                            if (path_parts[apiIndex + 2] === 'metadata') {
+                                base_root_parts = path_parts.slice(0, apiIndex + 3);
+                            } else {
+                                base_root_parts = path_parts.slice(0, apiIndex + 4);
+                            }
+
+                            root_uri = `${url.protocol}//${url.host}/${base_root_parts.join('/')}`;
+                            uri = decodeURIComponent(path_parts.slice(base_root_parts.length).join('/'));
+                        } else {
+                            console.warn("Unexpected Tiled URL format:", tiled_url);
                         }
 
-                        log.debug("Root URI:", root_uri, "URI:", uri);
+                        // Check for slice index in the query string
+                        const params = new URLSearchParams(url.search);
+                        const sliceParam = params.get('slice');
 
-                        if (index >= 0) {
-                            live_indices = [...live_indices, index];
-                            log.debug("Updated live_indices:", live_indices);
+                        if (sliceParam) {
+                            // Expecting format like "0,0,:,:"
+                            const sliceParts = sliceParam.split(',');
+                            const parsedIndex = parseInt(sliceParts[0], 10);
+                            if (!isNaN(parsedIndex)) {
+                                index = parsedIndex;
+                            }
+                        } else {
+                            // No slice param, fallback to last dataset entry
+                            if (data_project_dict.datasets.length > 0) {
+                                const lastEntry = data_project_dict.datasets[data_project_dict.datasets.length - 1];
+                                index = lastEntry.cumulative_data_count;
+                            } else {
+                                index = 0;
+                                console.warn(`No dataset entries available for uri: ${uri}`);
+                            }
                         }
+
+                        log.debug("Root URI:", root_uri, "URI:", uri, "Index:", index);
+
+                        if (index < 0) {
+                            log.warn("Received negative index; skipping update");
+                            return [
+                                window.dash_clientside.no_update,
+                                window.dash_clientside.no_update,
+                                window.dash_clientside.no_update,
+                                window.dash_clientside.no_update,
+                                window.dash_clientside.no_update
+                            ];
+                        }
+
+                        live_indices = [...live_indices, index];
+                        log.debug("Updated live_indices:", live_indices);
 
                         let cum_size = Math.max(...live_indices) + 1;
                         log.debug("Cumulative size:", cum_size);
