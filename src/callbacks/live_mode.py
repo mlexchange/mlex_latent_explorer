@@ -15,9 +15,9 @@ from dash import (
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
-from src.arroyo_reduction.redis_model_store import (  # Import the RedisModelStore class
+from src.arroyo_reduction.redis_model_store import (
     RedisModelStore,
-)
+)  # Import the RedisModelStore class
 from src.utils.mlflow_utils import MLflowClient
 from src.utils.plot_utils import (
     generate_scatter_data,
@@ -96,12 +96,8 @@ def show_model_selection_dialog(n_clicks, last_selected_models):
     Output("stats-div", "children", allow_duplicate=True),
     Output("buffer", "data", allow_duplicate=True),
     Output("live-indices", "data", allow_duplicate=True),
-    Output(
-        "model-loading-spinner", "style", allow_duplicate=True
-    ),  # Add spinner output
-    Output(
-        "in-model-transition", "data", allow_duplicate=True
-    ),  # Add transition state output
+    Output("model-loading-spinner", "style", allow_duplicate=True),
+    Output("in-model-transition", "data", allow_duplicate=True),
     Input("live-model-continue", "n_clicks"),
     State("live-autoencoder-dropdown", "value"),
     State("live-dimred-dropdown", "value"),
@@ -116,65 +112,97 @@ def handle_model_continue(
     autoencoder_options,
     dimred_options,
 ):
-    if continue_clicks:
-        # Close dialog and save selected models
-        selected_models = {
-            "autoencoder": selected_autoencoder,
-            "dimred": selected_dimred,
-        }
+    """
+    Handle the Continue button click in the model selection dialog.
+    This function:
+    1. Checks model compatibility
+    2. Stores models in Redis if compatible
+    3. Updates UI elements for Live Mode
+    4. Shows loading spinner
+    """
+    if not continue_clicks:
+        raise PreventUpdate
 
-        # Show loading spinner and set transition state to True
-        spinner_style = {
-            "position": "fixed",
-            "top": 0,
-            "left": 0,
-            "width": "100%",
-            "height": "100%",
-            "backgroundColor": "rgba(0, 0, 0, 0.7)",
-            "zIndex": 9998,
-            "display": "block",  # Show the spinner
-        }
-
-        # Transition to live mode UI
-        return (
-            False,  # Close dialog
-            selected_models,  # Save selected models
-            {"display": "none"},  # Hide data selection controls
-            {"display": "none"},  # Hide dimension reduction controls
-            {"display": "none"},  # Hide clustering controls
-            {"display": "none"},  # Hide data overview card
-            {},  # Show live mode models section
-            autoencoder_options,  # Copy options from dialog to sidebar
-            selected_autoencoder,  # Set selected autoencoder
-            dimred_options,  # Copy options from dialog to sidebar
-            selected_dimred,  # Set selected dimension reduction model
-            ["item-1"],  # Active sidebar item
-            {"width": "100%", "height": "85vh"},  # Image card style
-            {"height": "65vh"},  # Scatter style
-            {"height": "65vh"},  # Heatmap style
-            {  # Go-live button style
-                "display": "flex",
-                "font-size": "40px",
-                "padding": "5px",
-                "color": "white",
-                "background-color": "#D57800",
-                "border": "0px",
-            },
-            "Go to Offline Mode",  # Go-live tooltip
-            {  # Pause button style
-                "display": "flex",
-                "font-size": "1.5rem",
-                "padding": "5px",
-            },
-            plot_empty_scatter(),  # Clear scatter when continuing
-            plot_empty_heatmap(),  # Clear heatmap when continuing
-            "Number of images selected: 0",  # Reset stats text
-            {},  # Clear buffer
-            [],  # Clear indices
-            spinner_style,  # Show the loading spinner
-            True,  # Set transition state to True
+    # Check model compatibility before proceeding
+    if not mlflow_client.check_model_compatibility(
+        selected_autoencoder, selected_dimred
+    ):
+        logger.warning(
+            f"Incompatible models selected: {selected_autoencoder}, {selected_dimred}"
         )
-    raise PreventUpdate
+        # Prevent dialog from closing
+        return no_update
+
+    # Store models in Redis
+    try:
+        # Store autoencoder model
+        logger.info(f"Storing autoencoder model from dialog: {selected_autoencoder}")
+        redis_model_store.store_autoencoder_model(selected_autoencoder)
+
+        # Store dimension reduction model
+        logger.info(f"Storing dimension reduction model from dialog: {selected_dimred}")
+        redis_model_store.store_dimred_model(selected_dimred)
+    except Exception as e:
+        logger.error(f"Error storing models in Redis: {e}")
+        return no_update
+
+    # Models are compatible and stored in Redis, proceed with closing dialog and transition
+    selected_models = {
+        "autoencoder": selected_autoencoder,
+        "dimred": selected_dimred,
+    }
+
+    # Show loading spinner and set transition state to True
+    spinner_style = {
+        "position": "fixed",
+        "top": 0,
+        "left": 0,
+        "width": "100%",
+        "height": "100%",
+        "backgroundColor": "rgba(0, 0, 0, 0.7)",
+        "zIndex": 9998,
+        "display": "block",  # Show the spinner
+    }
+
+    # Transition to live mode UI
+    return (
+        False,  # Close dialog
+        selected_models,  # Save selected models
+        {"display": "none"},  # Hide data selection controls
+        {"display": "none"},  # Hide dimension reduction controls
+        {"display": "none"},  # Hide clustering controls
+        {"display": "none"},  # Hide data overview card
+        {},  # Show live mode models section
+        autoencoder_options,  # Copy options from dialog to sidebar
+        selected_autoencoder,  # Set selected autoencoder
+        dimred_options,  # Copy options from dialog to sidebar
+        selected_dimred,  # Set selected dimension reduction model
+        ["item-1"],  # Active sidebar item
+        {"width": "100%", "height": "85vh"},  # Image card style
+        {"height": "65vh"},  # Scatter style
+        {"height": "65vh"},  # Heatmap style
+        {  # Go-live button style
+            "display": "flex",
+            "font-size": "40px",
+            "padding": "5px",
+            "color": "white",
+            "background-color": "#D57800",
+            "border": "0px",
+        },
+        "Go to Offline Mode",  # Go-live tooltip
+        {  # Pause button style
+            "display": "flex",
+            "font-size": "1.5rem",
+            "padding": "5px",
+        },
+        plot_empty_scatter(),  # Clear scatter when continuing
+        plot_empty_heatmap(),  # Clear heatmap when continuing
+        "Number of images selected: 0",  # Reset stats text
+        {},  # Clear buffer
+        [],  # Clear indices
+        spinner_style,  # Show the loading spinner
+        True,  # Set transition state to True
+    )
 
 
 @callback(
@@ -199,11 +227,32 @@ def handle_model_cancel(cancel_clicks, go_live_clicks):
 
 @callback(
     Output("live-model-continue", "disabled"),
+    Output("live-model-continue", "color", allow_duplicate=True),
+    Output("live-model-continue", "children", allow_duplicate=True),
     Input("live-autoencoder-dropdown", "value"),
     Input("live-dimred-dropdown", "value"),
+    prevent_initial_call=True,  # Add this to prevent initial call
 )
 def toggle_continue_button(selected_autoencoder, selected_dimred):
-    return selected_autoencoder is None or selected_dimred is None
+    """
+    Disable the continue button if models are not selected or are incompatible
+    Also update the button color and text to indicate state
+    """
+    # First check if either model is not selected
+    if selected_autoencoder is None or selected_dimred is None:
+        return True, "secondary", "Continue"  # Disabled with neutral color
+
+    # Check if models are compatible
+    is_compatible = mlflow_client.check_model_compatibility(
+        selected_autoencoder, selected_dimred
+    )
+
+    if is_compatible:
+        # Models are compatible - enable with primary color
+        return False, "primary", "Continue"
+    else:
+        # Models are incompatible - disable with danger color
+        return True, "danger", "Incompatible Models"
 
 
 @callback(
@@ -417,12 +466,8 @@ def update_data_project_dict(n_clicks, selected_models):
     Output("heatmap", "figure", allow_duplicate=True),
     Output("stats-div", "children", allow_duplicate=True),
     Output("live-indices", "data", allow_duplicate=True),
-    Output(
-        "model-loading-spinner", "style", allow_duplicate=True
-    ),  # Add spinner output
-    Output(
-        "in-model-transition", "data", allow_duplicate=True
-    ),  # Add transition state output
+    Output("model-loading-spinner", "style", allow_duplicate=True),
+    Output("in-model-transition", "data", allow_duplicate=True),
     Output("buffer", "data", allow_duplicate=True),
     Input("update-live-models-button", "n_clicks"),
     State("live-mode-autoencoder-dropdown", "value"),
@@ -432,18 +477,53 @@ def update_data_project_dict(n_clicks, selected_models):
 )
 def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_dict):
     """
-    Update the selected models when the update button is clicked
+    Update the selected models when the sidebar update button is clicked.
+    This function:
+    1. Checks model compatibility
+    2. Stores models in Redis if compatible
+    3. Updates data project dictionary
+    4. Resets visualizations
+    5. Shows loading spinner
     """
     if n_clicks is None:
         raise PreventUpdate
 
-    if autoencoder_model is None or dimred_model is None:
-        # Show error notification
+    # Check model compatibility
+    if not mlflow_client.check_model_compatibility(autoencoder_model, dimred_model):
+        logger.warning(
+            f"Incompatible models selected: {autoencoder_model}, {dimred_model}"
+        )
+        return (
+            no_update,  # selected-live-models.data
+            no_update,  # data-project-dict.data
+            "danger",  # update-live-models-button.color
+            "Incompatible Models",  # update-live-models-button.children
+            no_update,  # scatter.figure
+            no_update,  # heatmap.figure
+            no_update,  # stats-div.children
+            no_update,  # live-indices.data
+            no_update,  # model-loading-spinner.style
+            no_update,  # in-model-transition.data
+            no_update,  # buffer.data
+        )
+
+    # Store models in Redis
+    try:
+        # Store autoencoder model
+        logger.info(f"Storing autoencoder model from sidebar: {autoencoder_model}")
+        redis_model_store.store_autoencoder_model(autoencoder_model)
+
+        # Store dimension reduction model
+        logger.info(f"Storing dimension reduction model from sidebar: {dimred_model}")
+        redis_model_store.store_dimred_model(dimred_model)
+    except Exception as e:
+        logger.error(f"Error storing models in Redis: {e}")
         return (
             no_update,
             no_update,
             "danger",
-            "Invalid Selection",
+            "Update Fail",
+            no_update,
             no_update,
             no_update,
             no_update,
@@ -487,6 +567,7 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
         "display": "block",  # Show the spinner
     }
 
+    # Return all 11 outputs
     return (
         selected_models,
         data_project_dict,
@@ -497,12 +578,13 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
         stats_text,
         empty_indices,
         spinner_style,
-        True,
-        [],
+        True,  # Set transition state to True
+        [],  # Clear buffer data
     )
 
 
 @callback(
+    Output("update-live-models-button", "disabled", allow_duplicate=True),
     Output("update-live-models-button", "color", allow_duplicate=True),
     Output("update-live-models-button", "children", allow_duplicate=True),
     Input("live-mode-autoencoder-dropdown", "value"),
@@ -512,20 +594,32 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
 )
 def reset_update_button(autoencoder_model, dimred_model, selected_models):
     """
-    Reset the update button color when dropdowns change
+    Reset the update button color when dropdowns change and check model compatibility
     """
     # If no models are selected yet or either dropdown is empty
     if selected_models is None or autoencoder_model is None or dimred_model is None:
-        return "primary", "Update Models"
+        return True, "secondary", "Update Models"  # Disabled, secondary color
+
+    # Check if models are compatible using the shared compatibility check function
+    is_compatible = mlflow_client.check_model_compatibility(
+        autoencoder_model, dimred_model
+    )
+
+    if not is_compatible:
+        # Models are incompatible - disable button with danger color
+        return True, "danger", "Incompatible Models"
 
     # Check if the current selection is different from what's already selected
-    if autoencoder_model != selected_models.get(
+    models_changed = autoencoder_model != selected_models.get(
         "autoencoder"
-    ) or dimred_model != selected_models.get("dimred"):
-        return "primary", "Update Models"
+    ) or dimred_model != selected_models.get("dimred")
 
-    # If the selection is the same as current, keep the "Updated" state
-    return "secondary", "Updated"
+    if models_changed:
+        # Models are compatible and changed - enable button with primary color
+        return False, "primary", "Update Models"
+    else:
+        # Models are compatible but unchanged - show "Updated" state
+        return True, "secondary", "Updated"
 
 
 @callback(

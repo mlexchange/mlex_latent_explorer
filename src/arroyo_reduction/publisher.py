@@ -69,8 +69,11 @@ class LSEWSResultPublisher(Publisher):
 
         if isinstance(message, LatentSpaceEvent):
             # send image data separately to client memory issues
-           
-            logger.debug(f"WS Sending LatentSpaceEvent {message.feature_vector}")
+            logger.debug(
+                f"WS Sending LatentSpaceEvent: vector={message.feature_vector}, "
+                f"autoencoder={message.autoencoder_model}, dimred={message.dimred_model}, "
+                f"index={message.index}, tiled_url={message.tiled_url}"
+            )
             await client.send(message.model_dump_json())
 
     async def websocket_handler(self, websocket):
