@@ -5,7 +5,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
     liveWS: {
         updateLiveData: function(message, buffer_data, n_clicks, data_project_dict, live_indices, selected_models) {
             // Initialize log level if not set
-            window.DASH_LOG_LEVEL = window.DASH_LOG_LEVEL || 3;
+            window.DASH_LOG_LEVEL = 4; // window.DASH_LOG_LEVEL || 3;
 
             const LOG_LEVELS = {
                 NONE: 0,
@@ -27,6 +27,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                     log.info("Clientside callback triggered with message:", message);
                     log.debug("Current buffer_data:", buffer_data, "Type:", typeof buffer_data);
                     log.debug("Selected models:", selected_models);
+                    log.debug("Current data_project_dict:", data_project_dict);
 
                     // Initialize default values
                     if (!Array.isArray(buffer_data)) buffer_data = [];
@@ -120,7 +121,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                             transition_state = false;
                         }
 
-                        // Process the data (existing logic)
+                        // Process the data
                         let new_entry = {};
                         if (data.feature_vector) {
                             log.debug("Feature vector found:", data.feature_vector);
@@ -134,29 +135,65 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                         log.debug("Updated buffer_data:", buffer_data);
 
                         let tiled_url = data.tiled_url;
-                        let index = parseInt(data.index);
-                        log.debug("Tiled URI:", tiled_url, "Index:", index);
 
                         let url = new URL(tiled_url);
-                        let path_parts = url.pathname.split('/');
-                        let root_uri = tiled_url;
+                        const path_parts = url.pathname.split('/').filter(p => p !== '');
+                        let root_uri = url.origin;
                         let uri = "";
 
-                        if (path_parts.length > 1 && path_parts[path_parts.length - 1] !== '') {
-                            let root_path = path_parts.slice(0, -1).join('/') + '/';
-                            root_uri = url.protocol + '//' + url.host + root_path;
-                            uri = path_parts[path_parts.length - 1];
+                        // Find base URI (e.g., api/v1/metadata or api/v1/array/full)
+                        const apiIndex = path_parts.findIndex((p, i) =>
+                            p === 'api' &&
+                            path_parts[i + 1] === 'v1' &&
+                            (
+                                path_parts[i + 2] === 'metadata' ||
+                                (path_parts[i + 2] === 'array' && ['full', 'block'].includes(path_parts[i + 3]))
+                            )
+                        );
+
+                        if (apiIndex !== -1) {
+                            let base_root_parts;
+                            if (path_parts[apiIndex + 2] === 'metadata') {
+                                base_root_parts = path_parts.slice(0, apiIndex + 3);
+                            } else {
+                                base_root_parts = path_parts.slice(0, apiIndex + 4);
+                            }
+
+                            root_uri = `${url.protocol}//${url.host}/${base_root_parts.join('/')}`;
+                            uri = decodeURIComponent(path_parts.slice(base_root_parts.length).join('/'));
+                        } else {
+                            console.warn("Unexpected Tiled URL format:", tiled_url);
                         }
 
-                        log.debug("Root URI:", root_uri, "URI:", uri);
+                        // Check for slice index in the query string
+                        const params = new URLSearchParams(url.search);
+                        const sliceParam = params.get('slice');
 
-                        if (index >= 0) {
-                            live_indices = [...live_indices, index];
-                            log.debug("Updated live_indices:", live_indices);
+                        if (sliceParam) {
+                            // Expecting format like "0,0,:,:"
+                            const sliceParts = sliceParam.split(',');
+                            const parsedIndex = parseInt(sliceParts[0], 10);
+                            if (!isNaN(parsedIndex)) {
+                                index = parsedIndex;
+                            }
+                        } else {
+                            // No slice param, assume single data point
+                            index = 0;
+                            console.warn(`No 'slice' parameter found in Tiled URL: ${tiled_url}`);
                         }
 
-                        let cum_size = Math.max(...live_indices) + 1;
-                        log.debug("Cumulative size:", cum_size);
+                        log.debug("Root URI:", root_uri, "URI:", uri, "Index:", index);
+
+                        if (index < 0) {
+                            log.warn("Received negative index; skipping update");
+                            return [
+                                window.dash_clientside.no_update,
+                                window.dash_clientside.no_update,
+                                window.dash_clientside.no_update,
+                                window.dash_clientside.no_update,
+                                window.dash_clientside.no_update
+                            ];
+                        }
 
                         if (data_project_dict["root_uri"] !== root_uri) {
                             data_project_dict = {
@@ -167,29 +204,72 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                             log.info("Updated data_project_dict root_uri and data_type:", data_project_dict);
                         }
 
+                        let currentCumulative;
+
                         if (data_project_dict["datasets"].length === 0) {
+                            log.debug("Initializing datasets with raw index:", index, "URI:", uri);
+
+                            currentCumulative = index; // Since cumulative_data_count = index + 1
+
                             data_project_dict = {
                                 ...data_project_dict,
                                 "datasets": [{
                                     "uri": uri,
-                                    "cumulative_data_count": cum_size
+                                    "cumulative_data_count": currentCumulative + 1
                                 }]
                             };
-                            log.debug("Initialized datasets in data_project_dict:", data_project_dict["datasets"]);
+
+                            log.debug("Initialized data_project_dict:", data_project_dict, "with cumulative count:", currentCumulative + 1, "and index:", index);
+
                         } else {
-                            data_project_dict = {
-                                ...data_project_dict,
-                                "datasets": [
-                                    ...data_project_dict["datasets"],
-                                    {
-                                        "uri": uri,
-                                        "cumulative_data_count": cum_size
+                            const existingDataset = data_project_dict["datasets"].find(d => d.uri === uri);
+
+                            if (existingDataset) {
+                                // Update existing dataset cumulative count
+                                const datasetIndex = data_project_dict["datasets"].findIndex(d => d.uri === uri);
+                                const prevCumulative = datasetIndex > 0
+                                    ? data_project_dict["datasets"][datasetIndex - 1].cumulative_data_count
+                                    : 0;
+
+                                currentCumulative = prevCumulative + index;
+
+                                const newCumulative = Math.max(existingDataset.cumulative_data_count, currentCumulative + 1);
+
+                                // Only proceed if we're actually updating the cumulative_data_count
+                                if (newCumulative !== existingDataset.cumulative_data_count) {
+                                    existingDataset.cumulative_data_count = newCumulative;
+
+                                    // Update cumulative_data_count for all subsequent datasets
+                                    for (let i = datasetIndex + 1; i < data_project_dict["datasets"].length; i++) {
+                                        const previousDataset = data_project_dict["datasets"][i - 1];
+                                        data_project_dict["datasets"][i].cumulative_data_count =
+                                            previousDataset.cumulative_data_count + 1;
                                     }
-                                ]
-                            };
-                            log.debug("Appended to datasets in data_project_dict:", data_project_dict["datasets"]);
+                                }
+
+
+                                log.debug("Updated existing dataset cumulative count:", data_project_dict);
+
+                            } else {
+                                // Append new dataset with cumulative count
+                                const lastCumulative = data_project_dict["datasets"].at(-1).cumulative_data_count;
+
+                                currentCumulative = lastCumulative + index;
+
+                                data_project_dict["datasets"].push({
+                                    "uri": uri,
+                                    "cumulative_data_count": currentCumulative + 1
+                                });
+
+                                log.debug("Appended new dataset with cumulative count:", currentCumulative + 1, "data_project_dict:", data_project_dict);
+                            }
                         }
+
+                        // Track the cumulative index of the current slice
+                        live_indices = [...live_indices, currentCumulative];
+                        log.debug("Updated live_indices:", live_indices);
                     }
+
 
                     return [buffer_data, data_project_dict, live_indices, spinner_style, transition_state];
 
