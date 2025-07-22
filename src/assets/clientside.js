@@ -5,7 +5,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
     liveWS: {
         updateLiveData: function(message, buffer_data, n_clicks, data_project_dict, live_indices, selected_models) {
             // Initialize log level if not set
-            window.DASH_LOG_LEVEL = window.DASH_LOG_LEVEL || 3;
+            window.DASH_LOG_LEVEL = 4; // window.DASH_LOG_LEVEL || 3;
 
             const LOG_LEVELS = {
                 NONE: 0,
@@ -27,6 +27,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                     log.info("Clientside callback triggered with message:", message);
                     log.debug("Current buffer_data:", buffer_data, "Type:", typeof buffer_data);
                     log.debug("Selected models:", selected_models);
+                    log.debug("Current data_project_dict:", data_project_dict);
 
                     // Initialize default values
                     if (!Array.isArray(buffer_data)) buffer_data = [];
@@ -120,7 +121,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                             transition_state = false;
                         }
 
-                        // Process the data (existing logic)
+                        // Process the data
                         let new_entry = {};
                         if (data.feature_vector) {
                             log.debug("Feature vector found:", data.feature_vector);
@@ -176,14 +177,9 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                                 index = parsedIndex;
                             }
                         } else {
-                            // No slice param, fallback to last dataset entry
-                            if (data_project_dict.datasets.length > 0) {
-                                const lastEntry = data_project_dict.datasets[data_project_dict.datasets.length - 1];
-                                index = lastEntry.cumulative_data_count;
-                            } else {
-                                index = 0;
-                                console.warn(`No dataset entries available for uri: ${uri}`);
-                            }
+                            // No slice param, assume single data point
+                            index = 0;
+                            console.warn(`No 'slice' parameter found in Tiled URL: ${tiled_url}`);
                         }
 
                         log.debug("Root URI:", root_uri, "URI:", uri, "Index:", index);
@@ -199,12 +195,6 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                             ];
                         }
 
-                        live_indices = [...live_indices, index];
-                        log.debug("Updated live_indices:", live_indices);
-
-                        let cum_size = Math.max(...live_indices) + 1;
-                        log.debug("Cumulative size:", cum_size);
-
                         if (data_project_dict["root_uri"] !== root_uri) {
                             data_project_dict = {
                                 ...data_project_dict,
@@ -214,29 +204,72 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                             log.info("Updated data_project_dict root_uri and data_type:", data_project_dict);
                         }
 
+                        let currentCumulative;
+
                         if (data_project_dict["datasets"].length === 0) {
+                            log.debug("Initializing datasets with raw index:", index, "URI:", uri);
+
+                            currentCumulative = index; // Since cumulative_data_count = index + 1
+
                             data_project_dict = {
                                 ...data_project_dict,
                                 "datasets": [{
                                     "uri": uri,
-                                    "cumulative_data_count": cum_size
+                                    "cumulative_data_count": currentCumulative + 1
                                 }]
                             };
-                            log.debug("Initialized datasets in data_project_dict:", data_project_dict["datasets"]);
+
+                            log.debug("Initialized data_project_dict:", data_project_dict, "with cumulative count:", currentCumulative + 1, "and index:", index);
+
                         } else {
-                            data_project_dict = {
-                                ...data_project_dict,
-                                "datasets": [
-                                    ...data_project_dict["datasets"],
-                                    {
-                                        "uri": uri,
-                                        "cumulative_data_count": cum_size
+                            const existingDataset = data_project_dict["datasets"].find(d => d.uri === uri);
+
+                            if (existingDataset) {
+                                // Update existing dataset cumulative count
+                                const datasetIndex = data_project_dict["datasets"].findIndex(d => d.uri === uri);
+                                const prevCumulative = datasetIndex > 0
+                                    ? data_project_dict["datasets"][datasetIndex - 1].cumulative_data_count
+                                    : 0;
+
+                                currentCumulative = prevCumulative + index;
+
+                                const newCumulative = Math.max(existingDataset.cumulative_data_count, currentCumulative + 1);
+
+                                // Only proceed if we're actually updating the cumulative_data_count
+                                if (newCumulative !== existingDataset.cumulative_data_count) {
+                                    existingDataset.cumulative_data_count = newCumulative;
+
+                                    // Update cumulative_data_count for all subsequent datasets
+                                    for (let i = datasetIndex + 1; i < data_project_dict["datasets"].length; i++) {
+                                        const previousDataset = data_project_dict["datasets"][i - 1];
+                                        data_project_dict["datasets"][i].cumulative_data_count =
+                                            previousDataset.cumulative_data_count + 1;
                                     }
-                                ]
-                            };
-                            log.debug("Appended to datasets in data_project_dict:", data_project_dict["datasets"]);
+                                }
+
+
+                                log.debug("Updated existing dataset cumulative count:", data_project_dict);
+
+                            } else {
+                                // Append new dataset with cumulative count
+                                const lastCumulative = data_project_dict["datasets"].at(-1).cumulative_data_count;
+
+                                currentCumulative = lastCumulative + index;
+
+                                data_project_dict["datasets"].push({
+                                    "uri": uri,
+                                    "cumulative_data_count": currentCumulative + 1
+                                });
+
+                                log.debug("Appended new dataset with cumulative count:", currentCumulative + 1, "data_project_dict:", data_project_dict);
+                            }
                         }
+
+                        // Track the cumulative index of the current slice
+                        live_indices = [...live_indices, currentCumulative];
+                        log.debug("Updated live_indices:", live_indices);
                     }
+
 
                     return [buffer_data, data_project_dict, live_indices, spinner_style, transition_state];
 
