@@ -7,12 +7,14 @@ corresponding dimensionality reduction model:
 - Autoencoder/VAE model: Using PyFunc wrapper with get_latent_features functionality
 - Dimensionality reduction model: Using PyFunc wrapper
 
-The model type (VIT or VAE) is determined by the AUTOENCODER_TYPE environment variable.
+The model type (VIT or VAE) is determined by the configuration.
 """
 
 import os
 import sys
 import traceback
+import yaml
+from pathlib import Path
 
 # Fix transformers compatibility BEFORE any imports
 os.environ["TRANSFORMERS_USE_TORCH_EXPORT"] = "0"
@@ -20,11 +22,24 @@ os.environ["TRANSFORMERS_USE_TORCH_EXPORT"] = "0"
 import mlflow
 from dotenv import load_dotenv
 
+
 # Load environment variables from .env file
 load_dotenv(dotenv_path="../.env")
 
-# Determine which model wrappers to import based on autoencoder type
-AUTOENCODER_TYPE = os.getenv("AUTOENCODER_TYPE", "VIT").upper()
+# Load MLflow configuration from YAML
+CONFIG_PATH = Path(__file__).parent / "mlflow_config.yaml"
+config = {}  # Initialize as empty dict
+try:
+    with open(CONFIG_PATH, 'r') as file:
+        config = yaml.safe_load(file)
+    print("✓ Loaded MLflow configuration from YAML")
+except Exception as e:
+    print(f"⚠️ Error loading configuration: {e}")
+    sys.exit(1)
+
+
+# Get autoencoder type from config
+AUTOENCODER_TYPE = config.get("common", {}).get("autoencoder_type", "VIT").upper()
 if AUTOENCODER_TYPE == "VIT":
     from vit_wrapper import save_vit_model_with_wrapper as save_model_fn
 elif AUTOENCODER_TYPE == "VAE":
@@ -46,39 +61,28 @@ os.environ["MLFLOW_TRACKING_USERNAME"] = MLFLOW_TRACKING_USERNAME
 os.environ["MLFLOW_TRACKING_PASSWORD"] = MLFLOW_TRACKING_PASSWORD
 
 # Load model-specific configuration based on autoencoder type
-if AUTOENCODER_TYPE == "VIT":
-    # For ViT model, use VIT-specific variables
-    AUTOENCODER_WEIGHTS_PATH = os.getenv("VIT_WEIGHTS_PATH")
-    AUTOENCODER_CODE_PATH = os.getenv("VIT_CODE_PATH")
-    DR_WEIGHTS_PATH = os.getenv("VIT_DR_WEIGHTS_PATH")
-    LATENT_DIM = os.getenv("VIT_LATENT_DIM")
-    IMAGE_SIZE_STR = os.getenv("VIT_IMAGE_SIZE", "(512, 512)")
-    MLFLOW_EXPERIMENT_NAME = os.getenv("VIT_MLFLOW_EXPERIMENT_NAME")
-    MLFLOW_AUTO_MODEL_NAME = os.getenv("VIT_MLFLOW_AUTO_MODEL_NAME")
-    MLFLOW_DR_MODEL_NAME = os.getenv("VIT_MLFLOW_DR_MODEL_NAME")
-else:  # AUTOENCODER_TYPE == "VAE"
-    # For VAE model, use VAE-specific variables
-    AUTOENCODER_WEIGHTS_PATH = os.getenv("VAE_WEIGHTS_PATH")
-    AUTOENCODER_CODE_PATH = os.getenv("VAE_CODE_PATH")
-    DR_WEIGHTS_PATH = os.getenv("VAE_DR_WEIGHTS_PATH")
-    LATENT_DIM = os.getenv("VAE_LATENT_DIM")
-    IMAGE_SIZE_STR = os.getenv("VAE_IMAGE_SIZE", "(512, 512)")
-    MLFLOW_EXPERIMENT_NAME = os.getenv("VAE_MLFLOW_EXPERIMENT_NAME")
-    MLFLOW_AUTO_MODEL_NAME = os.getenv("VAE_MLFLOW_AUTO_MODEL_NAME")
-    MLFLOW_DR_MODEL_NAME = os.getenv("VAE_MLFLOW_DR_MODEL_NAME")
+model_config_key = "vit" if AUTOENCODER_TYPE == "VIT" else "vae"
+model_config = config.get("models", {}).get(model_config_key, {})
 
-# Parse IMAGE_SIZE for both models
-try:
-    # Convert string to tuple
-    IMAGE_SIZE = eval(IMAGE_SIZE_STR)
-except Exception as e:
-    print(f"⚠️ Error parsing IMAGE_SIZE: {e}. Using default (512, 512).")
-    IMAGE_SIZE = (512, 512)
+if model_config:
+    # For the selected model, use values from YAML config
+    AUTOENCODER_WEIGHTS_PATH = model_config.get("weights_path")
+    AUTOENCODER_CODE_PATH = model_config.get("code_path")
+    DR_WEIGHTS_PATH = model_config.get("dr_weights_path")
+    LATENT_DIM = model_config.get("latent_dim")
+    IMAGE_SIZE = tuple(model_config.get("image_size", [512, 512]))
+    MLFLOW_EXPERIMENT_NAME = model_config.get("experiment_name")
+    MLFLOW_AUTO_MODEL_NAME = model_config.get("auto_model_name")
+    MLFLOW_DR_MODEL_NAME = model_config.get("dr_model_name")
+else:
+    print(f"❌ Error: No configuration found for {AUTOENCODER_TYPE} model in the YAML file.")
+    sys.exit(1)
 
 
 # Print configuration for verification
 print("----------------------------------------------")
 print("MLFLOW_TRACKING_URI:", MLFLOW_TRACKING_URI)
+print("MLFLOW_TRACKING_USERNAME:", MLFLOW_TRACKING_USERNAME)
 print("AUTOENCODER_TYPE:", AUTOENCODER_TYPE)
 print("MLFLOW_EXPERIMENT_NAME:", MLFLOW_EXPERIMENT_NAME)
 print("MLFLOW_AUTO_MODEL_NAME:", MLFLOW_AUTO_MODEL_NAME)

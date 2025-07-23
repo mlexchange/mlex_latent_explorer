@@ -108,21 +108,14 @@ models
 
 ```
 
-2. Configure environment variables in `.env`:
+2. Configure variables in `live_operator_example/mlflow_config.yaml`:
 Set the model type by modifying the following variable to either "VIT" or "VAE", depending on which model you want to log to the MLflow server:
 ```
-AUTOENCODER_TYPE="VIT"
+common:
+  autoencoder_type: "VIT"  # use VIT or VAE
 ```
 
-Also, make sure the following paths are correctly set in `.env`. If you use the recommended directory structure, these defaults will work:
-```
-VIT_WEIGHTS_PATH="../models/vit/vit_model_weights.npz"
-VIT_CODE_PATH="../models/vit/vit.py"
-VIT_DR_WEIGHTS_PATH="../models/vit/vit_joblib_test.joblib"
-VAE_WEIGHTS_PATH="../models/vae/vae_model_512_weights.npz"
-VAE_CODE_PATH="../models/vae/vae.py"
-VAE_DR_WEIGHTS_PATH="../models/vae/vae_joblib_test.joblib"
-```
+Also, make sure the file paths are correctly set in `mlflow_config.yaml`. If you use the recommended directory structure, the defaults will work.
 
 3. Start the services:
 ```
