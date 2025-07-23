@@ -110,7 +110,7 @@ class LatentSpaceReducer(Reducer):
         if self.is_loading_model:
             logger.info(f"Waiting for {self.loading_model_type} model to finish loading...")
             # Return a placeholder while models are loading
-            return np.zeros((1, 2))  # Return empty vector during loading
+            return None 
             
         try:
             # Get numpy array from message
@@ -121,7 +121,7 @@ class LatentSpaceReducer(Reducer):
             
         except Exception as e:
             logger.error(f"Error in image preparation: {e}")
-            return np.zeros((1, 2))  # Return empty vector on error
+            return None 
         
         # Process with autoencoder to get latent features
         try:
@@ -132,7 +132,7 @@ class LatentSpaceReducer(Reducer):
             
         except Exception as e:
             logger.error(f"Error in autoencoder processing: {e}")
-            return np.zeros((1, 2))  # Return empty vector on error
+            return None  
         
         # Apply dimension reduction directly with latent features
         try:            
@@ -142,7 +142,7 @@ class LatentSpaceReducer(Reducer):
             return f_vec
         except Exception as e:
             logger.error(f"Error in dimension reduction: {e}")
-            return np.zeros((1, 2))  # Return empty vector on error
+            return None  
             
     
     def _subscribe_to_model_updates(self):

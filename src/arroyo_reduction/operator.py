@@ -70,6 +70,9 @@ class LatentSpaceOperator(Operator):
                 return None
                 
             feature_vector = await asyncio.to_thread(self.reducer.reduce, message)
+            if feature_vector is None:
+                logger.info(f"Skipping frame {message.frame_number} due to processing error or model transition")
+                return None
             
             # Get the current model names from the reducer
             current_autoencoder = self.reducer.autoencoder_model_name

@@ -59,6 +59,35 @@ class MLflowClient:
         # Create client
         self.client = MlflowClient()
 
+    def check_model_compatibility(self, autoencoder_model, dim_reduction_model):
+        """
+        Check if autoencoder and dimension reduction models are compatible.
+        
+        Models are compatible if autoencoder latent_dim matches dimension reduction input_dim.
+        
+        Args:
+            autoencoder_model (str): The autoencoder model ID or name
+            dim_reduction_model (str): The dimension reduction model ID or name
+            
+        Returns:
+            bool: True if models are compatible, False otherwise
+        """
+        if not autoencoder_model or not dim_reduction_model:
+            return False
+        
+        # Check dimension compatibility
+        try:
+            auto_params = self.get_mlflow_params(autoencoder_model)
+            dimred_params = self.get_mlflow_params(dim_reduction_model)
+            
+            auto_dim = int(auto_params.get("latent_dim", 0))
+            dimred_dim = int(dimred_params.get("input_dim", 0))
+            
+            return auto_dim > 0 and auto_dim == dimred_dim
+        except Exception as e:
+            logger.warning(f"Error checking dimensions: {e}")
+            return False
+        
     def check_mlflow_ready(self):
         """
         Check if MLflow server is reachable by performing a lightweight API call.

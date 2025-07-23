@@ -31,7 +31,6 @@ from src.utils.job_utils import (
 )
 from src.utils.mlflow_utils import MLflowClient
 from src.utils.plot_utils import generate_notification
-from src.arroyo_reduction.redis_model_store import RedisModelStore  # Import the RedisModelStore class
 
 MODE = os.getenv("MODE", "")
 TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
@@ -43,7 +42,6 @@ FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
 # Initialize Redis model store instead of direct Redis client
 REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
-redis_model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
 
 logger = logging.getLogger(__name__)
 mlflow_client = MLflowClient()
@@ -73,58 +71,6 @@ def refresh_mlflow_models(n_clicks):
         return options, options[0]["value"] if options else None
     return [], None
 
-
-@callback(
-    # Output to the button's n_clicks property
-    Output("live-model-continue", "n_clicks"),
-    Input("live-model-continue", "n_clicks"),
-    State("live-autoencoder-dropdown", "value"),
-    State("live-dimred-dropdown", "value"),
-    prevent_initial_call=True
-)
-def store_dialog_models_in_redis_on_continue(n_clicks, autoencoder_model, dim_reduction_model):
-    """Store both model selections from dialog dropdowns in Redis when Continue is clicked"""
-    if not n_clicks:
-        raise PreventUpdate
-    
-    # Store autoencoder model if provided
-    if autoencoder_model:
-        logger.info(f"Storing autoencoder model from dialog: {autoencoder_model}")
-        redis_model_store.store_autoencoder_model(autoencoder_model)
-    
-    # Store dimension reduction model if provided    
-    if dim_reduction_model:
-        logger.info(f"Storing dimension reduction model from dialog: {dim_reduction_model}")
-        redis_model_store.store_dimred_model(dim_reduction_model)
-    
-    # Return the same n_clicks value (this won't change the button state)
-    return n_clicks
-
-@callback(
-    # Output to the button's color property
-    Output("update-live-models-button", "color", allow_duplicate=True),
-    Input("update-live-models-button", "n_clicks"),
-    State("live-mode-autoencoder-dropdown", "value"),
-    State("live-mode-dimred-dropdown", "value"),
-    prevent_initial_call=True
-)
-def store_sidebar_models_in_redis_on_update(n_clicks, autoencoder_model, dim_reduction_model):
-    """Store both model selections from sidebar in Redis when Update button is clicked"""
-    if not n_clicks:
-        raise PreventUpdate
-    
-    # Store autoencoder model if provided
-    if autoencoder_model:
-        logger.info(f"Storing autoencoder model from sidebar: {autoencoder_model}")
-        redis_model_store.store_autoencoder_model(autoencoder_model)
-    
-    # Store dimension reduction model if provided
-    if dim_reduction_model:
-        logger.info(f"Storing dimension reduction model from sidebar: {dim_reduction_model}")
-        redis_model_store.store_dimred_model(dim_reduction_model)
-    
-    # Return "secondary" color to indicate success
-    return "secondary"
 
 @callback(
     Output(

@@ -1,0 +1,25 @@
+# Common settings
+common:
+  autoencoder_type: "VIT"  # use VIT or VAE
+
+# Model configurations
+models:
+  vit:
+    experiment_name: "smi_exp_vit"
+    auto_model_name: "smi_auto_vit"
+    dr_model_name: "smi_dr_umap_vit"
+    weights_path: "../models/vit/vit_model_weights.npz"
+    code_path: "../models/vit/vit.py"
+    dr_weights_path: "../models/vit/vit_joblib_test.joblib"
+    latent_dim: 64
+    image_size: [512, 512]
+  
+  vae:
+    experiment_name: "smi_exp_vae"
+    auto_model_name: "smi_auto_vae"
+    dr_model_name: "smi_dr_umap_vae"
+    weights_path: "../models/vae/vae_model_512_weights.npz"
+    code_path: "../models/vae/vae.py"
+    dr_weights_path: "../models/vae/vae_joblib_test.joblib"
+    latent_dim: 512
+    image_size: [512, 512]

@@ -90,21 +90,32 @@ docker compose down
 
 This will **shut down all services** but **retain data** if volumes are used.
 
-### 8. Test Live Mode
+### 8. Test Live Mode Processing wth Arroyo
 
-1. Download model checkpoints from Google Drive.
+`arroyopy` and `arroyosas` code has been added to create a pipeline that does dimensionality reduction in a streaming fashion, providing faster reduction on models that are loaded at startup, avoidng latency from Prefect. Follow the instructions below to test the live mode:
 
-2. Configure environment variables in `.env`:
+1. Download model checkpoints from Google Drive. We recommend you put the files using the following structure
+```
+models
+├── vit
+│   ├── vit.py
+│   ├── vit_model_weights.npz
+│   └── vit_joblib_test.joblib
+├── vae
+│   ├── vae.py
+│   ├── vae_model_512_weights.npz
+│   └── vae_joblib_test.joblib
 
 ```
-MLFLOW_EXPERIMENT_NAME="smi_experiment"
-MLFLOW_VIT_MODEL_NAME="smi_auto_vit"
-MLFLOW_UMAP_MODEL_NAME="smi_dr_umap"
-AUTOENCODER_WEIGHTS_PATH="./models/vit/vit_model_weights.npz"
-AUTOENCODER_CODE_PATH="./models/vit/vit.py"
-UMAP_WEIGHTS_PATH="./models/vit/vit_joblib_test.joblib"
-LATENT_DIM=64
+
+2. Configure variables in `live_operator_example/mlflow_config.yaml`:
+Set the model type by modifying the following variable to either "VIT" or "VAE", depending on which model you want to log to the MLflow server:
 ```
+common:
+  autoencoder_type: "VIT"  # use VIT or VAE
+```
+
+Also, make sure the file paths are correctly set in `mlflow_config.yaml`. If you use the recommended directory structure, the defaults will work.
 
 3. Start the services:
 ```
@@ -161,55 +172,6 @@ pre-commit run --all-files
 python -m pytest
 ```
 
-## Live Mode Processing wth Arroyo
-arroyopy and arroyosas code has been added to create a pipeline that does dimensionality reduction in a streaming fashion, providing faster reduction on models that are loaded at startup, avoidng latency from Prefect.
-
-### Setup
-Copy a provided "models" directory into the root of the project.
-
-Note that this step will go away when MLFlow is integrated.
-
-The following file structure is
-```
-models
-├── cnn_autoencoder
-│   ├── model.py
-│   └── model_state_dict.npz
-├── g_saxs
-│   ├── ViT.py
-│   ├── model_weights.npz
-│   └── vit_joblib.joblib
-└── t_waxs
-    ├── ViT.py
-    ├── __pycache__
-    │   └── ViT.cpython-311.pyc
-    ├── model_weights.npz
-    └── vit_joblib_test.joblib
-```
-
-maps to the `lse_reducer` section in arroyo_settings.yml:
-```
-lse_reducer:
-  models:
-    - name: CNNAutoencoder
-      state_dict: ./models/cnn_autoencoder/model_state_dict.npz
-      python_class: CNNAutoencoder
-      python_file: ./models/cnn_autoencoder/model.py
-      type: torch
-    
-    - name: AE
-      state_dict: ./models/ae_v1/ae_model_finetuned.npz
-      python_class: CNNAutoencoder
-      python_file: ./models/ae_v1/ae.py
-      type: torch
-
-    - name: UMAP
-      file: ./models/umap/quick_test.joblib
-      type: joblib
-      
-  current_latent_space: AE
-  current_dim_reduction: UMAP
-```
 
 ## Copyright
 MLExchange Copyright (c) 2023, The Regents of the University of California,
