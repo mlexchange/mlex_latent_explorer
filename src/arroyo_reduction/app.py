@@ -7,9 +7,9 @@ import typer
 from arroyosas.zmq import ZMQFrameListener
 from dynaconf import Dynaconf
 
-from .operator import LatentSpaceOperator
-from .publisher import LSEWSResultPublisher
-from .redis_model_store import RedisModelStore  # Import the RedisModelStore class
+from arroyo_reduction.operator import LatentSpaceOperator
+from arroyo_reduction.publisher import LSEWSResultPublisher
+from arroyo_reduction.redis_model_store import RedisModelStore  # Import the RedisModelStore class
 
 settings = Dynaconf(
     envvar_prefix="",
@@ -36,7 +36,16 @@ setup_logger(logger, settings.logging_level)
 
 
 @app.command()
-async def start() -> None:
+def start(
+    log_level: str = typer.Option("INFO", help="Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
+):
+    """
+    Start the Arroyo Reduction application.
+    """
+    setup_logger(logger, log_level)
+    asyncio.run(_start())
+
+async def _start() -> None:
     try:
         app_settings = settings.lse_operator
         logger.info("Getting settings")
@@ -47,7 +56,7 @@ async def start() -> None:
         
         # Initialize the WebSocket publisher first (so it's available for connections)
         ws_publisher = LSEWSResultPublisher.from_settings(app_settings.ws_publisher)
-        publisher_task = asyncio.create_task(ws_publisher.start())
+        asyncio.create_task(ws_publisher.start())
         
         # Initialize Redis model store instead of direct Redis client
         logger.info("Initializing Redis Model Store")
@@ -64,7 +73,7 @@ async def start() -> None:
                 dimred_model = redis_model_store.get_dimred_model()
                 
                 if autoencoder_model and dimred_model:
-                    logger.info(f"Models selected - starting processing:")
+                    logger.info("Models selected - starting processing:")
                     logger.info(f"  Autoencoder: {autoencoder_model}")
                     logger.info(f"  Dimension Reduction: {dimred_model}")
                     break
@@ -92,4 +101,4 @@ async def start() -> None:
         sys.exit(1)
 
 if __name__ == "__main__":
-    asyncio.run(start())
+    app()
