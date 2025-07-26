@@ -133,7 +133,6 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
 
                         buffer_data = [...buffer_data, new_entry];
                         log.debug("Updated buffer_data:", buffer_data);
-
                         let tiled_url = data.tiled_url;
 
                         let url = new URL(tiled_url);
@@ -287,7 +286,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                             "height": "100%",
                             "backgroundColor": "rgba(0, 0, 0, 0.7)",
                             "zIndex": 9998,
-                            "display": "block"
+                            "display": "none"
                         },
                         true
                     ];
