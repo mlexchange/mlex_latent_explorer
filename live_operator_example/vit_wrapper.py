@@ -165,7 +165,7 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
         if model_input.dtype == np.uint8:
             # uint8 is already the preferred format, no conversion needed
             img_array = model_input
-        elif model_input.dtype == np.uint32:
+        else:
             # Convert uint32 to uint8 with robust min-max scaling
             array_min = model_input.min()
             array_max = model_input.max()
@@ -182,25 +182,6 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
             else:
                 # If all values are the same, create a uniform image
                 img_array = np.zeros_like(model_input, dtype=np.uint8)
-        elif model_input.dtype == np.float32:
-            # Convert float32 to uint8 with robust min-max scaling
-            array_min = model_input.min()
-            array_max = model_input.max()
-
-            # Protect against divide-by-zero and handle the case where all values are the same
-            if array_max > array_min:
-                # Scale using full range from min to max for better contrast
-                img_array = (
-                    ((model_input - array_min) / (array_max - array_min)) * 255
-                ).astype(np.uint8)
-            else:
-                # If all values are the same, create a uniform image
-                img_array = np.zeros_like(model_input, dtype=np.uint8)
-        else:
-            # Raise exception for unsupported dtypes
-            raise ValueError(
-                f"Input must be uint8, uint32, or float32, got {model_input.dtype}"
-            )
 
         try:
             # Convert numpy array to PIL Image
