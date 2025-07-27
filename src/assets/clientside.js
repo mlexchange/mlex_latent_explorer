@@ -170,11 +170,22 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                         const sliceParam = params.get('slice');
 
                         if (sliceParam) {
-                            // Expecting format like "0,0,:,:"
-                            const sliceParts = sliceParam.split(',');
-                            const parsedIndex = parseInt(sliceParts[0], 10);
-                            if (!isNaN(parsedIndex)) {
-                                index = parsedIndex;
+                            // Expecting format like "0,0,:,:" or "0:1,0:1679,0:1475"
+                            const sliceParts = sliceParam.split(','); 
+                            const firstSliceParts = sliceParts[0];
+                            
+                            if (firstSliceParts.includes(':')) {
+                                // New format: extract the first number before the colon (e.g., "0" from "0:1")
+                                const startIndex = parseInt(firstSliceParts.split(':')[0], 10);
+                                if (!isNaN(startIndex)) {
+                                    index = startIndex;
+                                }
+                            } else {
+                                // Old format: directly parse the first part as an integer
+                                const parsedIndex = parseInt(firstSliceParts, 10);
+                                if (!isNaN(parsedIndex)) {
+                                    index = parsedIndex;
+                                }
                             }
                         } else {
                             // No slice param, assume single data point
@@ -287,9 +298,9 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                             "height": "100%",
                             "backgroundColor": "rgba(0, 0, 0, 0.7)",
                             "zIndex": 9998,
-                            "display": "block"
+                            "display": "none"
                         },
-                        true
+                        false
                     ];
                 }
             }
