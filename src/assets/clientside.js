@@ -194,6 +194,12 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                         }
 
                         log.debug("Root URI:", root_uri, "URI:", uri, "Index:", index);
+                        
+                        // Change root_uri from /api/v1/array/full to /api/v1/metadata
+                        if (root_uri.includes('/api/v1/array/full')) {
+                            root_uri = root_uri.replace('/api/v1/array/full', '/api/v1/metadata');
+                            log.debug("Modified Root URI:", root_uri);
+                        }
 
                         if (index < 0) {
                             log.warn("Received negative index; skipping update");
