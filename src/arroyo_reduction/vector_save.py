@@ -19,7 +19,7 @@ class VectorSavePublisher(Publisher):
         self.db_path = db_path
         self._db_initialized = False
         self.db: aiosqlite.Connection = None
-        # Database will be initialized lazily in _init_db()
+        # Database will be initialized lazily in start()
 
 
     async def _init_db(self):
