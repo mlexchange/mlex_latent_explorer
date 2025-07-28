@@ -194,6 +194,7 @@ services:
     volumes:
       - .:/app:Z
       - ./data/mlflow_cache:/mlflow_cache
+      - ./data/vector_save:/data/vector_save
     ports:
       - 127.0.0.1:8765:8765
     environment:

@@ -1,7 +1,9 @@
 import aiosqlite
+import json
 import pytest
-import numpy as np
 
+
+from src.arroyo_reduction.schemas import LatentSpaceEvent
 from src.arroyo_reduction.vector_save import VectorSavePublisher
 
 
@@ -11,25 +13,30 @@ async def test_vector_save_listener(tmp_path):
     publisher = VectorSavePublisher(db_path=str(db_path))
 
     # Simulate a message
-    message = {"image_url": "http://example.com/image1.jpg", "vector": np.array([1, 2, 3, 4])}
+    message = {
+        "tiled_url": "http://example.com/image1.jpg",
+        "feature_vector": [1, 2],
+        "index": 0,
+        "autoencoder_model": "model_v1",
+        "dimred_model": "model_v2"
+    }
+    message = LatentSpaceEvent(**message)
     await publisher.publish(message)
 
     # Check that the data was saved
     async with aiosqlite.connect(str(db_path)) as db:
-        async with db.execute("SELECT image_url, vector FROM vectors") as cursor:
+        async with db.execute("SELECT tiled_url, feature_vector, autoencoder_model, dimred_model FROM vectors") as cursor:
             rows = await cursor.fetchall()
             assert len(rows) == 1
-            assert rows[0][0] == message["image_url"]
-            # Convert the stored string back to a numpy array for comparison
-            stored_vector = np.fromstring(rows[0][1][1:-1], sep=',', dtype=int)
-            assert np.array_equal(stored_vector, message["vector"])
+            assert rows[0][0] == message.tiled_url
+            assert rows[0][1] == json.dumps(message.feature_vector)
+            assert rows[0][2] == message.autoencoder_model
+            assert rows[0][3] == message.dimred_model
+    
 
-    # Test missing fields
-    bad_message = {"image_url": "http://example.com/image2.jpg"}
-    await publisher.publish(bad_message)  # Should not raise
 
-    # Should still only be one row
-    async with aiosqlite.connect(str(db_path)) as db:
-        async with db.execute("SELECT COUNT(*) FROM vectors") as cursor:
-            count = (await cursor.fetchone())[0]
-            assert count == 1
+    # # Should still only be one row
+    # async with aiosqlite.connect(str(db_path)) as db:
+    #     async with db.execute("SELECT COUNT(*) FROM vectors") as cursor:
+    #         count = (await cursor.fetchone())[0]
+    #         assert count == 1

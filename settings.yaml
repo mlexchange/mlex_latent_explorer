@@ -9,6 +9,8 @@ lse_operator:
     port: 8765
   listener:
     zmq_address: tcp://sim_realistic:5000
+  vector_save:
+    db_path: /data/vector_save/latent_vectors.db  # Path to SQLite database for saving vectors
 
 lse_reducer:
   demo_mode: true
