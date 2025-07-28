@@ -52,6 +52,7 @@ dev = [
     "isort==5.13.2",
     "pre-commit==3.6.2",
     "pytest==8.1.1",
+    "pytest-asyncio"
 ]
 
 simulator = [
@@ -60,6 +61,7 @@ simulator = [
 ]
 
 arroyo = [
+    "aiosqlite",
     "arroyopy<=1.0.0",
     "arroyosas @ git+https://github.com/als-computing/arroyosas.git@move_lse",
     "dynaconf",
