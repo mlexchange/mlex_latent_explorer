@@ -48,7 +48,7 @@ async def start() -> None:
         
         # Initialize the WebSocket publisher first (so it's available for connections)
         ws_publisher = LSEWSResultPublisher.from_settings(app_settings.ws_publisher)
-    
+        asyncio.create_task(ws_publisher.start())
 
         # Initialize the VectorSavePublisher for saving vectors to SQLite
         vector_save_publisher = VectorSavePublisher(db_path=app_settings.vector_save.db_path)

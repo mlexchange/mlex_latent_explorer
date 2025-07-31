@@ -54,7 +54,8 @@ class VectorSavePublisher(Publisher):
         await self.db.commit()
 
     async def publish(self, message: LatentSpaceEvent) -> None:
-        # Expect message to be a dict with 'vector' and 'image_url'
+        if not isinstance(message, LatentSpaceEvent):
+            return None
 
         tiled_url = message.tiled_url
         feature_vector = message.feature_vector
