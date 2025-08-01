@@ -48,7 +48,7 @@ label_names = {
 }
 
 
-async def stream():
+async def mnist_stream():
     """
     Connect to the existing WebSocket server elsewhere,
     send messages, then close the connection.
