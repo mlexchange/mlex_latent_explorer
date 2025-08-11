@@ -11,6 +11,9 @@ from src.arroyo_reduction.vector_save import VectorSavePublisher
 async def test_vector_save_listener(tmp_path):
     db_path = tmp_path / "test_vectors.db"
     publisher = VectorSavePublisher(db_path=str(db_path))
+    
+    # Initialize the database but don't call start() which would create a server
+    await publisher._init_db()
 
     # Simulate a message
     message = {
@@ -21,6 +24,8 @@ async def test_vector_save_listener(tmp_path):
         "dimred_model": "model_v2"
     }
     message = LatentSpaceEvent(**message)
+    
+    # Call the publish method directly
     await publisher.publish(message)
 
     # Check that the data was saved
@@ -32,6 +37,10 @@ async def test_vector_save_listener(tmp_path):
             assert rows[0][1] == json.dumps(message.feature_vector)
             assert rows[0][2] == message.autoencoder_model
             assert rows[0][3] == message.dimred_model
+
+    # Explicitly close the database connection
+    if publisher.db is not None:
+        await publisher.db.close()
     
 
 
