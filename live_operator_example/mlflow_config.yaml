@@ -1,6 +1,7 @@
 # Common settings
 common:
-  autoencoder_type: "VIT"  # use VIT or VAE
+  autoencoder_type: "VAE"  # use VIT or VAE
+  umap_type: "neural" #use joblib or neural
 
 # Model configurations
 models:
@@ -18,8 +19,18 @@ models:
     experiment_name: "smi_exp_vae"
     auto_model_name: "smi_auto_vae"
     dr_model_name: "smi_dr_umap_vae"
+    dr_neural_model_name: "smi_dr_neural_umap_vae"
     weights_path: "../models/vae/vae_model_512_weights.npz"
     code_path: "../models/vae/vae.py"
     dr_weights_path: "../models/vae/vae_joblib_test.joblib"
+    dr_neural_weights_path: "../models/vae/umap_approximator.pth"
+    dr_neural_scaler_path: "../models/vae/scaler.pkl"
     latent_dim: 512
     image_size: [512, 512]
+
+# Save settings
+save:
+  autoencoder: "true"
+  dr: "true"
+
+

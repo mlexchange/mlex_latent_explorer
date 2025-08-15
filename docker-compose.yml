@@ -240,6 +240,23 @@ services:
     networks:
       mle_net:
 
+  # Simulator 3: replay the runs saved in local db during smi beamtime
+  sim_replay:
+    image: ghcr.io/als-computing/arroyosas:main
+    container_name: sim_replay
+    command: python -m arroyosas.app.db_replay_sim_cli
+    profiles:
+      - sim_replay
+    volumes:
+      - ./data/vector_db_smi:/data/vector_db_smi:ro # Mount directory containing the vector database
+    environment:
+      - DB_PATH=/data/vector_db_smi/latent_vectors.db
+      - TILED_API_KEY=${TILED_SINGLE_USER_API_KEY}
+      - TILED_LIVE_API_KEY=${TILED_SINGLE_USER_API_KEY}
+      - DYNACONF_TILED_POLLER__PUBLISH_ADDRESS=tcp://0.0.0.0:5000
+    networks:
+      mle_net:
+
 networks:
   mle_net:
     name: mle_net
