@@ -22,6 +22,11 @@ WRITE_DIR = os.getenv("WRITE_DIR")
 DATA_TILED_KEY = os.getenv("DATA_TILED_KEY", None)
 if DATA_TILED_KEY == "":
     DATA_TILED_KEY = None
+
+REMOTE_DATA_TILED_KEY = os.getenv("REMOTE_DATA_TILED_KEY", None)
+if REMOTE_DATA_TILED_KEY == "":
+    REMOTE_DATA_TILED_KEY = None
+    
 MODE = os.getenv("MODE", "dev")
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 USER = os.getenv("USER")
