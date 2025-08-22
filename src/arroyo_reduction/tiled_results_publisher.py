@@ -146,7 +146,12 @@ class TiledResultsPublisher(Publisher):
 
         try:
             # Run the entire publish operation in a separate thread
-            await asyncio.to_thread(self._publish_sync, message)
+            uuid_to_write = await asyncio.to_thread(self._publish_sync, message)
+            
+            # If there's a UUID to write, write it
+            if uuid_to_write:
+                await self.write_table_to_tiled(uuid_to_write)
+                
         except Exception as e:
             logger.error(f"Error publishing to Tiled: {e}")
             import traceback
@@ -158,7 +163,7 @@ class TiledResultsPublisher(Publisher):
             # Ensure daily container exists
             if self.daily_container is None:
                 logger.error("Daily container not initialized, cannot publish")
-                return
+                return None
 
             # Format vector and metadata
             vector = np.array(message.feature_vector, dtype=np.float32)
@@ -170,21 +175,19 @@ class TiledResultsPublisher(Publisher):
                 # Check if this UUID already exists
                 if uuid in self.existing_uuids:
                     logger.debug(f"Skipping vector for existing UUID: {uuid}")
-                    return
+                    return None
                 
                 # Check if this is a new UUID
+                uuid_to_write = None
+                
                 if self.current_uuid is not None and uuid != self.current_uuid and self.current_uuid in self.uuid_dataframes:
                     # We have a new UUID, so write the data for the previous UUID (if it's not an existing UUID)
                     if self.current_uuid not in self.existing_uuids and not self.uuid_dataframes[self.current_uuid].empty:
-                        logger.info(f"New UUID detected, writing data for previous UUID: {self.current_uuid}")
-                        self._write_table_to_tiled_sync(self.current_uuid)
+                        logger.info(f"New UUID detected, marking previous UUID for writing: {self.current_uuid}")
+                        uuid_to_write = self.current_uuid
                 
                 # Update current UUID
                 self.current_uuid = uuid
-                
-                # If this UUID already exists, skip further processing
-                if uuid in self.existing_uuids:
-                    return
                 
                 # Initialize tracking for this UUID if needed
                 if uuid not in self.uuid_dataframes:
@@ -211,10 +214,23 @@ class TiledResultsPublisher(Publisher):
                 
                 logger.debug(f"Added vector to table '{uuid}'")
                 
+                return uuid_to_write
             else:
                 logger.warning(f"Received vector with unexpected dimensions: {vector.shape}")
+                return None
         except Exception as e:
             logger.error(f"Error in _publish_sync: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None
+    
+    async def write_table_to_tiled(self, table_key):
+        """Write the collected vectors for a specific UUID to Tiled."""
+        try:
+            # Run the write operation in a separate thread
+            await asyncio.to_thread(self._write_table_to_tiled_sync, table_key)
+        except Exception as e:
+            logger.error(f"Error in write_table_to_tiled for {table_key}: {e}")
             import traceback
             logger.error(traceback.format_exc())
     
@@ -266,29 +282,43 @@ class TiledResultsPublisher(Publisher):
     async def stop(self):
         """Write any remaining data for new UUIDs before stopping."""
         try:
-            # Run the stopping operation in a separate thread
-            await asyncio.to_thread(self._stop_sync)
+            # Run the stopping operation in a separate thread to get UUID to write
+            uuid_to_write = await asyncio.to_thread(self._stop_sync)
+            
+            # If there's a UUID to write, write it
+            if uuid_to_write:
+                logger.info(f"Writing final data for UUID: {uuid_to_write}")
+                await self.write_table_to_tiled(uuid_to_write)
+                
+            logger.info("Publisher stopped")
         except Exception as e:
             logger.error(f"Error stopping publisher: {e}")
             import traceback
             logger.error(traceback.format_exc())
     
     def _stop_sync(self):
-        """Synchronous implementation of stop() to be run in a thread."""
+        """Synchronous implementation of stop() to be run in a thread.
+        
+        Returns:
+            str or None: UUID that needs to be written, or None if no writing needed
+        """
         try:
-            logger.info("Publisher stopping, writing any remaining data for new UUIDs")
+            logger.info("Publisher stopping, checking if current UUID needs writing")
             
-            # Write data for all UUIDs that have accumulated data and don't already exist
-            for uuid in list(self.uuid_dataframes.keys()):
-                if uuid not in self.existing_uuids and not self.uuid_dataframes[uuid].empty:
-                    logger.info(f"Writing remaining data for new UUID: {uuid}")
-                    self._write_table_to_tiled_sync(uuid)
+            # Check if the current UUID needs writing
+            if (self.current_uuid is not None and 
+                self.current_uuid not in self.existing_uuids and 
+                self.current_uuid in self.uuid_dataframes and 
+                not self.uuid_dataframes[self.current_uuid].empty):
+                
+                return self.current_uuid
             
-            logger.info("Publisher stopped")
+            return None
         except Exception as e:
             logger.error(f"Error in _stop_sync: {e}")
             import traceback
             logger.error(traceback.format_exc())
+            return None
 
     @classmethod
     def from_settings(cls, settings):
