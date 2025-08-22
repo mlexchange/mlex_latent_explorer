@@ -263,6 +263,7 @@ services:
     volumes:
       - ./data/vector_db_smi:/data/vector_db_smi:ro # Mount directory containing the vector database
     environment:
+      - TILED_ENV=${TILED_ENV}
       - DB_PATH=/data/vector_db_smi/latent_vectors.db
       - TILED_API_KEY=${REMOTE_TILED_SINGLE_USER_API_KEY}
       - TILED_LIVE_API_KEY=${REMOTE_TILED_SINGLE_USER_API_KEY}

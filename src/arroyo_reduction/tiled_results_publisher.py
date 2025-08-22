@@ -7,7 +7,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import pytz  # Added import for timezone
+import pytz
 from arroyopy.publisher import Publisher
 from tiled.client import from_uri
 
@@ -18,6 +18,14 @@ logger = logging.getLogger("arroyo_reduction.tiled_results_publisher")
 # Environment variables for Tiled connections
 RESULTS_TILED_URI = os.getenv("RESULTS_TILED_URI", "http://tiled:8000")
 RESULTS_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
+
+# Constants
+# Timezone for log timestamps
+CALIFORNIA_TZ = pytz.timezone('US/Pacific')
+# Daily run ID that all instances will use
+DAILY_RUN_ID = f"daily_run_{datetime.now(CALIFORNIA_TZ).strftime('%Y-%m-%d')}"
+# Regex pattern to extract UUID from tiled_url
+UUID_PATTERN = r"([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"
 
 class TiledResultsPublisher(Publisher):
     """Publisher that saves latent space vectors to a Tiled server."""
@@ -40,23 +48,25 @@ class TiledResultsPublisher(Publisher):
         # Keep track of the current UUID
         self.current_uuid = None
         
-        # Create a daily run ID using California timezone
-        california_tz = pytz.timezone('US/Pacific')  # Added for California timezone
-        today = datetime.now(california_tz).strftime("%Y-%m-%d")  # Modified to use California timezone
-        self.run_id = f"daily_run_{today}"
-        
-        # Regex pattern to extract UUID from tiled_url
-        self.uuid_pattern = r"([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"
-        
         logger.info(f"Initialized publisher with UUID-based table grouping")
 
     async def start(self):
         """Connect to Tiled server and initialize containers."""
         try:
+            # Run the entire initialization in a separate thread
+            await asyncio.to_thread(self._start_sync)
+        except Exception as e:
+            logger.error(f"Failed to initialize Tiled client: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+    def _start_sync(self):
+        """Synchronous implementation of start() to be run in a thread."""
+        try:
             self.client = from_uri(self.tiled_uri, api_key=self.tiled_api_key)
             
             # Navigate to the root container and create the daily run container inside it
-            await self._setup_containers()
+            self._setup_containers_sync()
             
             # List all existing tables in the daily container
             if self.daily_container is not None:
@@ -71,13 +81,14 @@ class TiledResultsPublisher(Publisher):
                 if self.existing_uuids:
                     examples = list(self.existing_uuids)[:3]
                     logger.info(f"Examples of existing UUIDs: {', '.join(examples)}")
-            
+                    
             logger.info(f"Connected to Tiled server at {self.tiled_uri}")
-            logger.info(f"Using container path: {'/'.join(self.root_segments)}/{self.run_id}")
+            logger.info(f"Using container path: {'/'.join(self.root_segments)}/{DAILY_RUN_ID}")
         except Exception as e:
-            logger.error(f"Failed to initialize Tiled client: {e}")
+            logger.error(f"Error in _start_sync: {e}")
             import traceback
             logger.error(traceback.format_exc())
+            raise  # Re-raise so the async method can catch it
     
     def _extract_uuid_from_url(self, url):
         """Extract UUID from tiled_url."""
@@ -87,7 +98,7 @@ class TiledResultsPublisher(Publisher):
         # Log the URL for debugging
         logger.debug(f"Extracting UUID from URL: {url}")
         
-        match = re.search(self.uuid_pattern, url)
+        match = re.search(UUID_PATTERN, url)
         if match:
             uuid = match.group(1)
             logger.debug(f"Extracted UUID: {uuid}")
@@ -96,42 +107,53 @@ class TiledResultsPublisher(Publisher):
         logger.debug(f"No UUID found in URL, using default: {self.default_table_name}")
         return self.default_table_name
     
-    async def _setup_containers(self):
-        """Set up the container structure."""
+    def _setup_containers_sync(self):
+        """Set up the container structure (synchronous version)."""
         try:
             # Navigate through root_segments
             container = self.client
             for segment in self.root_segments:
-                if segment not in container:
-                    logger.info(f"Creating container: {segment}")
-                    container = container.create_container(segment)
-                else:
+                if segment in container:
                     logger.info(f"Using existing container: {segment}")
                     container = container[segment]
+                else:
+                    logger.info(f"Creating container: {segment}")
+                    container = container.create_container(segment)
             
             # Store reference to the root container
             self.root_container = container
             
             # Now create the daily run container inside the root container
-            if self.run_id not in self.root_container:
-                logger.info(f"Creating daily container: {self.run_id}")
-                self.root_container.create_container(self.run_id)
+            if DAILY_RUN_ID not in self.root_container:
+                logger.info(f"Creating daily container: {DAILY_RUN_ID}")
+                self.root_container.create_container(DAILY_RUN_ID)
             else:
-                logger.info(f"Using existing daily container: {self.run_id}")
+                logger.info(f"Using existing daily container: {DAILY_RUN_ID}")
             
             # Store reference to daily container
-            self.daily_container = self.root_container[self.run_id]
+            self.daily_container = self.root_container[DAILY_RUN_ID]
             
         except Exception as e:
             logger.error(f"Error setting up containers: {e}")
             import traceback
             logger.error(traceback.format_exc())
+            raise  # Re-raise to propagate the error
     
     async def publish(self, message):
         """Publish a message to Tiled server."""
         if not isinstance(message, LatentSpaceEvent):
             return
 
+        try:
+            # Run the entire publish operation in a separate thread
+            await asyncio.to_thread(self._publish_sync, message)
+        except Exception as e:
+            logger.error(f"Error publishing to Tiled: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+    
+    def _publish_sync(self, message):
+        """Synchronous implementation of publish() to be run in a thread."""
         try:
             # Ensure daily container exists
             if self.daily_container is None:
@@ -155,7 +177,7 @@ class TiledResultsPublisher(Publisher):
                     # We have a new UUID, so write the data for the previous UUID (if it's not an existing UUID)
                     if self.current_uuid not in self.existing_uuids and not self.uuid_dataframes[self.current_uuid].empty:
                         logger.info(f"New UUID detected, writing data for previous UUID: {self.current_uuid}")
-                        await self._write_table_to_tiled(self.current_uuid)
+                        self._write_table_to_tiled_sync(self.current_uuid)
                 
                 # Update current UUID
                 self.current_uuid = uuid
@@ -191,14 +213,13 @@ class TiledResultsPublisher(Publisher):
                 
             else:
                 logger.warning(f"Received vector with unexpected dimensions: {vector.shape}")
-                
         except Exception as e:
-            logger.error(f"Error publishing to Tiled: {e}")
+            logger.error(f"Error in _publish_sync: {e}")
             import traceback
             logger.error(traceback.format_exc())
     
-    async def _write_table_to_tiled(self, table_key):
-        """Write the collected vectors for a specific UUID to Tiled."""
+    def _write_table_to_tiled_sync(self, table_key):
+        """Synchronous implementation of write_table_to_tiled to be run in a thread."""
         try:
             # Check if this UUID already exists
             if table_key in self.existing_uuids:
@@ -206,8 +227,11 @@ class TiledResultsPublisher(Publisher):
                 return
             
             # Get the DataFrame for this UUID
-            df = self.uuid_dataframes[table_key]
-            
+            df = self.uuid_dataframes.get(table_key)
+            if df is None:
+                logger.warning(f"No DataFrame found for {table_key}")
+                return
+                
             # Log DataFrame info for debugging
             logger.info(f"Writing {len(df)} vectors to new table '{table_key}'")
             
@@ -219,11 +243,7 @@ class TiledResultsPublisher(Publisher):
             # Simply write the DataFrame to Tiled
             try:
                 # Use write_dataframe with the UUID as the key
-                await asyncio.to_thread(
-                    self.daily_container.write_dataframe,
-                    df,
-                    key=table_key
-                )
+                self.daily_container.write_dataframe(df, key=table_key)
                 
                 logger.info(f"Successfully wrote {len(df)} vectors to '{table_key}'")
                 
@@ -239,21 +259,36 @@ class TiledResultsPublisher(Publisher):
                 logger.error(traceback.format_exc())
                 
         except Exception as e:
-            logger.error(f"Error in _write_table_to_tiled for {table_key}: {e}")
+            logger.error(f"Error in _write_table_to_tiled_sync for {table_key}: {e}")
             import traceback
             logger.error(traceback.format_exc())
 
     async def stop(self):
         """Write any remaining data for new UUIDs before stopping."""
-        logger.info("Publisher stopping, writing any remaining data for new UUIDs")
-        
-        # Write data for all UUIDs that have accumulated data and don't already exist
-        for uuid in list(self.uuid_dataframes.keys()):
-            if uuid not in self.existing_uuids and not self.uuid_dataframes[uuid].empty:
-                logger.info(f"Writing remaining data for new UUID: {uuid}")
-                await self._write_table_to_tiled(uuid)
-        
-        logger.info("Publisher stopped")
+        try:
+            # Run the stopping operation in a separate thread
+            await asyncio.to_thread(self._stop_sync)
+        except Exception as e:
+            logger.error(f"Error stopping publisher: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+    
+    def _stop_sync(self):
+        """Synchronous implementation of stop() to be run in a thread."""
+        try:
+            logger.info("Publisher stopping, writing any remaining data for new UUIDs")
+            
+            # Write data for all UUIDs that have accumulated data and don't already exist
+            for uuid in list(self.uuid_dataframes.keys()):
+                if uuid not in self.existing_uuids and not self.uuid_dataframes[uuid].empty:
+                    logger.info(f"Writing remaining data for new UUID: {uuid}")
+                    self._write_table_to_tiled_sync(uuid)
+            
+            logger.info("Publisher stopped")
+        except Exception as e:
+            logger.error(f"Error in _stop_sync: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     @classmethod
     def from_settings(cls, settings):
