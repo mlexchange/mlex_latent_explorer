@@ -87,3 +87,50 @@ def hash_list_of_strings(strings_list):
     concatenated = "".join(strings_list)
     digest = hashlib.sha256(concatenated.encode("utf-8")).hexdigest()
     return humanize(digest)
+
+
+def get_available_experiment_uuids():
+    """
+    Retrieve all available experiment UUIDs from Tiled that were written
+    by tiled_results_publisher.py
+    
+    Returns:
+        list: List of dictionaries with {label: uuid, value: uuid}
+    """
+    try:
+        # Check if tiled_results client is available
+        if not tiled_results.check_dataloader_ready():
+            logger.warning("Tiled results client not available")
+            return []
+        
+        # Get the daily run container
+        container = tiled_results.data_client
+        
+        # Navigate to the lse_live_results/daily_run_YYYY-MM-DD path
+        if "lse_live_results" in container:
+            container = container["lse_live_results"]
+            
+            # Find the most recent daily run container
+            daily_runs = sorted([k for k in container.keys() if k.startswith("daily_run_")], reverse=True)
+            
+            if not daily_runs:
+                logger.warning("No daily run containers found")
+                return []
+                
+            # Get the latest daily run
+            latest_run = daily_runs[0]
+            container = container[latest_run]
+            
+            # Get all UUIDs (these are the keys in the container)
+            uuids = list(container.keys())
+            
+            # Format as dropdown options
+            return [{"label": uuid, "value": uuid} for uuid in uuids]
+            
+        else:
+            logger.warning("lse_live_results container not found")
+            return []
+            
+    except Exception as e:
+        logger.error(f"Error retrieving experiment UUIDs: {e}")
+        return []

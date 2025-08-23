@@ -9,8 +9,7 @@ from dash_iconify import DashIconify
 from ..utils.plot_utils import draw_rows, plot_empty_heatmap, plot_empty_scatter
 from .model_selection_dialog import create_model_selection_dialog
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("lse.main_display")
 
 NUM_IMGS_OVERVIEW = 6
 WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://localhost:8765/lse")
