@@ -67,6 +67,7 @@ from src.callbacks.live_mode import (  # noqa: F401
 from src.callbacks.experiment_replay import (  # noqa: F401
     load_experiment_uuids,
     toggle_load_button,
+    load_experiment_replay,
 )
 
 load_dotenv(".env")

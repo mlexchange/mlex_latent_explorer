@@ -50,6 +50,11 @@ def update_data_overview(
 ):
     if go_live is not None and go_live % 2 == 1:
         raise PreventUpdate
+    
+    # Skip if in replay mode - check for the replay_mode flag
+    if data_project_dict and data_project_dict.get("replay_mode", False):
+        raise PreventUpdate
+    
     imgs = []
     if data_project_dict != {}:
         data_project = DataProject.from_dict(data_project_dict, api_key=DATA_TILED_KEY)
@@ -329,11 +334,16 @@ def update_heatmap(
 
     # Determine which API key to use based on live mode
     is_live_mode = go_live is not None and go_live % 2 == 1
+    is_replay_mode = data_project_dict.get("replay_mode", False)
     
     if is_live_mode:
         # Use remote API key for live mode
         api_key = REMOTE_DATA_TILED_KEY
         logger.info("Using REMOTE_DATA_TILED_KEY for live mode heatmap")
+    elif is_replay_mode:
+        # Use remote API key for replay mode
+        api_key = REMOTE_DATA_TILED_KEY
+        logger.info("Using REMOTE_DATA_TILED_KEY for replay mode heatmap")
     else:
         # Use regular DATA_TILED_KEY for offline mode
         api_key = DATA_TILED_KEY
