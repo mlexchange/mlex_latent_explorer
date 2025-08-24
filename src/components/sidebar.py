@@ -218,7 +218,42 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                             id="experiment-replay-controls",
                             title="Experiment Replay",
                             children=[
-                                # First create the label and dropdown in a standard ControlItem
+                                # First dropdown for daily container selection
+                                ControlItem(
+                                    "Daily Container",
+                                    "daily-container-title",
+                                    html.Div([
+                                        dbc.Row([
+                                            dbc.Col(
+                                                dbc.Select(
+                                                    id="daily-container-dropdown",
+                                                    options=[],
+                                                    value=None,
+                                                    placeholder="Select a daily container",
+                                                ),
+                                                width=10,
+                                            ),
+                                            dbc.Col(
+                                                dbc.Button(
+                                                    DashIconify(
+                                                        icon="tabler:refresh",
+                                                        width=18,
+                                                        height=18,
+                                                    ),
+                                                    id="refresh-daily-containers",
+                                                    color="light",
+                                                    size="sm",
+                                                    className="rounded-circle",
+                                                    style={"aspectRatio": "1 / 1"},
+                                                ),
+                                                width=1,
+                                                style={"padding-left": "0"},
+                                            ),
+                                        ], className="align-items-center"),
+                                    ]),
+                                ),
+                                html.P(),
+                                # Second dropdown for UUID selection within the selected container
                                 ControlItem(
                                     "Experiment UUID",
                                     "experiment-uuid-title",

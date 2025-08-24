@@ -89,11 +89,59 @@ def hash_list_of_strings(strings_list):
     return humanize(digest)
 
 
-def get_available_experiment_uuids():
+def get_daily_containers():
     """
-    Retrieve all available experiment UUIDs from Tiled that were written
-    by tiled_results_publisher.py
+    Retrieve all available daily containers from Tiled
     
+    Returns:
+        list: List of dictionaries with {label: container_name, value: container_name}
+    """
+    try:
+        # Check if tiled_results client is available
+        if not tiled_results.check_dataloader_ready():
+            logger.warning("Tiled results client not available")
+            return []
+        
+        # Get the daily run container
+        container = tiled_results.data_client
+        
+        # Navigate to the lse_live_results path
+        if "lse_live_results" in container:
+            container = container["lse_live_results"]
+            
+            # Find all daily run containers and sort in reverse chronological order
+            daily_runs = sorted([k for k in container.keys() if k.startswith("daily_run_")], reverse=True)
+            
+            if not daily_runs:
+                logger.warning("No daily run containers found")
+                return []
+                
+            # Format as dropdown options with human-readable labels
+            return [{"label": format_container_name(run), "value": run} for run in daily_runs]
+            
+        else:
+            logger.warning("lse_live_results container not found")
+            return []
+            
+    except Exception as e:
+        logger.error(f"Error retrieving daily containers: {e}")
+        return []
+
+def format_container_name(container_name):
+    """Format a container name for display in the dropdown"""
+    if container_name.startswith("daily_run_"):
+        # Extract the date part
+        date_str = container_name[10:]  # Skip "daily_run_"
+        return f"Daily Run {date_str}"
+    return container_name
+
+def get_uuids_in_container(container_name):
+    """
+    Retrieve all available experiment UUIDs from a specific daily container
+    
+    Args:
+        container_name (str): The name of the daily container
+        
     Returns:
         list: List of dictionaries with {label: uuid, value: uuid}
     """
@@ -106,31 +154,23 @@ def get_available_experiment_uuids():
         # Get the daily run container
         container = tiled_results.data_client
         
-        # Navigate to the lse_live_results/daily_run_YYYY-MM-DD path
-        if "lse_live_results" in container:
-            container = container["lse_live_results"]
-            
-            # Find the most recent daily run container
-            daily_runs = sorted([k for k in container.keys() if k.startswith("daily_run_")], reverse=True)
-            
-            if not daily_runs:
-                logger.warning("No daily run containers found")
-                return []
-                
-            # Get the latest daily run
-            latest_run = daily_runs[0]
-            container = container[latest_run]
-            
-            # Get all UUIDs (these are the keys in the container)
-            uuids = list(container.keys())
-            
-            # Format as dropdown options
-            return [{"label": uuid, "value": uuid} for uuid in uuids]
-            
-        else:
+        # Navigate to the lse_live_results/container_name path
+        if "lse_live_results" not in container:
             logger.warning("lse_live_results container not found")
             return []
             
+        container = container["lse_live_results"]
+        
+        if container_name not in container:
+            logger.warning(f"Container {container_name} not found")
+            return []
+            
+        # Get all UUIDs in this container
+        uuids = list(container[container_name].keys())
+        
+        # Format as dropdown options
+        return [{"label": uuid, "value": uuid} for uuid in uuids]
+            
     except Exception as e:
-        logger.error(f"Error retrieving experiment UUIDs: {e}")
+        logger.error(f"Error retrieving UUIDs from container {container_name}: {e}")
         return []

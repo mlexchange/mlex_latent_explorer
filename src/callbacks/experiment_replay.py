@@ -5,7 +5,7 @@ from dash import Input, Output, State, callback, no_update
 from dash.exceptions import PreventUpdate
 from file_manager.data_project import DataProject
 
-from src.utils.data_utils import get_available_experiment_uuids, tiled_results
+from src.utils.data_utils import get_daily_containers, get_uuids_in_container, tiled_results
 from src.utils.plot_utils import (
     generate_scatter_data, 
     plot_empty_heatmap, 
@@ -17,15 +17,32 @@ logger = logging.getLogger("lse.replay")
 
 
 @callback(
-    Output("experiment-uuid-dropdown", "options"),
-    Output("experiment-uuid-dropdown", "value"),
-    Input("refresh-experiment-uuids", "n_clicks"),
+    Output("daily-container-dropdown", "options"),
+    Output("daily-container-dropdown", "value"),
+    Input("refresh-daily-containers", "n_clicks"),  # Updated button ID
     Input("sidebar", "active_item"),  # Also load when sidebar tab is selected
     prevent_initial_call=True,
 )
-def load_experiment_uuids(n_clicks, active_item):
-    """Load available experiment UUIDs from Tiled"""
-    uuids = get_available_experiment_uuids()
+def load_daily_containers(n_clicks, active_item):
+    """Load available daily containers from Tiled"""
+    containers = get_daily_containers()
+    
+    if containers:
+        return containers, containers[0]["value"]
+    else:
+        return [], None
+@callback(
+    Output("experiment-uuid-dropdown", "options"),
+    Output("experiment-uuid-dropdown", "value"),
+    Input("daily-container-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def load_experiment_uuids(selected_container):
+    """Load available experiment UUIDs from selected daily container"""
+    if not selected_container:
+        return [], None
+        
+    uuids = get_uuids_in_container(selected_container)
     
     if uuids:
         return uuids, uuids[0]["value"]
@@ -80,8 +97,9 @@ def filter_experiment_by_percentage(percentage_range, replay_buffer, data_projec
         # Create filtered data
         filtered_vectors = feature_vectors_full[start_idx:end_idx]
         
-        # Get experiment UUID
+        # Get experiment UUID and container
         experiment_uuid = replay_buffer.get("uuid", "unknown")
+        container = replay_buffer.get("container", "unknown")
         
         # Rebuild the scatter plot if we have vectors
         if len(filtered_vectors) > 0:
@@ -92,9 +110,9 @@ def filter_experiment_by_percentage(percentage_range, replay_buffer, data_projec
             
             # Update stats text
             if start_percent == 0 and end_percent == 100:
-                stats_text = f"Showing all {len(filtered_vectors)} feature vectors from experiment {experiment_uuid}"
+                stats_text = f"Showing all {len(filtered_vectors)} feature vectors from {container}/{experiment_uuid}"
             else:
-                stats_text = f"Showing {len(filtered_vectors)} feature vectors ({start_percent}% - {end_percent}% of data) from experiment {experiment_uuid}"
+                stats_text = f"Showing {len(filtered_vectors)} feature vectors ({start_percent}% - {end_percent}% of data) from {container}/{experiment_uuid}"
             
             return scatter_fig, stats_text
                 
@@ -114,12 +132,13 @@ def filter_experiment_by_percentage(percentage_range, replay_buffer, data_projec
     Output("replay-buffer", "data"),  # Use our new replay-buffer with structured format
     Output("replay-data-percentage", "value"),  # Reset the slider
     Input("load-experiment-button", "n_clicks"),
+    State("daily-container-dropdown", "value"),
     State("experiment-uuid-dropdown", "value"),
     prevent_initial_call=True,
 )
-def load_experiment_replay(n_clicks, selected_uuid):
+def load_experiment_replay(n_clicks, selected_container, selected_uuid):
     """Load feature vectors from selected experiment UUID and display in scatter plot"""
-    if not n_clicks or not selected_uuid:
+    if not n_clicks or not selected_container or not selected_uuid:
         raise PreventUpdate
     
     # Initialize a minimal data project dictionary with replay_mode flag
@@ -135,12 +154,13 @@ def load_experiment_replay(n_clicks, selected_uuid):
     replay_buffer = {
         "feature_vectors": [],
         "live_indices": [],
-        "uuid": selected_uuid
+        "uuid": selected_uuid,
+        "container": selected_container
     }
     
     try:
         # Connect to Tiled and load feature vectors
-        logger.info(f"Loading experiment UUID: {selected_uuid}")
+        logger.info(f"Loading experiment UUID: {selected_uuid} from container: {selected_container}")
         
         if not tiled_results.check_dataloader_ready():
             return no_update, f"Could not connect to Tiled server", data_project_dict, replay_buffer, [0, 100]
@@ -154,28 +174,23 @@ def load_experiment_replay(n_clicks, selected_uuid):
             
         container = container["lse_live_results"]
         
-        # Find the most recent daily run container
-        daily_runs = sorted([k for k in container.keys() if k.startswith("daily_run_")], reverse=True)
-        
-        if not daily_runs:
-            return no_update, "No experiment data found", data_project_dict, replay_buffer, [0, 100]
+        # Navigate to the selected daily container
+        if selected_container not in container:
+            return no_update, f"Daily container {selected_container} not found", data_project_dict, replay_buffer, [0, 100]
             
-        # Get the latest daily run containing our UUID
-        df = None
-        run_used = None
-        for run in daily_runs:
-            try:
-                if selected_uuid in container[run]:
-                    df = container[run][selected_uuid].read()
-                    run_used = run
-                    logger.info(f"Loaded DataFrame with shape: {df.shape} from run: {run}")
-                    break
-            except Exception as e:
-                logger.warning(f"Error loading data from {run}/{selected_uuid}: {e}")
-                continue
+        daily_container = container[selected_container]
         
-        if df is None:
-            return no_update, f"Could not load data for experiment {selected_uuid}", data_project_dict, replay_buffer, [0, 100]
+        # Check if the selected UUID exists in this container
+        if selected_uuid not in daily_container:
+            return no_update, f"UUID {selected_uuid} not found in container {selected_container}", data_project_dict, replay_buffer, [0, 100]
+            
+        # Get the DataFrame for the selected UUID
+        df = daily_container[selected_uuid].read()
+        
+        if df is None or df.empty:
+            return no_update, f"No data found for experiment {selected_uuid}", data_project_dict, replay_buffer, [0, 100]
+        
+        logger.info(f"Loaded DataFrame with shape: {df.shape} from {selected_container}/{selected_uuid}")
         
         # Extract feature vectors from DataFrame
         feature_cols = [col for col in df.columns if col.startswith('feature_')]
@@ -183,7 +198,6 @@ def load_experiment_replay(n_clicks, selected_uuid):
             return no_update, "No feature vectors found in the selected data", data_project_dict, replay_buffer, [0, 100]
             
         # Create numpy array with feature vectors
-        import numpy as np
         feature_vectors = df[feature_cols].values
         
         # Log sample of feature vectors (first 3 rows)
@@ -230,7 +244,8 @@ def load_experiment_replay(n_clicks, selected_uuid):
         replay_buffer = {
             "feature_vectors": feature_vectors.tolist(),
             "live_indices": live_indices,
-            "uuid": selected_uuid
+            "uuid": selected_uuid,
+            "container": selected_container
         }
         
         # Let's try to create a more complete data project dictionary
@@ -292,13 +307,8 @@ def load_experiment_replay(n_clicks, selected_uuid):
             # No URLs available - use the initialized data_project_dict
             pass
         
-        # Log the final data project dictionary
-        import json
-        logger.info(f"Created data project dictionary:")
-        logger.info(json.dumps(data_project_dict, indent=2))
-        
         # Success message
-        stats_text = f"Loaded {len(df)} feature vectors from experiment {selected_uuid}"
+        stats_text = f"Loaded {len(df)} feature vectors from {selected_container}/{selected_uuid}"
         
         return scatter_fig, stats_text, data_project_dict, replay_buffer, [0, 100]
             
