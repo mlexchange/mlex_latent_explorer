@@ -217,6 +217,7 @@ def main_display():
             create_model_selection_dialog(),
             dcc.Store(id="selected-live-models", data=None),
             dcc.Store(id="buffer", data={}),
+            dcc.Store(id="replay-buffer", data={}),
             dcc.Interval(id="buffer-debounce", interval=100, n_intervals=0),  # 100ms
             dcc.Store(id="live-indices", data=[]),
             WebSocket(id="ws-live", url=WEBSOCKET_URL),

@@ -78,56 +78,6 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                 ),
                             ],
                         ),
-                        # Option 1: Modify the experiment-replay-controls section to use a simpler structure
-                        dbc.AccordionItem(
-                            id="experiment-replay-controls",
-                            title="Experiment Replay",
-                            children=[
-                                # First create the label and dropdown in a standard ControlItem
-                                ControlItem(
-                                    "Experiment UUID",
-                                    "experiment-uuid-title",
-                                    html.Div([
-                                        dbc.Row([
-                                            dbc.Col(
-                                                dbc.Select(
-                                                    id="experiment-uuid-dropdown",
-                                                    options=[],
-                                                    value=None,
-                                                    placeholder="Select an experiment UUID",
-                                                ),
-                                                width=10,
-                                            ),
-                                            dbc.Col(
-                                                dbc.Button(
-                                                    DashIconify(
-                                                        icon="tabler:refresh",
-                                                        width=18,
-                                                        height=18,
-                                                    ),
-                                                    id="refresh-experiment-uuids",
-                                                    color="light",
-                                                    size="sm",
-                                                    className="rounded-circle",
-                                                    style={"aspectRatio": "1 / 1"},
-                                                ),
-                                                width=1,
-                                                style={"padding-left": "0"},
-                                            ),
-                                        ], className="align-items-center"),  # Add this class to align row items
-                                    ]),
-                                ),
-                                # Then add the button separately below
-                                html.Div(style={"height": "20px"}),
-                                dbc.Button(
-                                    "Load Experiment",
-                                    id="load-experiment-button",
-                                    color="primary",
-                                    className="w-100",
-                                    disabled=True,
-                                ),
-                            ],
-                        ),
                         dbc.AccordionItem(
                             id="live-mode-models",
                             title="Live Mode Models",
@@ -262,6 +212,72 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                 ),
                             ],
                             title="Clustering",
+                        ),
+                        # Moved experiment replay section after clustering
+                        dbc.AccordionItem(
+                            id="experiment-replay-controls",
+                            title="Experiment Replay",
+                            children=[
+                                # First create the label and dropdown in a standard ControlItem
+                                ControlItem(
+                                    "Experiment UUID",
+                                    "experiment-uuid-title",
+                                    html.Div([
+                                        dbc.Row([
+                                            dbc.Col(
+                                                dbc.Select(
+                                                    id="experiment-uuid-dropdown",
+                                                    options=[],
+                                                    value=None,
+                                                    placeholder="Select an experiment UUID",
+                                                ),
+                                                width=10,
+                                            ),
+                                            dbc.Col(
+                                                dbc.Button(
+                                                    DashIconify(
+                                                        icon="tabler:refresh",
+                                                        width=18,
+                                                        height=18,
+                                                    ),
+                                                    id="refresh-experiment-uuids",
+                                                    color="light",
+                                                    size="sm",
+                                                    className="rounded-circle",
+                                                    style={"aspectRatio": "1 / 1"},
+                                                ),
+                                                width=1,
+                                                style={"padding-left": "0"},
+                                            ),
+                                        ], className="align-items-center"),  # Add this class to align row items
+                                    ]),
+                                ),
+                                html.P(),
+                                # Add data percentage slider
+                                ControlItem(
+                                    "Data Percentage",
+                                    "replay-data-percentage-title",
+                                    dcc.RangeSlider(
+                                        id="replay-data-percentage",
+                                        min=0,
+                                        max=100,
+                                        tooltip={
+                                            "placement": "bottom",
+                                            "always_visible": True,
+                                        },
+                                        value=[0, 100],
+                                    ),
+                                ),
+                                # Then add the button separately below
+                                html.Div(style={"height": "20px"}),
+                                dbc.Button(
+                                    "Load Experiment",
+                                    id="load-experiment-button",
+                                    color="primary",
+                                    className="w-100",
+                                    disabled=True,
+                                ),
+                            ],
                         ),
                     ],
                 ),
