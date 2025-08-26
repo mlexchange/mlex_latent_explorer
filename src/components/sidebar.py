@@ -288,12 +288,12 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                     ]),
                                 ),
                                 html.P(),
-                                # Add data percentage slider
+                                # Change from Data Percentage to Data Range
                                 ControlItem(
-                                    "Data Percentage",
-                                    "replay-data-percentage-title",
+                                    "Data Range",
+                                    "replay-data-range-title",
                                     dcc.RangeSlider(
-                                        id="replay-data-percentage",
+                                        id="replay-data-range",
                                         min=0,
                                         max=100,
                                         tooltip={

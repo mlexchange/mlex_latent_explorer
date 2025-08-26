@@ -31,6 +31,7 @@ def load_daily_containers(n_clicks, active_item):
         return containers, containers[0]["value"]
     else:
         return [], None
+        
 @callback(
     Output("experiment-uuid-dropdown", "options"),
     Output("experiment-uuid-dropdown", "value"),
@@ -61,13 +62,14 @@ def toggle_load_button(selected_uuid):
 @callback(
     Output("scatter", "figure", allow_duplicate=True),
     Output("stats-div", "children", allow_duplicate=True),
-    Input("replay-data-percentage", "value"),
+    Output("replay-data-range", "max", allow_duplicate=True),
+    Input("replay-data-range", "value"),
     State("replay-buffer", "data"),
     State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
     prevent_initial_call=True,
 )
-def filter_experiment_by_percentage(percentage_range, replay_buffer, data_project_dict):
-    """Filter experiment data by percentage range"""
+def filter_experiment_by_range(range_value, replay_buffer, data_project_dict):
+    """Filter experiment data by index range"""
     # Check if buffer is empty or doesn't have feature_vectors
     if not replay_buffer or "feature_vectors" not in replay_buffer:
         raise PreventUpdate
@@ -84,22 +86,30 @@ def filter_experiment_by_percentage(percentage_range, replay_buffer, data_projec
         if total_points == 0:
             raise PreventUpdate
             
-        # Calculate the range indices based on percentage
-        start_percent, end_percent = percentage_range
-        
-        # Handle full range (0-100) the same way as partial ranges
-        start_idx = int((start_percent / 100) * total_points)
-        end_idx = int((end_percent / 100) * total_points)
-        
-        # Ensure at least one point is shown
-        end_idx = max(end_idx, start_idx + 1)
-        
-        # Create filtered data
-        filtered_vectors = feature_vectors_full[start_idx:end_idx]
+        # Make sure range_value contains integer indices
+        if range_value is None:
+            start_idx, end_idx = 0, total_points
+        else:
+            # Ensure we have integers for slicing
+            start_idx = int(range_value[0])
+            end_idx = int(range_value[1])
         
         # Get experiment UUID and container
         experiment_uuid = replay_buffer.get("uuid", "unknown")
         container = replay_buffer.get("container", "unknown")
+        
+        # Check for invalid range conditions
+        if start_idx >= end_idx or start_idx >= total_points or end_idx <= 0:
+            # Return an empty scatter plot for invalid ranges
+            empty_fig = plot_empty_scatter()
+            stats_text = f"No data available in the selected range ({start_idx} - {end_idx})"
+            return empty_fig, stats_text, total_points
+        
+        # Ensure end_idx doesn't exceed total_points
+        end_idx = min(end_idx, total_points)
+        
+        # Create filtered data
+        filtered_vectors = feature_vectors_full[start_idx:end_idx]
         
         # Rebuild the scatter plot if we have vectors
         if len(filtered_vectors) > 0:
@@ -108,29 +118,29 @@ def filter_experiment_by_percentage(percentage_range, replay_buffer, data_projec
             # Create a new scatter plot
             scatter_fig = generate_scatter_data(filtered_vectors, n_components)
             
-            # Update stats text
-            if start_percent == 0 and end_percent == 100:
-                stats_text = f"Showing all {len(filtered_vectors)} feature vectors from {container}/{experiment_uuid}"
-            else:
-                stats_text = f"Showing {len(filtered_vectors)} feature vectors ({start_percent}% - {end_percent}% of data) from {container}/{experiment_uuid}"
+            # Update stats text to show indices instead of percentages
+            stats_text = f"Showing vectors {start_idx} - {end_idx} of {total_points} from {container}/{experiment_uuid}"
             
-            return scatter_fig, stats_text
+            return scatter_fig, stats_text, total_points
                 
-        # If we get here, we couldn't create a valid plot
-        return no_update, f"No data available in the selected range ({start_percent}% - {end_percent}%)"
+        # If we get here, we couldn't create a valid plot (empty filtered_vectors)
+        empty_fig = plot_empty_scatter()
+        return empty_fig, f"No data available in the selected range ({start_idx} - {end_idx})", total_points
         
     except Exception as e:
         logger.error(f"Error filtering experiment data: {e}")
         logger.error(traceback.format_exc())
-        return no_update, f"Error filtering data: {str(e)}"
-
+        # Return an empty plot on error instead of no_update
+        empty_fig = plot_empty_scatter()
+        return empty_fig, f"Error filtering data: {str(e)}", 100  # Default max
 
 @callback(
     Output("scatter", "figure", allow_duplicate=True),
     Output("stats-div", "children", allow_duplicate=True),
     Output({"base_id": "file-manager", "name": "data-project-dict"}, "data", allow_duplicate=True),
-    Output("replay-buffer", "data"),  # Use our new replay-buffer with structured format
-    Output("replay-data-percentage", "value"),  # Reset the slider
+    Output("replay-buffer", "data"),
+    Output("replay-data-range", "value"),
+    Output("replay-data-range", "max"),
     Input("load-experiment-button", "n_clicks"),
     State("daily-container-dropdown", "value"),
     State("experiment-uuid-dropdown", "value"),
@@ -163,39 +173,39 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
         logger.info(f"Loading experiment UUID: {selected_uuid} from container: {selected_container}")
         
         if not tiled_results.check_dataloader_ready():
-            return no_update, f"Could not connect to Tiled server", data_project_dict, replay_buffer, [0, 100]
+            return no_update, f"Could not connect to Tiled server", data_project_dict, replay_buffer, [0, 100], 100
 
         # Build the path to the selected experiment table
         container = tiled_results.data_client
         
         # Navigate to lse_live_results/daily_run_YYYY-MM-DD/selected_uuid
         if "lse_live_results" not in container:
-            return no_update, "lse_live_results container not found in Tiled", data_project_dict, replay_buffer, [0, 100]
+            return no_update, "lse_live_results container not found in Tiled", data_project_dict, replay_buffer, [0, 100], 100
             
         container = container["lse_live_results"]
         
         # Navigate to the selected daily container
         if selected_container not in container:
-            return no_update, f"Daily container {selected_container} not found", data_project_dict, replay_buffer, [0, 100]
+            return no_update, f"Daily container {selected_container} not found", data_project_dict, replay_buffer, [0, 100], 100
             
         daily_container = container[selected_container]
         
         # Check if the selected UUID exists in this container
         if selected_uuid not in daily_container:
-            return no_update, f"UUID {selected_uuid} not found in container {selected_container}", data_project_dict, replay_buffer, [0, 100]
+            return no_update, f"UUID {selected_uuid} not found in container {selected_container}", data_project_dict, replay_buffer, [0, 100], 100
             
         # Get the DataFrame for the selected UUID
         df = daily_container[selected_uuid].read()
         
         if df is None or df.empty:
-            return no_update, f"No data found for experiment {selected_uuid}", data_project_dict, replay_buffer, [0, 100]
+            return no_update, f"No data found for experiment {selected_uuid}", data_project_dict, replay_buffer, [0, 100], 100
         
         logger.info(f"Loaded DataFrame with shape: {df.shape} from {selected_container}/{selected_uuid}")
         
         # Extract feature vectors from DataFrame
         feature_cols = [col for col in df.columns if col.startswith('feature_')]
         if not feature_cols:
-            return no_update, "No feature vectors found in the selected data", data_project_dict, replay_buffer, [0, 100]
+            return no_update, "No feature vectors found in the selected data", data_project_dict, replay_buffer, [0, 100], 100
             
         # Create numpy array with feature vectors
         feature_vectors = df[feature_cols].values
@@ -307,12 +317,16 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
             # No URLs available - use the initialized data_project_dict
             pass
         
-        # Success message
-        stats_text = f"Loaded {len(df)} feature vectors from {selected_container}/{selected_uuid}"
+        # Set total points as the data length
+        total_points = len(feature_vectors)
         
-        return scatter_fig, stats_text, data_project_dict, replay_buffer, [0, 100]
+        # Success message
+        stats_text = f"Loaded {total_points} feature vectors from {selected_container}/{selected_uuid}"
+        
+        # Return all outputs with data length as max and showing all data initially
+        return scatter_fig, stats_text, data_project_dict, replay_buffer, [0, total_points], total_points
             
     except Exception as e:
         logger.error(f"Error loading experiment: {e}")
         logger.error(traceback.format_exc())
-        return no_update, f"Error loading experiment: {str(e)}", data_project_dict, replay_buffer, [0, 100]
+        return no_update, f"Error loading experiment: {str(e)}", data_project_dict, replay_buffer, [0, 100], 100
