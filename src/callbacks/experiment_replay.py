@@ -15,22 +15,33 @@ from src.utils.plot_utils import (
 
 logger = logging.getLogger("lse.replay")
 
-
 @callback(
     Output("daily-container-dropdown", "options"),
     Output("daily-container-dropdown", "value"),
-    Input("refresh-daily-containers", "n_clicks"),  # Updated button ID
-    Input("sidebar", "active_item"),  # Also load when sidebar tab is selected
+    Input("refresh-daily-containers", "n_clicks"),
     prevent_initial_call=True,
 )
-def load_daily_containers(n_clicks, active_item):
+def load_daily_containers(n_clicks):
     """Load available daily containers from Tiled"""
+    if n_clicks is None:
+        raise PreventUpdate
+        
     containers = get_daily_containers()
     
     if containers:
         return containers, containers[0]["value"]
     else:
         return [], None
+    
+@callback(
+    Output("daily-container-dropdown", "options", allow_duplicate=True),
+    Input("sidebar", "active_item"),
+    prevent_initial_call="initial_duplicate",
+)
+def load_containers_on_render(active_item):
+    """Load daily containers when the page is first loaded"""
+    containers = get_daily_containers()
+    return containers if containers else []
         
 @callback(
     Output("experiment-uuid-dropdown", "options"),
