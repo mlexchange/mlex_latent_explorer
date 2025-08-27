@@ -296,6 +296,8 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                         id="replay-data-range",
                                         min=0,
                                         max=100,
+                                        step=1,  # Add this to enforce integer steps
+                                        marks={i: str(i) for i in range(0, 101, 20)},  # Add default marks at intervals of 20
                                         tooltip={
                                             "placement": "bottom",
                                             "always_visible": True,
