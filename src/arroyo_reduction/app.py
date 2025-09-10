@@ -9,7 +9,9 @@ from dynaconf import Dynaconf
 
 from .operator import LatentSpaceOperator
 from .publisher import LSEWSResultPublisher
-from .redis_model_store import RedisModelStore  # Import the RedisModelStore class
+from .redis_model_store import RedisModelStore
+from .vector_save import VectorSavePublisher
+from .tiled_results_publisher import TiledResultsPublisher  # Add import
 
 settings = Dynaconf(
     envvar_prefix="",
@@ -47,7 +49,15 @@ async def start() -> None:
         
         # Initialize the WebSocket publisher first (so it's available for connections)
         ws_publisher = LSEWSResultPublisher.from_settings(app_settings.ws_publisher)
-        publisher_task = asyncio.create_task(ws_publisher.start())
+        asyncio.create_task(ws_publisher.start())
+
+        # Initialize the VectorSavePublisher for saving vectors to SQLite
+        vector_save_publisher = VectorSavePublisher(db_path=app_settings.vector_save.db_path)
+        asyncio.create_task(vector_save_publisher.start())
+        
+        # Initialize the TiledResultsPublisher for saving vectors to Tiled
+        tiled_publisher = TiledResultsPublisher.from_settings(app_settings.tiled_publisher)
+        asyncio.create_task(tiled_publisher.start())
         
         # Initialize Redis model store instead of direct Redis client
         logger.info("Initializing Redis Model Store")
@@ -80,6 +90,8 @@ async def start() -> None:
         # Models are selected, now create operator and start listening
         operator = LatentSpaceOperator.from_settings(app_settings, settings.lse_reducer)
         operator.add_publisher(ws_publisher)
+        operator.add_publisher(vector_save_publisher)
+        operator.add_publisher(tiled_publisher)  # Add the Tiled publisher
         
         listener = ZMQFrameListener.from_settings(app_settings.listener, operator)
         

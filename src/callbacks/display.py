@@ -1,4 +1,5 @@
 import io
+import logging
 import math
 from base64 import b64encode
 
@@ -9,7 +10,7 @@ from file_manager.data_project import DataProject
 from mlex_utils.prefect_utils.core import get_children_flow_run_ids
 from PIL import Image
 
-from src.app_layout import DATA_TILED_KEY, NUM_IMGS_OVERVIEW, USER
+from src.app_layout import DATA_TILED_KEY, REMOTE_DATA_TILED_KEY, NUM_IMGS_OVERVIEW, USER
 from src.utils.data_utils import hash_list_of_strings, tiled_results
 from src.utils.plot_utils import (
     generate_heatmap_plot,
@@ -17,6 +18,9 @@ from src.utils.plot_utils import (
     plot_empty_heatmap,
     plot_empty_scatter,
 )
+
+# Add logger for display.py
+logger = logging.getLogger("lse.display")
 
 
 def get_empty_image():
@@ -276,6 +280,7 @@ def clear_selections(n_clicks, current_fig):
     Input("min-max-percentile", "value"),
     State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
     State("live-indices", "data"),
+    State("go-live", "n_clicks"),  # Add state for live mode
     prevent_initial_call=True,
 )
 def update_heatmap(
@@ -286,6 +291,7 @@ def update_heatmap(
     percentiles,
     data_project_dict,
     live_indices,
+    go_live,  # New state parameter for live mode detection
 ):
     """
     This callback update the heatmap
@@ -296,6 +302,8 @@ def update_heatmap(
         log_transform:          log transform option
         percentiles:            percentiles for min-max scaling
         data_project_dict:      data project dictionary
+        live_indices:           indices for live mode
+        go_live:                n_clicks for live mode button
     Returns:
         fig:                    updated heatmap
     """
@@ -319,7 +327,19 @@ def update_heatmap(
     if len(live_indices) > 0:
         selected_indices = [live_indices[i] for i in selected_indices]
 
-    data_project = DataProject.from_dict(data_project_dict, api_key=DATA_TILED_KEY)
+    # Determine which API key to use based on live mode
+    is_live_mode = go_live is not None and go_live % 2 == 1
+    
+    if is_live_mode:
+        # Use remote API key for live mode
+        api_key = REMOTE_DATA_TILED_KEY
+        logger.info("Using REMOTE_DATA_TILED_KEY for live mode heatmap")
+    else:
+        # Use regular DATA_TILED_KEY for offline mode
+        api_key = DATA_TILED_KEY
+        logger.info("Using DATA_TILED_KEY for offline mode heatmap")
+
+    data_project = DataProject.from_dict(data_project_dict, api_key=api_key)
     selected_images, _ = data_project.read_datasets(
         selected_indices,
         resize=True,

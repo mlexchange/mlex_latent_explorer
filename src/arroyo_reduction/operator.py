@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import time
 
 import msgpack
 import redis
@@ -68,8 +69,17 @@ class LatentSpaceOperator(Operator):
                 loading_type = self.reducer.loading_model_type or "unknown"
                 logger.info(f"Waiting for {loading_type} model to finish loading before processing frame {message.frame_number}...")
                 return None
-                
-            feature_vector = await asyncio.to_thread(self.reducer.reduce, message)
+            
+            # Record timing information
+            start_time = time.time()
+            
+            # Pass message to reducer with timing information tracking
+            feature_vector, timing_info = await asyncio.to_thread(self.reducer.reduce, message)
+            
+            # Calculate total processing time
+            end_time = time.time()
+            total_processing_time = end_time - start_time
+            
             if feature_vector is None:
                 logger.info(f"Skipping frame {message.frame_number} due to processing error or model transition")
                 return None
@@ -84,6 +94,10 @@ class LatentSpaceOperator(Operator):
                 index=message.frame_number,
                 autoencoder_model=current_autoencoder,  # Add autoencoder model name
                 dimred_model=current_dimred,            # Add dimension reduction model name
+                timestamp=start_time,                   # Add start timestamp
+                total_processing_time=total_processing_time,  # Add total processing time
+                autoencoder_time=timing_info.get('autoencoder_time'),  # Add autoencoder processing time
+                dimred_time=timing_info.get('dimred_time'),            # Add dimension reduction processing time
             )
             return response
         except Exception as e:
