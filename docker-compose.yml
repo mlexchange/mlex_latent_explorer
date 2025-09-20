@@ -128,6 +128,7 @@ services:
       # Tiled
       DEFAULT_TILED_URI: '${DEFAULT_TILED_URI}'
       DATA_TILED_KEY: '${DATA_TILED_KEY}'
+      REMOTE_DATA_TILED_KEY: '${REMOTE_DATA_TILED_KEY}'
       RESULTS_TILED_URI: '${RESULTS_TILED_URI}'
       RESULTS_TILED_API_KEY: '${RESULTS_TILED_API_KEY}'
       # Prefect
@@ -202,6 +203,7 @@ services:
     volumes:
       - .:/app:Z
       - ./data/mlflow_cache:/mlflow_cache
+      - ./data/vector_save:/data/vector_save
     ports:
       - 127.0.0.1:8765:8765
     environment:
@@ -211,6 +213,17 @@ services:
       MLFLOW_CACHE_DIR: "/mlflow_cache"
       PYTHONUNBUFFERED: 1
       MALLOC_TRIM_THRESHOLD_: 0
+      # MLflow
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME}
+      MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD}
+      MLFLOW_TRACKING_INSECURE_TLS: ${MLFLOW_TRACKING_INSECURE_TLS:-False}
+      # Redis
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      # Tiled Publisher
+      RESULTS_TILED_URI: '${RESULTS_TILED_URI}'
+      RESULTS_TILED_API_KEY: '${RESULTS_TILED_API_KEY}'
     depends_on:
       - latent-space-explorer
     networks:
@@ -242,8 +255,8 @@ services:
     volumes:
       - ./data/test_sim_data:/data/test_data:ro # Mount test data repository containing TIFF images
     environment:
-      - TILED_LIVE_API_KEY=${TILED_SINGLE_USER_API_KEY}
-      - DATA_TILED_KEY=${DATA_TILED_KEY}
+      - TILED_LIVE_API_KEY=${REMOTE_TILED_SINGLE_USER_API_KEY}
+      - DATA_TILED_KEY=${REMOTE_DATA_TILED_KEY}
       - DYNACONF_TILED_POLLER__PUBLISH_ADDRESS=tcp://0.0.0.0:5000 # Make sure ZMQ publisher address is correctly set
     networks:
       mle_net:

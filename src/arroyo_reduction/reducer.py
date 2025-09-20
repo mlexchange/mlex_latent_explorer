@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -46,9 +47,10 @@ class Reducer(ABC):
     """
 
     @abstractmethod
-    def reduce(self, message: RawFrameEvent) -> np.ndarray:
+    def reduce(self, message: RawFrameEvent) -> tuple[np.ndarray, dict]:
         """
-        Reduce the image to a feature vector.
+        Reduce the image to a feature vector and return timing information.
+        Returns a tuple of (feature_vector, timing_info_dict)
         """
         pass
 
@@ -103,14 +105,20 @@ class LatentSpaceReducer(Reducer):
         # Subscribe to model update channel if supported
         self._subscribe_to_model_updates()
 
-    def reduce(self, message: RawFrameEvent) -> np.ndarray:
-        """Process an image through the models to get feature vectors"""
+    def reduce(self, message: RawFrameEvent) -> tuple[np.ndarray, dict]:
+        """Process an image through the models to get feature vectors with timing information"""
         
-        # Check if models are currently being loaded
+        # Initialize timing dictionary
+        timing_info = {
+            'autoencoder_time': None,
+            'dimred_time': None
+        }
+        
+        # Check if models are currently being loading
         if self.is_loading_model:
             logger.info(f"Waiting for {self.loading_model_type} model to finish loading...")
             # Return a placeholder while models are loading
-            return None 
+            return None, timing_info
             
         try:
             # Get numpy array from message
@@ -121,29 +129,45 @@ class LatentSpaceReducer(Reducer):
             
         except Exception as e:
             logger.error(f"Error in image preparation: {e}")
-            return None 
+            return None, timing_info
         
-        # Process with autoencoder to get latent features
+        # Process with autoencoder to get latent features with timing
         try:
+            # Start timing autoencoder processing
+            autoencoder_start = time.time()
+            
             # Pass numpy array directly to model, the predict() API will handle data preprocessing 
             autoencoder_result = self.current_torch_model.predict(img_array)  
             latent_features = autoencoder_result["latent_features"]
-            logger.info(f"Latent features shape: {latent_features.shape}")
+            
+            # End timing autoencoder processing
+            autoencoder_end = time.time()
+            timing_info['autoencoder_time'] = autoencoder_end - autoencoder_start
+            
+            logger.info(f"Latent features shape: {latent_features.shape}, processing time: {timing_info['autoencoder_time']:.4f}s")
             
         except Exception as e:
             logger.error(f"Error in autoencoder processing: {e}")
-            return None  
+            return None, timing_info
         
-        # Apply dimension reduction directly with latent features
-        try:            
+        # Apply dimension reduction directly with latent features with timing
+        try:
+            # Start timing dimension reduction processing
+            dimred_start = time.time()
+            
             umap_result = self.current_dim_reduction_model.predict(latent_features)  
             f_vec = umap_result["umap_coords"]
-            logger.info(f"Feature vector shape: {f_vec.shape}")
-            return f_vec
+            
+            # End timing dimension reduction processing
+            dimred_end = time.time()
+            timing_info['dimred_time'] = dimred_end - dimred_start
+            
+            logger.info(f"Feature vector shape: {f_vec.shape}, processing time: {timing_info['dimred_time']:.4f}s")
+            
+            return f_vec, timing_info
         except Exception as e:
             logger.error(f"Error in dimension reduction: {e}")
-            return None  
-            
+            return None, timing_info
     
     def _subscribe_to_model_updates(self):
         """
@@ -232,4 +256,3 @@ class LatentSpaceReducer(Reducer):
             self.is_loading_model = False
             self.loading_model_type = None
             logger.error(f"Error handling model update: {e}")
-
