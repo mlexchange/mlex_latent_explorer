@@ -42,6 +42,9 @@ services:
       - TILED_DB_NAME=${TILED_DB_NAME}
       - TILED_DB_SERVER=${TILED_DB_SERVER}
       - TILED_SINGLE_USER_API_KEY=${TILED_SINGLE_USER_API_KEY}
+      # tiled server-side cache
+      - TILED_RESOURCE_CACHE_MAX_SIZE=2048
+      - TILED_RESOURCE_CACHE_TTU=300
     volumes:
       - ./tiled/deploy:/deploy
       - ${READ_DIR}:/tiled_storage
@@ -155,9 +158,14 @@ services:
       # Redis
       REDIS_HOST: '${REDIS_HOST}'
       REDIS_PORT: '${REDIS_PORT}'
+      # tiled client-side cache
+      TILED_CACHE_PATH: "/tiled_cache/tiled_cache.db"
+      TILED_CACHE_CAPACITY: '${TILED_CACHE_CAPACITY}'
+      TILED_CACHE_MAX_ITEM_SIZE: '${TILED_CACHE_MAX_ITEM_SIZE}'
     volumes:
       - ${READ_DIR}:/tiled_storage
       - ./src:/app/work/src
+      - ./data/tiled_cache:/tiled_cache
     ports:
       - "127.0.0.1:8070:8070"
     depends_on:
@@ -250,10 +258,47 @@ services:
     volumes:
       - ./data/vector_db_smi:/data/vector_db_smi:ro # Mount directory containing the vector database
     environment:
+      - TILED_ENV=${TILED_ENV}
       - DB_PATH=/data/vector_db_smi/latent_vectors.db
+      - TILED_API_KEY=${REMOTE_TILED_SINGLE_USER_API_KEY}
+      - TILED_LIVE_API_KEY=${REMOTE_TILED_SINGLE_USER_API_KEY}
+      - DYNACONF_TILED_POLLER__PUBLISH_ADDRESS=tcp://0.0.0.0:5000
+    networks:
+      mle_net:
+
+  # Simulator 4: Read images from Tiled using a saved URL and send via ZMQ
+  sim_local_tiled:
+    image: ghcr.io/als-computing/arroyosas:main
+    container_name: sim_local_tiled
+    command: python -m arroyosas.app.local_tiled_sim_cli
+    profiles:
+      - sim_local_tiled
+    volumes:
+      - ./data:/data:rw  # Mount directory for the URL file
+    environment:
+      - URL_FILE=/data/tiled_url/Nafion_p25_30_run_1.json
       - TILED_API_KEY=${TILED_SINGLE_USER_API_KEY}
       - TILED_LIVE_API_KEY=${TILED_SINGLE_USER_API_KEY}
-      - DYNACONF_TILED_POLLER__PUBLISH_ADDRESS=tcp://0.0.0.0:5000
+      - DYNACONF_TILED_POLLER__ZMQ_FRAME_PUBLISHER__ADDRESS=tcp://0.0.0.0:5000
+    networks:
+      mle_net:
+
+  # Image Ingestion Service - run this first to prepare data for Simulator 4
+  ingest_local_images:
+    image: ghcr.io/als-computing/arroyosas:main
+    container_name: ingest_local_images
+    command: python -m arroyosas.app.ingest_local_images
+    profiles:
+      - ingest_images
+    volumes:
+      - ./data/733_april24_2025_png/Nafion_p25_30_run_1:/data/Nafion_p25_30_run_1:ro  # Mount directory containing the images
+      - ./data:/data:rw  # Mount directory for the URL file
+    environment:
+      - DEFAULT_IMAGE_FOLDER=/data/Nafion_p25_30_run_1
+      - TILED_URI=${DEFAULT_TILED_URI}
+      - TILED_API_KEY=${TILED_SINGLE_USER_API_KEY}
+      - TILED_CONTAINER=Nafion_p25_30_run_1
+      - URL_FILE=/data/tiled_url/Nafion_p25_30_run_1.json
     networks:
       mle_net:
 
