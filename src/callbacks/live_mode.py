@@ -1,6 +1,7 @@
 import logging
 import os
 
+import plotly.graph_objects as go
 import numpy as np
 from dash import (
     ClientsideFunction,
@@ -646,6 +647,10 @@ def set_live_latent_vectors(n_intervals, current_figure, pause_n_clicks, buffer_
                 vectors.append(vector)
 
         latent_vectors = np.array(vectors, dtype=float)
+        total_n_vectors = len(latent_vectors)
+
+        if total_n_vectors == 0:
+            raise PreventUpdate
 
         n_components = latent_vectors.shape[1]
 
@@ -655,11 +660,32 @@ def set_live_latent_vectors(n_intervals, current_figure, pause_n_clicks, buffer_
             or len(current_figure["data"]) == 0
             or "customdata" not in current_figure["data"][0]
         ):
-            return generate_scatter_data(latent_vectors, n_components)
+            # Create new figure with color based on indices
+            fig = go.Figure(go.Scattergl(
+                x=latent_vectors[:, 0],
+                y=latent_vectors[:, 1],
+                mode="markers",
+                marker=dict(
+                    size=8,
+                    color=list(range(total_n_vectors)),  # Use index as color
+                    colorscale="jet",
+                    showscale=True,
+                    colorbar=dict(
+                        title="Frame Index",
+                    ),
+                ),
+                customdata=[[i] for i in range(total_n_vectors)]
+            ))
+            
+            fig.update_layout(
+                dragmode="lasso",
+                margin=go.layout.Margin(l=20, r=20, b=20, t=20, pad=0),
+            )
+            
+            return fig
 
         # Incremental update logic
         current_n_points = len(current_figure["data"][0]["x"])
-        total_n_vectors = len(latent_vectors)
 
         if total_n_vectors <= current_n_points:
             logging.debug("No new latent vectors to append.")
@@ -688,12 +714,24 @@ def set_live_latent_vectors(n_intervals, current_figure, pause_n_clicks, buffer_
             else:
                 figure_patch["data"][0]["y"] = new_vectors[:, 1].tolist()
 
+            # Update customdata
             if "customdata" in current_figure["data"][0]:
                 figure_patch["data"][0]["customdata"] = current_figure["data"][0][
                     "customdata"
-                ] + [[0]] * len(new_vectors)
+                ] + [[i] for i in range(current_n_points, total_n_vectors)]
             else:
-                figure_patch["data"][0]["customdata"] = [[0]] * len(new_vectors)
+                figure_patch["data"][0]["customdata"] = [[i] for i in range(total_n_vectors)]
+
+            # Update marker colors with full range of indices
+            figure_patch["data"][0]["marker"] = dict(
+                size=8,
+                color=list(range(total_n_vectors)),  # Use full range of indices
+                colorscale="jet",
+                showscale=True,
+                colorbar=dict(
+                    title="Frame Index",
+                ),
+            )
 
             return figure_patch
 
