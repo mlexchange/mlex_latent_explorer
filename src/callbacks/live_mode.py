@@ -660,29 +660,12 @@ def set_live_latent_vectors(n_intervals, current_figure, pause_n_clicks, buffer_
             or len(current_figure["data"]) == 0
             or "customdata" not in current_figure["data"][0]
         ):
-            # Create new figure with color based on indices
-            fig = go.Figure(go.Scattergl(
-                x=latent_vectors[:, 0],
-                y=latent_vectors[:, 1],
-                mode="markers",
-                marker=dict(
-                    size=8,
-                    color=list(range(total_n_vectors)),  # Use index as color
-                    colorscale="jet",
-                    showscale=True,
-                    colorbar=dict(
-                        title="Frame Index",
-                    ),
-                ),
-                customdata=[[i] for i in range(total_n_vectors)]
-            ))
-            
-            fig.update_layout(
-                dragmode="lasso",
-                margin=go.layout.Margin(l=20, r=20, b=20, t=20, pad=0),
+            # Use generate_scatter_data with time coloring
+            return generate_scatter_data(
+                latent_vectors,
+                n_components,
+                color_by="time"
             )
-            
-            return fig
 
         # Incremental update logic
         current_n_points = len(current_figure["data"][0]["x"])
