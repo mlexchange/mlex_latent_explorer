@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 
 import plotly.graph_objects as go
 import numpy as np
@@ -39,38 +40,53 @@ mlflow_client = MLflowClient()
     Output("live-model-dialog", "is_open"),
     Output("live-autoencoder-dropdown", "options"),
     Output("live-dimred-dropdown", "options"),
-    Output("live-autoencoder-dropdown", "value"),
-    Output("live-dimred-dropdown", "value"),
     Input("go-live", "n_clicks"),
-    State("selected-live-models", "data"),
     prevent_initial_call=True,
 )
-def show_model_selection_dialog(n_clicks, last_selected_models):
+def show_model_selection_dialog(n_clicks):
     if n_clicks is not None and n_clicks % 2 == 1:
-        # Get model options filtered by type
+        # Show dialog immediately with loading placeholders
+        loading_options = [{"label": "Loading models...", "value": None}]
+        
+        # Just show the dialog with loading placeholders
+        return True, loading_options, loading_options
+    
+    return False, [], []
+
+@callback(
+    Output("live-autoencoder-dropdown", "options", allow_duplicate=True),
+    Output("live-dimred-dropdown", "options", allow_duplicate=True),
+    Input("live-model-dialog", "is_open"),
+    prevent_initial_call=True,
+)
+def update_model_dropdowns(dialog_open):
+    """
+    Update the dropdowns with actual model options after a slight delay
+    """
+    if not dialog_open:
+        raise PreventUpdate
+    
+    # Add a small delay to ensure dialog is shown first
+    time.sleep(0.5)
+    
+    try:
+        # Load actual model options
         autoencoder_options = mlflow_client.get_mlflow_models(
             livemode=True, model_type="autoencoder"
         )
+        
         dimred_options = mlflow_client.get_mlflow_models(
             livemode=True, model_type="dimension_reduction"
         )
+        
+        # Return the actual options to replace the loading placeholders
+        return autoencoder_options, dimred_options
+        
+    except Exception as e:
+        logger.error(f"Error loading model options: {e}")
+        error_option = [{"label": "Error loading models", "value": None}]
+        return error_option, error_option
 
-        # Set default values from previous selection if available
-        autoencoder_default = None
-        dimred_default = None
-
-        if last_selected_models is not None:
-            autoencoder_default = last_selected_models.get("autoencoder")
-            dimred_default = last_selected_models.get("dimred")
-
-        return (
-            True,
-            autoencoder_options,
-            dimred_options,
-            autoencoder_default,
-            dimred_default,
-        )
-    return False, [], [], None, None
 
 
 @callback(
