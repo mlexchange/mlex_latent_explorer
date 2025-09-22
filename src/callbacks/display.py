@@ -4,6 +4,7 @@ import math
 from base64 import b64encode
 
 import numpy as np
+import numba as nb
 from dash import ALL, Input, Output, Patch, State, callback, no_update
 from dash.exceptions import PreventUpdate
 from file_manager.data_project import DataProject
@@ -22,6 +23,49 @@ from src.utils.plot_utils import (
 # Add logger for display.py
 logger = logging.getLogger("lse.display")
 
+@nb.njit(parallel=True)
+def fast_mean(arr):
+    """
+    Custom Numba-accelerated mean calculation along axis 0
+    Works with 3D arrays like our image data
+    """
+    result = np.zeros((arr.shape[1], arr.shape[2]), dtype=np.float32)
+    for i in nb.prange(arr.shape[1]):
+        for j in nb.prange(arr.shape[2]):
+            sum_val = 0.0
+            for k in range(arr.shape[0]):
+                sum_val += arr[k, i, j]
+            result[i, j] = sum_val / arr.shape[0]
+    return result
+
+
+@nb.njit(parallel=True)
+def fast_std(arr):
+    """
+    Custom Numba-accelerated standard deviation calculation along axis 0
+    Works with 3D arrays like our image data
+    """
+    # First calculate the mean
+    mean = np.zeros((arr.shape[1], arr.shape[2]), dtype=np.float32)
+    for i in nb.prange(arr.shape[1]):
+        for j in nb.prange(arr.shape[2]):
+            sum_val = 0.0
+            for k in range(arr.shape[0]):
+                sum_val += arr[k, i, j]
+            mean[i, j] = sum_val / arr.shape[0]
+    
+    # Then calculate the variance
+    var = np.zeros((arr.shape[1], arr.shape[2]), dtype=np.float32)
+    for i in nb.prange(arr.shape[1]):
+        for j in nb.prange(arr.shape[2]):
+            sum_squared_diff = 0.0
+            for k in range(arr.shape[0]):
+                diff = arr[k, i, j] - mean[i, j]
+                sum_squared_diff += diff * diff
+            var[i, j] = sum_squared_diff / arr.shape[0]
+    
+    # Return the square root of the variance (standard deviation)
+    return np.sqrt(var)
 
 def get_empty_image():
     img = Image.fromarray(255 * (np.ones((32, 32)).astype(np.uint8)))
@@ -351,9 +395,9 @@ def update_heatmap(
     selected_images = np.array(selected_images)
 
     if display_option == "mean":
-        plot_data = np.mean(selected_images, axis=0)
+        plot_data = fast_mean(selected_images)
     else:
-        plot_data = np.std(selected_images, axis=0)
+        plot_data = fast_std(selected_images)
 
     return (
         generate_heatmap_plot(plot_data),
