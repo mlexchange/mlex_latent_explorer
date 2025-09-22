@@ -218,42 +218,21 @@ class RedisModelStore:
             return {"is_loading_model": False, "loading_model_type": None}
         
         try:
-            # Get values from Redis
-            is_loading = self.redis_client.get("model_loading_state")
+            # Get values directly from Redis
+            is_loading_str = self.redis_client.get("model_loading_state")
             loading_type = self.redis_client.get("loading_model_type")
             
-            # Process is_loading value carefully
-            if is_loading is not None:
-                if isinstance(is_loading, bytes):
-                    is_loading_str = is_loading.decode('utf-8')
-                else:
-                    is_loading_str = str(is_loading)
-                    
-                is_loading_bool = is_loading_str == "True"
-                logger.debug(f"Raw is_loading: {is_loading}, decoded: {is_loading_str}, as bool: {is_loading_bool}")
-            else:
-                is_loading_bool = False
-                
-            # Process loading_type value
-            if loading_type is not None:
-                if isinstance(loading_type, bytes):
-                    loading_type_str = loading_type.decode('utf-8')
-                else:
-                    loading_type_str = str(loading_type)
-                    
-                if not loading_type_str:  # Empty string
-                    loading_type_str = None
-            else:
-                loading_type_str = None
-                
-            result = {
-                "is_loading_model": is_loading_bool,
-                "loading_model_type": loading_type_str
+            # Convert is_loading to boolean - compare with string "True"
+            is_loading = str(is_loading_str) == "True"
+            
+            # Empty loading_type becomes None
+            if not loading_type:
+                loading_type = None
+            
+            return {
+                "is_loading_model": is_loading,
+                "loading_model_type": loading_type
             }
-            
-            logger.debug(f"get_model_loading_state result: {result}")
-            return result
-            
         except Exception as e:
             logger.error(f"Error retrieving model loading state from Redis: {e}")
             return {"is_loading_model": False, "loading_model_type": None}

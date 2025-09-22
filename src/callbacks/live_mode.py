@@ -40,18 +40,21 @@ mlflow_client = MLflowClient()
     Output("live-model-dialog", "is_open"),
     Output("live-autoencoder-dropdown", "options"),
     Output("live-dimred-dropdown", "options"),
+    Output("live-autoencoder-dropdown", "value"),  # Add this output
+    Output("live-dimred-dropdown", "value"),       # Add this output
     Input("go-live", "n_clicks"),
     prevent_initial_call=True,
 )
 def show_model_selection_dialog(n_clicks):
     if n_clicks is not None and n_clicks % 2 == 1:
         # Show dialog immediately with loading placeholders
-        loading_options = [{"label": "Loading models...", "value": None}]
+        loading_options = [{"label": "Loading models...", "value": None, "disabled": True}]
         
-        # Just show the dialog with loading placeholders
-        return True, loading_options, loading_options
+        # Just show the dialog with loading placeholders and set values to None
+        # Setting value to None will show the placeholder when options are loaded
+        return True, loading_options, loading_options, None, None
     
-    return False, [], []
+    return False, [], [], None, None
 
 @callback(
     Output("live-autoencoder-dropdown", "options", allow_duplicate=True),
@@ -66,8 +69,6 @@ def update_model_dropdowns(dialog_open):
     if not dialog_open:
         raise PreventUpdate
     
-    # Add a small delay to ensure dialog is shown first
-    time.sleep(0.5)
     
     try:
         # Load actual model options
