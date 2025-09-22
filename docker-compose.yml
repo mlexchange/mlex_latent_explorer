@@ -159,10 +159,6 @@ services:
       # Redis
       REDIS_HOST: '${REDIS_HOST}'
       REDIS_PORT: '${REDIS_PORT}'
-      # tiled client-side cache
-      TILED_CACHE_PATH: "/tiled_cache/tiled_cache.db"
-      TILED_CACHE_CAPACITY: '${TILED_CACHE_CAPACITY}'
-      TILED_CACHE_MAX_ITEM_SIZE: '${TILED_CACHE_MAX_ITEM_SIZE}'
     volumes:
       - ${READ_DIR}:/tiled_storage
       - ./src:/app/work/src
