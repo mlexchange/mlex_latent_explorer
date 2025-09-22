@@ -148,7 +148,7 @@ app.layout = html.Div(
                             color="white",
                             spinner_style={"width": "4rem", "height": "4rem"},
                         ),
-                        html.H2("Loading Models...", className="mt-3")
+                        html.H2("Loading Models...", id="model-loading-spinner-text", className="mt-3")
                     ],
                     style={
                         "position": "absolute",

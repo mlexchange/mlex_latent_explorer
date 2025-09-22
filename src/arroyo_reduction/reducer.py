@@ -92,7 +92,7 @@ class LatentSpaceReducer(Reducer):
         # Set loading flags before loading models
         self.is_loading_model = True
         self.loading_model_type = "initial"
-        
+
         try:
             self.current_torch_model = mlflow_client.load_model(self.autoencoder_model_name)
             self.current_dim_reduction_model = mlflow_client.load_model(self.dimred_model_name)
@@ -101,6 +101,15 @@ class LatentSpaceReducer(Reducer):
             # Reset loading flags
             self.is_loading_model = False
             self.loading_model_type = None
+            
+            # Also clear the loading state in Redis
+            try:
+                if self.redis_model_store and self.redis_model_store.redis_client:
+                    self.redis_model_store.redis_client.set("model_loading_state", "False")
+                    self.redis_model_store.redis_client.set("loading_model_type", "")
+                    logger.info("Cleared loading state in Redis")
+            except Exception as e:
+                logger.error(f"Error clearing loading state in Redis: {e}")
         
         # Subscribe to model update channel if supported
         self._subscribe_to_model_updates()
@@ -210,6 +219,7 @@ class LatentSpaceReducer(Reducer):
         except Exception as e:
             logger.warning(f"Could not start model update listener: {e}")
     
+
     def _handle_model_update(self, update):
         """Handle a model update from Redis PubSub"""
         try:
@@ -224,11 +234,24 @@ class LatentSpaceReducer(Reducer):
             if (model_type == "autoencoder" and model_name == self.autoencoder_model_name) or \
             (model_type == "dimred" and model_name == self.dimred_model_name):
                 logger.info(f"Ignoring duplicate model update: {model_type} = {model_name} (already loaded)")
+                self.redis_model_store.redis_client.set("model_loading_state", "False")
+                self.redis_model_store.redis_client.set("loading_model_type", "")
+                logger.info("Cleared loading state in Redis")
                 return
-                
+                    
             logger.info(f"Received model update: {model_type} = {model_name}")
             
-            # Set loading flags before updating models
+            # Ensure loading flag is set to True in Redis before starting to load the model
+            # This should happen before setting self.is_loading_model
+            try:
+                if self.redis_model_store and self.redis_model_store.redis_client:
+                    self.redis_model_store.redis_client.set("model_loading_state", "True") 
+                    self.redis_model_store.redis_client.set("loading_model_type", model_type)
+                    logger.info(f"Set loading state in Redis: is_loading=True, type={model_type}")
+            except Exception as e:
+                logger.error(f"Error setting loading state in Redis: {e}")
+            
+            # Set loading flags after Redis is updated
             self.is_loading_model = True
             self.loading_model_type = model_type
             
@@ -250,9 +273,29 @@ class LatentSpaceReducer(Reducer):
                 # Reset loading flags
                 self.is_loading_model = False
                 self.loading_model_type = None
+                
+                # Clear loading state in Redis
+                try:
+                    if self.redis_model_store and self.redis_model_store.redis_client:
+                        self.redis_model_store.redis_client.set("model_loading_state", "False")
+                        self.redis_model_store.redis_client.set("loading_model_type", "")
+                        logger.info("Cleared loading state in Redis")
+                except Exception as e:
+                    logger.error(f"Error clearing loading state in Redis: {e}")
+                    
                 logger.info(f"Model update complete. Ready to process images.")
         except Exception as e:
             # Ensure we reset flags even if there's an error
             self.is_loading_model = False
             self.loading_model_type = None
+            
+            # Clear loading state in Redis
+            try:
+                if self.redis_model_store and self.redis_model_store.redis_client:
+                    self.redis_model_store.redis_client.set("model_loading_state", "False")
+                    self.redis_model_store.redis_client.set("loading_model_type", "")
+                    logger.info("Cleared loading state in Redis after error")
+            except Exception as e2:
+                logger.error(f"Error clearing loading state in Redis: {e2}")
+                
             logger.error(f"Error handling model update: {e}")

@@ -787,3 +787,64 @@ clientside_callback(
     ],
     prevent_initial_call=True,
 )
+@callback(
+    Output("model-loading-spinner-text", "children"),  # Remove the style output
+    Input("in-model-transition", "data"),
+    Input("buffer-debounce", "n_intervals"),
+    State("selected-live-models", "data"),
+    prevent_initial_call=True,
+)
+def update_loading_spinner_text(in_transition, n_intervals, selected_models):
+    """
+    Update the spinner text based on a simple rule:
+    - If is_loading_model is True: "Loading Model..."
+    - Otherwise: "Waiting for data..."
+    """
+    if not in_transition or selected_models is None:
+        return "Loading Model..."  # Default when not in transition
+    
+    try:
+        # Get loading state directly from Redis
+        loading_state = redis_model_store.get_model_loading_state()
+        
+        # Add detailed logging
+        logger.info(f"Loading state from Redis: {loading_state}")
+        is_loading = loading_state and loading_state.get("is_loading_model", False)
+        logger.info(f"is_loading_model value: {is_loading}")
+        
+        # Exact logic as requested
+        if is_loading:
+            logger.info("Setting spinner text to 'Loading Model...'")
+            return "Loading Model..."
+        else:
+            logger.info("Setting spinner text to 'Waiting for data...'")
+            return "Waiting for data..."
+            
+    except Exception as e:
+        logger.error(f"Error checking Redis model state: {e}")
+        return "Loading Model..."  # Default on error
+
+@callback(
+    Output("model-loading-spinner-text", "children", allow_duplicate=True),  # Set allow_duplicate=True
+    Input("live-model-continue", "n_clicks"),
+    State("live-autoencoder-dropdown", "value"),
+    State("live-dimred-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def set_initial_loading_state(continue_clicks, autoencoder_model, dimred_model):
+    """
+    Set the initial loading state in Redis when models are first selected
+    """
+    if continue_clicks:
+        try:
+            # Set loading state to True initially
+            if redis_model_store and redis_model_store.redis_client:
+                redis_model_store.redis_client.set("model_loading_state", "True")
+                redis_model_store.redis_client.set("loading_model_type", "initial")
+                logger.info("Set initial loading state in Redis: is_loading=True")
+                
+                return "Loading Model..."  # Return just the text, not the style
+        except Exception as e:
+            logger.error(f"Error setting initial loading state in Redis: {e}")
+    
+    raise PreventUpdate
