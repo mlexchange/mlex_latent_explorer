@@ -69,7 +69,7 @@ services:
       mle_net:
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.22.0 
+    image: ghcr.io/mlflow/mlflow:v2.22.0
     container_name: mlflow-server
     command: >
       /bin/sh -c "pip install --no-cache-dir psycopg2-binary 'mlflow[auth]' &&
@@ -172,16 +172,16 @@ services:
     networks:
       mle_net:
 
-  kvrocks:  
-    image: docker.io/apache/kvrocks:latest 
-    container_name: kvrocks  # Added container name 
-    volumes:  
-      - ./conf/kvrocks/kvrocks.conf:/etc/kvrocks/kvrocks.conf  
-      - ./persist/kvrocks/data:/data  
+  kvrocks:
+    image: docker.io/apache/kvrocks:latest
+    container_name: kvrocks  # Added container name
+    volumes:
+      - ./conf/kvrocks/kvrocks.conf:/etc/kvrocks/kvrocks.conf
+      - ./persist/kvrocks/data:/data
     ports:
       - "127.0.0.1:6666:6666"  # Added port mapping
-    networks:  
-      mle_net: 
+    networks:
+      mle_net:
 
   # arroyo, arroyo_vec_sim and arroyo_sim are made optional via profiles
   # To run vector simulator, use
@@ -238,6 +238,10 @@ services:
       - .:/app:Z
     ports:
       - 127.0.0.1:8765:8765
+    environment:
+      SIMULATION_TYPE: "default"  # Set to "mnist" for MNIST simulation
+      RESULTS_TILED_URI: '${RESULTS_TILED_URI}'
+      RESULTS_TILED_API_KEY: '${RESULTS_TILED_API_KEY}'
     networks:
       mle_net:
 
