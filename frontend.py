@@ -1,6 +1,30 @@
 import json
 import os
+import sys
 from uuid import uuid4
+
+# Configure logging at the earliest possible point
+import logging
+import sys
+
+# Set up basic configuration
+logging.basicConfig(
+    level=logging.INFO,  # Use DEBUG to see all logs
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+
+# Create logger for this module
+logger = logging.getLogger("lse")
+logger.info("Logging configured. Frontend module initializing.")
+
+# Explicitly set level for lse namespace
+logging.getLogger("lse").setLevel(logging.INFO)
+
+# Force propagation for all existing lse loggers
+for name in logging.root.manager.loggerDict:
+    if name.startswith('lse.'):
+        logging.getLogger(name).propagate = True
 
 from dash import Input, Output, html
 from dotenv import load_dotenv

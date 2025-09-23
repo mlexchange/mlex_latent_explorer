@@ -206,3 +206,33 @@ class RedisModelStore:
         thread.start()
         logger.info("Started model update listener thread")
 
+    def get_model_loading_state(self):
+        """
+        Get the current model loading state from Redis
+        
+        Returns:
+            dict: Dictionary with is_loading_model (bool) and loading_model_type (str or None)
+        """
+        if self.redis_client is None:
+            logger.warning("Redis client not available")
+            return {"is_loading_model": False, "loading_model_type": None}
+        
+        try:
+            # Get values directly from Redis
+            is_loading_str = self.redis_client.get("model_loading_state")
+            loading_type = self.redis_client.get("loading_model_type")
+            
+            # Convert is_loading to boolean - compare with string "True"
+            is_loading = str(is_loading_str) == "True"
+            
+            # Empty loading_type becomes None
+            if not loading_type:
+                loading_type = None
+            
+            return {
+                "is_loading_model": is_loading,
+                "loading_model_type": loading_type
+            }
+        except Exception as e:
+            logger.error(f"Error retrieving model loading state from Redis: {e}")
+            return {"is_loading_model": False, "loading_model_type": None}

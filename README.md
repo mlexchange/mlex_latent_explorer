@@ -121,6 +121,42 @@ Also, make sure the file paths are correctly set in `mlflow_config.yaml`. If you
 ```
 docker compose --profile arroyo --profile sim up
 ```
+Note for Simulators:
+
+There are four available simulators:
+
+(1) **Feature Vector Simulator**
+   - Does not require Arroyo.
+   - Run with:
+     ```bash
+     docker compose --profile vector_sim up
+     ```
+
+(2) **Public Tiled Dataset Simulator**
+   - Reads images from a public Tiled dataset and sends them to Arroyo.
+   - Run with:
+     ```bash
+     docker compose --profile arroyo --profile sim up
+     ```
+
+(3) **Previous Experiment Simulator**
+   - Reads Tiled URLs stored in a local `.db` from a previous experiment.
+   - Re-reads those images and sends them to Arroyo.
+      ```bash
+      docker compose --profile arroyo --profile sim_replay up
+      ```
+
+(4) **Local Tiled Simulator**
+   - Requires you to first start a local Tiled instance and ingest data.
+   - Steps:
+     ```bash
+     docker compose up tiled tiled_db
+     docker compose --profile ingest_images up --no-deps ingest_local_images
+     docker compose --profile arroyo --profile sim_local_tiled up
+     ```
+
+   - When using this simulator, update `lse_operator.operator.zmq_address` in `settings.yaml` accordingly (e.g., `tcp://sim_local_tiled:5000` for the 4th simulator).
+
 
 4. Register models with MLflow:
 ```sh

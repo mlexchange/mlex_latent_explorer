@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pytz
 from arroyopy.publisher import Publisher
+from arroyosas.schemas import SASStop
 from tiled.client import from_uri
 
 from .schemas import LatentSpaceEvent
@@ -141,6 +142,11 @@ class TiledResultsPublisher(Publisher):
     
     async def publish(self, message):
         """Publish a message to Tiled server."""
+        if isinstance(message, SASStop):
+            logger.info("Received Stop message, writing any remaining data to Tiled")
+            await self.stop()
+            return
+        
         if not isinstance(message, LatentSpaceEvent):
             return
 
