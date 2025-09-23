@@ -677,11 +677,14 @@ def set_live_latent_vectors(n_intervals, current_figure, pause_n_clicks, buffer_
             or len(current_figure["data"]) == 0
             or "customdata" not in current_figure["data"][0]
         ):
-            # Use generate_scatter_data with time coloring
+            # For time-based coloring
+            time_array = np.arange(len(latent_vectors))
             return generate_scatter_data(
                 latent_vectors,
                 n_components,
-                color_by="time"
+                color_by="metadata",
+                metadata_array=time_array,
+                metadata_label="Frame Index"
             )
 
         # Incremental update logic

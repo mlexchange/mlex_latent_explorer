@@ -32,7 +32,9 @@ def generate_scattergl_plot(
     label_to_string_map,
     show_legend=False,
     custom_indices=None,
-    color_by_time=False,
+    color_by=None,
+    metadata_array=None,
+    metadata_label="Value"
 ):
     """
     Generates a multi-trace Scattergl plot with one trace per label,
@@ -42,26 +44,33 @@ def generate_scattergl_plot(
     not belonging to that trace's label, we insert None. This ensures:
       - i-th point in the figure is i-th data row (helpful for selectedData).
       - Each label gets its own legend entry.
-      
-    If color_by_time is True, colors points by their index (time order).
+    
+    Parameters:
+    x_coords, y_coords: Coordinates to plot
+    labels: Label for each point (for cluster or label coloring)
+    label_to_string_map: Mapping from labels to display strings
+    show_legend: Whether to show legend
+    custom_indices: Custom indices for points
+    color_by: "metadata" to use metadata coloring, or None/others for label-based
+    metadata_array: Array of values to use for coloring when color_by="metadata"
+    metadata_label: Label for colorbar when using metadata coloring
     """
     import plotly.graph_objects as go
 
     if custom_indices is None:
         custom_indices = list(range(len(x_coords)))
 
-    # For time-based coloring, create a single trace with color mapping
-    if color_by_time:
+    # Handle metadata-based coloring
+    if color_by == "metadata" and metadata_array is not None:
         n_points = len(x_coords)
         
-        # Set up the marker properties with time-based coloring
         marker_props = dict(
             size=8,
-            color=list(range(n_points)),  # Use index as color
+            color=list(metadata_array),  # Use metadata values
             colorscale="jet",
             showscale=True,
             colorbar=dict(
-                title="Frame Index",
+                title=metadata_label,
             ),
         )
         
@@ -131,7 +140,9 @@ def generate_scatter3d_plot(
     label_to_string_map,
     show_legend=False,
     custom_indices=None,
-    color_by_time=False,
+    color_by=None,
+    metadata_array=None,
+    metadata_label="Value"
 ):
     """
     Generates a three-dimensional Scatter3d plot with one trace per label,
@@ -147,6 +158,9 @@ def generate_scatter3d_plot(
     label_to_string_map (dict): A mapping from labels to label strings.
     show_legend (bool, optional): Whether to show a legend. Default is False.
     custom_indices (list, optional): Custom indices for the points. Default is None.
+    color_by: "metadata" to use metadata coloring, or None/others for label-based
+    metadata_array: Array of values to use for coloring when color_by="metadata"
+    metadata_label: Label for colorbar when using metadata coloring
 
     Returns:
     go.Figure: The generated Scatter3d plot.
@@ -158,18 +172,18 @@ def generate_scatter3d_plot(
     if custom_indices is None:
         custom_indices = list(range(len(x_coords)))
 
-    # For time-based coloring, create a single trace with color mapping
-    if color_by_time:
+    # Handle metadata-based coloring
+    if color_by == "metadata" and metadata_array is not None:
         n_points = len(x_coords)
         
-        # Set up the marker properties with time-based coloring
+        # Set up the marker properties with metadata-based coloring
         marker_props = dict(
             size=5,
-            color=list(range(n_points)),  # Use index as color
+            color=list(metadata_array),  # Use metadata values
             colorscale="jet",
             showscale=True,
             colorbar=dict(
-                title="Frame Index",
+                title=metadata_label,
             ),
         )
         
@@ -258,6 +272,8 @@ def generate_scatter_data(
     labels=None,
     label_names=None,
     color_by=None,
+    metadata_array=None,
+    metadata_label="Value"
 ):
     """
     Generate data for a plot according to the provided selection options:
@@ -275,14 +291,13 @@ def generate_scatter_data(
     label_selection (str, optional): Which label to select. Defaults to -2: all labels. -1 mean
     Unlabeled labels (numpy.ndarray, N, int, optional): The current labels Defaults to None.
     label_names (dict, optional): A dictionary that relates label number to name.
-    color_by (str, optional): Determines if we color by label, cluster, or time. Defaults to None.
+    color_by (str, optional): "cluster", "label", "time" or "metadata". Defaults to None.
+    metadata_array (array-like, optional): Values to use for coloring when color_by="metadata"
+    metadata_label (str, optional): Label for the colorbar when using metadata coloring
 
     Returns:
     plotly.scattergl: A plot as specified.
     """
-    # Check if we should use time-based coloring
-    color_by_time = (color_by == "time")
-    
     # Set up vals and vals_names for regular coloring
     vals_names = {}
     if color_by == "cluster":
@@ -305,7 +320,9 @@ def generate_scatter_data(
                 latent_vectors[:, 1], 
                 vals, 
                 vals_names,
-                color_by_time=color_by_time
+                color_by=color_by,
+                metadata_array=metadata_array,
+                metadata_label=metadata_label
             )
         else:
             scatter_data = generate_scatter3d_plot(
@@ -314,7 +331,9 @@ def generate_scatter_data(
                 latent_vectors[:, 2],
                 vals,
                 vals_names,
-                color_by_time=color_by_time
+                color_by=color_by,
+                metadata_array=metadata_array,
+                metadata_label=metadata_label
             )
     else:
         # Handle cluster/label selection logic
@@ -350,7 +369,9 @@ def generate_scatter_data(
                 vals[selected_indices],
                 vals_names,
                 custom_indices=selected_indices,
-                color_by_time=color_by_time
+                color_by=color_by,
+                metadata_array=metadata_array,
+                metadata_label=metadata_label
             )
         elif n_components == 3:
             scatter_data = generate_scatter3d_plot(
@@ -360,7 +381,9 @@ def generate_scatter_data(
                 vals[selected_indices],
                 vals_names,
                 custom_indices=selected_indices,
-                color_by_time=color_by_time
+                color_by=color_by,
+                metadata_array=metadata_array,
+                metadata_label=metadata_label
             )
 
     fig = go.Figure(scatter_data)
