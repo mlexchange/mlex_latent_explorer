@@ -464,12 +464,11 @@ def update_data_project_dict(n_clicks, selected_models):
             # Exiting live mode - completely reset to empty project
             return {
                 "root_uri": "",
-                "data_type": "tiled",
+                "data_type": "",
                 "datasets": [],  # Empty datasets list is key
                 "project_id": None,
             }
     raise PreventUpdate
-
 
 @callback(
     Output("selected-live-models", "data", allow_duplicate=True),
@@ -867,4 +866,18 @@ def set_initial_loading_state(continue_clicks, autoencoder_model, dimred_model):
         except Exception as e:
             logger.error(f"Error setting initial loading state in Redis: {e}")
     
+    raise PreventUpdate
+
+@callback(
+    Output("current-page", "data", allow_duplicate=True),
+    Output("image-length", "data", allow_duplicate=True),
+    Output("user-upload-data-dir", "data", allow_duplicate=True),
+    Input("go-live", "n_clicks"),
+    prevent_initial_call=True,
+)
+def force_data_reset(n_clicks):
+    """Reset all data stores when toggling between modes"""
+    if n_clicks is not None:
+        # Reset for both entering and exiting live mode
+        return 0, 0, None
     raise PreventUpdate
