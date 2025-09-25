@@ -15,7 +15,7 @@ lse_operator:
     root_segments:
       - lse_live_results
   local_image_publisher:  # New section for TiledLocalImagePublisher
-    container_name: live_cache  # Container for storing images
+    container_name: live_data_cache  # Container for storing images
 
 lse_reducer:
   demo_mode: true

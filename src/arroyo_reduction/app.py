@@ -62,7 +62,7 @@ async def start() -> None:
         
         # Initialize the new TiledLocalImagePublisher for caching raw images
         # Using existing tiled_publisher settings for now, but could be updated to use a dedicated section
-        local_image_publisher = TiledLocalImagePublisher.from_settings(app_settings.tiled_publisher)
+        local_image_publisher = TiledLocalImagePublisher.from_settings(app_settings.local_image_publisher)
         asyncio.create_task(local_image_publisher.start())
         
         # Initialize Redis model store instead of direct Redis client

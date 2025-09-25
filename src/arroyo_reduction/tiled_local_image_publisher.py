@@ -12,8 +12,8 @@ from tiled.client import from_uri
 logger = logging.getLogger("arroyo_reduction.tiled_local_image_publisher")
 
 # Environment variables for local Tiled connections
-LOCAL_TILED_URI = os.getenv("LOCAL_TILED_URI", "http://tiled:8000") 
-LOCAL_TILED_API_KEY = os.getenv("LOCAL_TILED_API_KEY", "")
+LOCAL_TILED_URI = os.getenv("RESULTS_TILED_URI", "http://tiled:8000")
+LOCAL_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
 
 class TiledLocalImagePublisher(Publisher):
     """Publisher that saves raw images to a local Tiled server cache."""
@@ -64,10 +64,11 @@ class TiledLocalImagePublisher(Publisher):
     
     def _parse_tiled_url(self, url):
         """
-        Parse a Tiled URL to extract components.
-        Handles both formats:
-        1. http://tiled.nsls2.bnl.gov/api/v1/array/full/smi/raw/{uuid}/primary/data/{image_name}?slice=...
-        2. {url_parts[0]}/api/v1/array/full/{container_name}/{image_key}?slice=0:1,0:1679,0:1475
+        Parse a Tiled URL to extract components and frame index.
+        Handles both production and testing formats:
+        
+        Production: http://domain/api/v1/array/full/UUID/streams/primary/pil2M_image?slice=1:2,0:1679,0:1475
+        Testing: http://domain/api/v1/array/full/container/image?slice=0:1,0:1679,0:1475
         """
         try:
             # Parse the URL to extract components
@@ -75,7 +76,7 @@ class TiledLocalImagePublisher(Publisher):
             path_parts = parsed_url.path.split('/')
             query_params = parse_qs(parsed_url.query)
             
-            # Extract slice information
+            # Extract slice information and frame index
             slice_param = query_params.get('slice', [''])[0]
             frame_index = 0
             image_h = 0
@@ -84,7 +85,9 @@ class TiledLocalImagePublisher(Publisher):
             if slice_param:
                 slice_parts = slice_param.split(',')
                 if len(slice_parts) >= 1 and ':' in slice_parts[0]:
-                    frame_index = int(slice_parts[0].split(':')[0])
+                    # Extract frame index from "X:X+1" format
+                    frame_start = int(slice_parts[0].split(':')[0])
+                    frame_index = frame_start
                 
                 # Try to extract image dimensions from slice
                 if len(slice_parts) >= 3:
@@ -100,11 +103,12 @@ class TiledLocalImagePublisher(Publisher):
                         except (ValueError, IndexError):
                             pass
             
-            # Check for UUID in the URL
-            uuid_match = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', url)
+            # Check for UUID in the URL to determine if it's production format
+            uuid_pattern = r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})'
+            uuid_match = re.search(uuid_pattern, url)
             
             if uuid_match:
-                # Format 1: With UUID
+                # Production format: With UUID
                 uuid = uuid_match.group(1)
                 
                 # Find position of uuid in path
@@ -115,26 +119,40 @@ class TiledLocalImagePublisher(Publisher):
                         break
                 
                 if uuid_idx >= 0:
-                    # Extract the path prefix (before uuid) and suffix (after uuid)
-                    array_full_idx = path_parts.index('full') if 'full' in path_parts else -1
+                    # Extract the path components after "array/full"
+                    array_full_idx = -1
+                    for i, part in enumerate(path_parts):
+                        if part == "array" and i < len(path_parts) - 1 and path_parts[i+1] == "full":
+                            array_full_idx = i + 1
+                            break
                     
-                    if array_full_idx >= 0 and array_full_idx < uuid_idx:
-                        prefix = '/'.join(path_parts[array_full_idx+1:uuid_idx])
-                        suffix = '/'.join(path_parts[uuid_idx+1:])
+                    if array_full_idx >= 0:
+                        # Get path after array/full but before and after UUID
+                        remaining_path = path_parts[array_full_idx+1:]  # Skip "full"
                         
-                        # Format: prefix/uuid/suffix
-                        storage_path = f"{prefix}/{uuid}/{suffix}"
+                        # Find UUID position in remaining path
+                        uuid_pos = -1
+                        for i, part in enumerate(remaining_path):
+                            if uuid in part:
+                                uuid_pos = i
+                                break
                         
-                        return {
-                            "has_uuid": True,
-                            "storage_path": storage_path,
-                            "frame_index": frame_index,
-                            "uuid": uuid,
-                            "image_h": image_h,
-                            "image_w": image_w,
-                        }
+                        if uuid_pos >= 0:
+                            # path structure: [uuid, 'streams', 'primary', 'pil2M_image']
+                            path_after_uuid = remaining_path[uuid_pos+1:]  # Skip UUID
+                            storage_path = f"{uuid}/{'/'.join(path_after_uuid)}"
+                            
+                            return {
+                                "has_uuid": True,
+                                "storage_path": storage_path,
+                                "frame_index": frame_index,
+                                "uuid": uuid,
+                                "image_h": image_h,
+                                "image_w": image_w,
+                                "path_after_uuid": path_after_uuid,
+                            }
             
-            # Format 2: No UUID, simpler format
+            # Testing format: No UUID, simpler format
             # Extract the path after "array/full"
             array_full_idx = -1
             for i, part in enumerate(path_parts):
@@ -196,40 +214,50 @@ class TiledLocalImagePublisher(Publisher):
                 return True
             
             if url_info["has_uuid"]:
-                # For UUID format, save to a container path: storage_path/frame_index
-                path_components = storage_path.split('/')
-                path_with_frame = path_components + [str(frame_index)]
+                # Production format: save to UUID/streams/primary/pil2M_image/frameX
+                uuid = url_info["uuid"]
+                path_after_uuid = url_info["path_after_uuid"]
                 
-                # Create containers up to the frame level
+                # Create containers: live_cache/UUID/streams/primary/pil2M_image/frameX
                 current = self.root_container
-                for component in path_with_frame:
+                
+                # Create UUID container
+                if uuid not in current:
+                    current = current.create_container(uuid)
+                else:
+                    current = current[uuid]
+                
+                # Create path after UUID (streams/primary/pil2M_image)
+                for component in path_after_uuid:
                     if not component:  # Skip empty components
                         continue
                     if component not in current:
                         current = current.create_container(component)
                     else:
                         current = current[component]
+                
+                # Create frame container
+                frame_name = f"frame{frame_index}"
                 
                 # Save the image directly in the frame container
-                logger.info(f"Saving image to {self.container_name}/{storage_path}/{frame_index}")
-                current.write_array(image_array)
+                logger.info(f"Saving production image to {self.container_name}/{uuid}/{'/'.join(path_after_uuid)}/{frame_name}")
+                if frame_name not in current:
+                    current.write_array(image_array,key=frame_name)
             else:
-                # For testing format, save directly to storage_path
-                path_components = storage_path.split('/')
-                
-                # Create containers up to the path level
+                # Save the image directly
                 current = self.root_container
-                for component in path_components:
+                path_components = storage_path.split('/')
+                logger.info(f"image_name:{path_components[-1]}")
+                for component in path_components[:-1]:
                     if not component:  # Skip empty components
                         continue
                     if component not in current:
                         current = current.create_container(component)
                     else:
                         current = current[component]
-                
-                # Save the image directly
                 logger.info(f"Saving test image to {self.container_name}/{storage_path}")
-                current.write_array(image_array)
+                if path_components[-1] not in current:
+                    current.write_array(image_array,key=path_components[-1])
             
             # Mark as saved
             self.saved_images.add(image_key)
@@ -289,8 +317,9 @@ class TiledLocalImagePublisher(Publisher):
     def from_settings(cls, settings):
         """Create a TiledLocalImagePublisher from settings."""
         return cls(
-            container_name=settings.get("container_name", "live_cache")
+            container_name=settings.get("container_name", "live_data_cache")
         )
+        
     def get_local_url_for(self, original_url):
         """
         Convert an original Tiled URL to its local equivalent.
@@ -310,20 +339,17 @@ class TiledLocalImagePublisher(Publisher):
         # Construct the local URL
         storage_path = url_info["storage_path"]
         frame_index = url_info["frame_index"]
-        image_h = url_info.get("image_h", 0) 
-        image_w = url_info.get("image_w", 0)
+        image_h = url_info.get("image_h", 1679) 
+        image_w = url_info.get("image_w", 1475)
         
-        if not image_h or not image_w:
-            # Use default values if dimensions are unknown
-            image_h = 1024
-            image_w = 1024
-        
-        # Construct local URL based on the format
         if url_info["has_uuid"]:
-            # For UUID case with frame as separate container
-            local_url = f"{self.tiled_uri}/api/v1/array/full/{self.container_name}/{storage_path}/{frame_index}?slice=0:1,0:{image_h},0:{image_w}"
+            # Production format: add frame path
+            uuid = url_info["uuid"]
+            path_after_uuid = url_info["path_after_uuid"]
+            local_path = f"{self.container_name}/{uuid}/{'/'.join(path_after_uuid)}/frame{frame_index}"
+            local_url = f"{self.tiled_uri}/api/v1/array/full/{local_path}?slice=0:1,0:{image_h},0:{image_w}"
         else:
-            # For testing case
+            # Testing format: simple path
             local_url = f"{self.tiled_uri}/api/v1/array/full/{self.container_name}/{storage_path}?slice=0:1,0:{image_h},0:{image_w}"
         
         return local_url

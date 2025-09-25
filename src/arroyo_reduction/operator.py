@@ -44,6 +44,7 @@ class LatentSpaceOperator(Operator):
         elif isinstance(message, RawFrameEvent):
             # Process the RawFrameEvent message normally
             # Note: All publishers will automatically receive this message through self.publish
+            await self.publish(message)
             result = await self.dispatch(message)
             if result is not None:  # Only publish if we got a valid result
                 await self.publish(result)
