@@ -11,7 +11,8 @@ from .operator import LatentSpaceOperator
 from .publisher import LSEWSResultPublisher
 from .redis_model_store import RedisModelStore
 from .vector_save import VectorSavePublisher
-from .tiled_results_publisher import TiledResultsPublisher  # Add import
+from .tiled_results_publisher import TiledResultsPublisher
+from .tiled_local_image_publisher import TiledLocalImagePublisher  # Updated import
 
 settings = Dynaconf(
     envvar_prefix="",
@@ -59,6 +60,11 @@ async def start() -> None:
         tiled_publisher = TiledResultsPublisher.from_settings(app_settings.tiled_publisher)
         asyncio.create_task(tiled_publisher.start())
         
+        # Initialize the new TiledLocalImagePublisher for caching raw images
+        # Using existing tiled_publisher settings for now, but could be updated to use a dedicated section
+        local_image_publisher = TiledLocalImagePublisher.from_settings(app_settings.tiled_publisher)
+        asyncio.create_task(local_image_publisher.start())
+        
         # Initialize Redis model store instead of direct Redis client
         logger.info("Initializing Redis Model Store")
         redis_model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
@@ -91,12 +97,12 @@ async def start() -> None:
         operator = LatentSpaceOperator.from_settings(app_settings, settings.lse_reducer)
         operator.add_publisher(ws_publisher)
         operator.add_publisher(vector_save_publisher)
-        operator.add_publisher(tiled_publisher)  # Add the Tiled publisher
-        
-        listener = ZMQFrameListener.from_settings(app_settings.listener, operator)
+        operator.add_publisher(tiled_publisher)
+        operator.add_publisher(local_image_publisher)  # Add the local image publisher
         
         # Start the listener
         logger.info("Starting to listen for messages from arroyo_sim")
+        listener = ZMQFrameListener.from_settings(app_settings.listener, operator)
         await listener.start()
         
     except Exception as e:

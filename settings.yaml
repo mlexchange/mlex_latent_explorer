@@ -11,9 +11,11 @@ lse_operator:
     zmq_address: tcp://sim_local_tiled:5000
   vector_save:
     db_path: /data/vector_save/latent_vectors.db  # Path to SQLite database for saving vectors
-  tiled_publisher:  # Added new section for TiledResultsPublisher
+  tiled_publisher:  # Settings for TiledResultsPublisher
     root_segments:
       - lse_live_results
+  local_image_publisher:  # New section for TiledLocalImagePublisher
+    container_name: live_cache  # Container for storing images
 
 lse_reducer:
   demo_mode: true

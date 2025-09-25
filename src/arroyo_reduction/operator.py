@@ -12,7 +12,7 @@ from arroyosas.schemas import RawFrameEvent, SASMessage
 
 from .reducer import LatentSpaceReducer, Reducer
 from .schemas import LatentSpaceEvent
-from .redis_model_store import RedisModelStore  # Import the RedisModelStore class
+from .redis_model_store import RedisModelStore
 
 logger = logging.getLogger("arroyo_reduction.operator")
 
@@ -32,6 +32,9 @@ class LatentSpaceOperator(Operator):
         except Exception as e:
             logger.warning(f"Could not connect to Redis Model Store: {e}")
             self.redis_model_store = None
+            
+        # Dictionary to store mappings from remote to local Tiled URLs
+        self.local_image_urls = {}
 
     async def process(self, message: SASMessage) -> None:
         # logger.debug("message recvd")
@@ -39,6 +42,8 @@ class LatentSpaceOperator(Operator):
             logger.info("Received Start Message")
             await self.publish(message)
         elif isinstance(message, RawFrameEvent):
+            # Process the RawFrameEvent message normally
+            # Note: All publishers will automatically receive this message through self.publish
             result = await self.dispatch(message)
             if result is not None:  # Only publish if we got a valid result
                 await self.publish(result)
@@ -88,16 +93,26 @@ class LatentSpaceOperator(Operator):
             current_autoencoder = self.reducer.autoencoder_model_name
             current_dimred = self.reducer.dimred_model_name
             
+            # Get the local Tiled URL if available
+            local_tiled_url = self.get_local_url(message.tiled_url)
+            
+            # If we have a local URL, log it
+            if local_tiled_url:
+                logger.debug(f"Using local Tiled URL: {local_tiled_url} instead of {message.tiled_url}")
+            
             response = LatentSpaceEvent(
-                tiled_url=message.tiled_url,
+                # Use local URL if available, otherwise use the original
+                tiled_url=local_tiled_url or message.tiled_url,
+                # Store the original URL regardless
+                original_tiled_url=message.tiled_url,
                 feature_vector=feature_vector[0].tolist(),
                 index=message.frame_number,
-                autoencoder_model=current_autoencoder,  # Add autoencoder model name
-                dimred_model=current_dimred,            # Add dimension reduction model name
-                timestamp=start_time,                   # Add start timestamp
-                total_processing_time=total_processing_time,  # Add total processing time
-                autoencoder_time=timing_info.get('autoencoder_time'),  # Add autoencoder processing time
-                dimred_time=timing_info.get('dimred_time'),            # Add dimension reduction processing time
+                autoencoder_model=current_autoencoder,
+                dimred_model=current_dimred,
+                timestamp=start_time,
+                total_processing_time=total_processing_time,
+                autoencoder_time=timing_info.get('autoencoder_time'),
+                dimred_time=timing_info.get('dimred_time'),
             )
             return response
         except Exception as e:
@@ -121,6 +136,24 @@ class LatentSpaceOperator(Operator):
             return LatentSpaceEvent(**msgpack.unpackb(response))
         except Exception as e:
             logger.error(f"Error sending message to broker {e}")
+
+    def get_local_url(self, original_url):
+        """Get the local URL for an original Tiled URL, if available."""
+        # First check our cache
+        if original_url in self.local_image_urls:
+            return self.local_image_urls[original_url]
+            
+        # If not in cache, try to get it from the TiledLocalImagePublisher
+        for publisher in self.publishers:
+            if hasattr(publisher, 'get_local_url_for'):
+                local_url = publisher.get_local_url_for(original_url)
+                if local_url:
+                    # Cache the result for future use
+                    self.local_image_urls[original_url] = local_url
+                    return local_url
+                    
+        # If no local URL is available, return None
+        return None
 
     @classmethod
     def from_settings(cls, settings, reducer_settings=None):

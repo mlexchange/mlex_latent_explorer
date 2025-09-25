@@ -174,8 +174,11 @@ class TiledResultsPublisher(Publisher):
             # Format vector and metadata
             vector = np.array(message.feature_vector, dtype=np.float32)
             if vector.ndim == 1:
-                # Extract UUID from tiled_url
+                # Extract URLs
                 tiled_url = getattr(message, "tiled_url", None)
+                original_tiled_url = getattr(message, "original_tiled_url", tiled_url)
+                
+                # Extract UUID from tiled_url
                 uuid = self._extract_uuid_from_url(tiled_url)
                 
                 # Check if this UUID already exists
@@ -202,6 +205,7 @@ class TiledResultsPublisher(Publisher):
                 # Create a record with metadata and the vector
                 record = {
                     "tiled_url": tiled_url,
+                    "original_tiled_url": original_tiled_url,
                     "autoencoder_model": getattr(message, "autoencoder_model", None),
                     "dimred_model": getattr(message, "dimred_model", None),
                     "timestamp": getattr(message, "timestamp", time.time()),

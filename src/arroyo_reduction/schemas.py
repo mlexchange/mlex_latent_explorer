@@ -34,6 +34,7 @@ class SerializableNumpyArrayModel(BaseModel):
 
 class LatentSpaceEvent(Event):
     tiled_url: str
+    original_tiled_url: str = None  # Add this field to store the original URL
     feature_vector: list[float]
     index: int
     autoencoder_model: str = None  # Add autoencoder model name
