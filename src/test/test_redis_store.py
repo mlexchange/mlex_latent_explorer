@@ -11,10 +11,10 @@ from src.test.test_utils import mock_redis_client, redis_test_store
 class TestRedisStore:
 
     def test_store_and_get_models(self, redis_test_store):
-        """Test storing and retrieving model names"""
-        # Test data
-        autoencoder_name = "test_autoencoder_model"
-        dimred_name = "test_dimred_model"
+        """Test storing and retrieving model names with versions"""
+        # Test data - now with version format
+        autoencoder_name = "test_autoencoder_model:3"
+        dimred_name = "test_dimred_model:2"
 
         # Configure mock to return our test data
         redis_test_store._mock_client.get.side_effect = [autoencoder_name, dimred_name]
@@ -47,9 +47,9 @@ class TestRedisStore:
         )
 
     def test_publish_model_update(self, redis_test_store):
-        """Test pub/sub functionality"""
+        """Test pub/sub functionality with versions"""
         model_type = "autoencoder"
-        model_name = "new_model"
+        model_name = "new_model:5"
 
         # Mock publish to return 1 (one client received the message)
         redis_test_store._mock_client.publish.return_value = 1

@@ -19,13 +19,13 @@ async def test_vector_save_listener(tmp_path):
     # Current timestamp for testing
     current_time = time.time()
     
-    # Simulate a message with timing data
+    # Simulate a message with timing data and versions
     message = {
         "tiled_url": "http://example.com/image1.jpg",
         "feature_vector": [1, 2],
         "index": 0,
-        "autoencoder_model": "model_v1",
-        "dimred_model": "model_v2",
+        "autoencoder_model": "model_v1:3",  # ← CHANGED: added version
+        "dimred_model": "model_v2:2",        # ← CHANGED: added version
         "timestamp": current_time,
         "total_processing_time": 0.1234,
         "autoencoder_time": 0.0789,
@@ -54,8 +54,8 @@ async def test_vector_save_listener(tmp_path):
             assert len(rows) == 1
             assert rows[0][0] == message.tiled_url
             assert rows[0][1] == json.dumps(message.feature_vector)
-            assert rows[0][2] == message.autoencoder_model
-            assert rows[0][3] == message.dimred_model
+            assert rows[0][2] == message.autoencoder_model  # Now contains "model_v1:3"
+            assert rows[0][3] == message.dimred_model        # Now contains "model_v2:2"
             assert rows[0][4] == current_time
             assert rows[0][5] == 0.1234
             assert rows[0][6] == 0.0789
