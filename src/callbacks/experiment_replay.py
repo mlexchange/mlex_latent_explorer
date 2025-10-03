@@ -182,7 +182,6 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
         if not tiled_results.check_dataloader_ready():
             # Default marks for error case
             default_marks = {i: str(i) for i in range(0, 101, 20)}
-            # Removed stats_text
             return no_update, data_project_dict, replay_buffer, [0, 100], 100, default_marks
 
         # Build the path to the selected experiment table
@@ -191,7 +190,6 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
         # Navigate to lse_live_results/daily_run_YYYY-MM-DD/selected_uuid
         if "lse_live_results" not in container:
             default_marks = {i: str(i) for i in range(0, 101, 20)}
-            # Removed stats_text
             return no_update, data_project_dict, replay_buffer, [0, 100], 100, default_marks
             
         container = container["lse_live_results"]
@@ -199,7 +197,6 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
         # Navigate to the selected daily container
         if selected_container not in container:
             default_marks = {i: str(i) for i in range(0, 101, 20)}
-            # Removed stats_text
             return no_update, data_project_dict, replay_buffer, [0, 100], 100, default_marks
             
         daily_container = container[selected_container]
@@ -207,7 +204,6 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
         # Check if the selected UUID exists in this container
         if selected_uuid not in daily_container:
             default_marks = {i: str(i) for i in range(0, 101, 20)}
-            # Removed stats_text
             return no_update, data_project_dict, replay_buffer, [0, 100], 100, default_marks
             
         # Get the DataFrame for the selected UUID
@@ -215,7 +211,6 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
         
         if df is None or df.empty:
             default_marks = {i: str(i) for i in range(0, 101, 20)}
-            # Removed stats_text
             return no_update, data_project_dict, replay_buffer, [0, 100], 100, default_marks
         
         logger.info(f"Loaded DataFrame with shape: {df.shape} from {selected_container}/{selected_uuid}")
@@ -224,7 +219,6 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
         feature_cols = [col for col in df.columns if col.startswith('feature_')]
         if not feature_cols:
             default_marks = {i: str(i) for i in range(0, 101, 20)}
-            # Removed stats_text
             return no_update, data_project_dict, replay_buffer, [0, 100], 100, default_marks
             
         # Create numpy array with feature vectors
@@ -239,29 +233,41 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
         # Extract tiled_urls for reference
         tiled_urls = df['tiled_url'].tolist() if 'tiled_url' in df.columns else []
         
+        # Check if this is the special "feature_vectors" case
+        is_feature_vectors_special_case = (selected_uuid == "feature_vectors")
+        logger.info(f"Is feature_vectors special case: {is_feature_vectors_special_case}")
+        
         # Extract slice indices from URLs
         live_indices = []
         if tiled_urls:
             import re
             
-            # Initialize live_indices as a list of the same length as feature_vectors
-            live_indices = [-1] * len(feature_vectors)
-            
-            # Extract slice indices from URLs
-            for i, url in enumerate(tiled_urls):
-                # Look for slice parameter in the URL
-                slice_match = re.search(r'slice=(\d+):', url)
-                if slice_match:
-                    slice_index = int(slice_match.group(1))
-                    live_indices[i] = slice_index
-                    
-                    # Log some samples for debugging
-                    if i < 3:
-                        logger.info(f"URL {i}: Extracted slice index {slice_index} from {url}")
-            
-            # Log the slice indices
-            logger.info(f"Extracted {sum(1 for idx in live_indices if idx >= 0)} slice indices")
-            logger.info(f"Sample indices: {live_indices[:5]}")
+            if is_feature_vectors_special_case:
+                # Special case: Each image is in its own container
+                # live_indices should be sequential [0, 1, 2, ...] because each scatter point
+                # maps to a dataset, and each dataset has only 1 image at index 0
+                logger.info("Processing feature_vectors special case - using sequential indices")
+                live_indices = list(range(len(df)))
+                logger.info(f"Set live_indices to sequential: {live_indices[:5]}...")
+            else:
+                # Normal case: Extract slice indices from URLs
+                # Initialize live_indices as a list of the same length as feature_vectors
+                live_indices = [-1] * len(feature_vectors)
+                
+                for i, url in enumerate(tiled_urls):
+                    # Look for slice parameter in the URL
+                    slice_match = re.search(r'slice=(\d+):', url)
+                    if slice_match:
+                        slice_index = int(slice_match.group(1))
+                        live_indices[i] = slice_index
+                        
+                        # Log some samples for debugging
+                        if i < 3:
+                            logger.info(f"URL {i}: Extracted slice index {slice_index} from {url}")
+                
+                # Log the slice indices
+                logger.info(f"Extracted {sum(1 for idx in live_indices if idx >= 0)} slice indices")
+                logger.info(f"Sample indices: {live_indices[:5]}")
         
         # Create a scatter plot from the feature vectors
         n_components = 2  # Default to 2D
@@ -275,7 +281,8 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
             "feature_vectors": feature_vectors.tolist(),
             "live_indices": live_indices,
             "uuid": selected_uuid,
-            "container": selected_container
+            "container": selected_container,
+            "is_feature_vectors_special_case": is_feature_vectors_special_case  # Add flag
         }
         
         # Let's try to create a more complete data project dictionary
@@ -299,38 +306,95 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
                 query = first_url.query
                 logger.info(f"Query from URL: {query}")
                 
-                # Try to create a useful dataset structure
-                # Typically path will be like /api/v1/array/full/smi/raw/UUID/primary/data/pil2M_image
-                parts = path.split('/api/v1/')
-                if len(parts) > 1:
-                    uri_path = parts[1]
-                    logger.info(f"Path after /api/v1/: {uri_path}")
+                if is_feature_vectors_special_case:
+                    # Special case: Each image is in its own container
+                    # URL example: /api/v1/metadata/Nafion_p25_30_run_1/local_images_1758157540_0170
+                    # We need to create one dataset per image
                     
-                    if uri_path.startswith(('array/full/', 'metadata/')):
-                        uri_path = uri_path.split('/', 2)[2]  # Get path after array/full/ or metadata/
-                        logger.info(f"Final URI path: {uri_path}")
+                    logger.info("Processing feature_vectors special case - creating datasets")
                     
-                    # Create a dataset with this path
-                    datasets = [
-                        {
-                            "uri": uri_path,
-                            "cumulative_data_count": len(df)
-                        }
-                    ]
+                    datasets = []
+                    for i, url in enumerate(tiled_urls):
+                        # Extract the container path from each URL
+                        parsed_url = urlparse(url)
+                        url_path = parsed_url.path
+                        
+                        # Remove /api/v1/metadata/ or /api/v1/array/full/ prefix
+                        if '/api/v1/metadata/' in url_path:
+                            container_uri = url_path.split('/api/v1/metadata/')[-1]
+                        elif '/api/v1/array/full/' in url_path:
+                            container_uri = url_path.split('/api/v1/array/full/')[-1]
+                        else:
+                            # Fallback: try to extract path after /api/v1/
+                            parts = url_path.split('/api/v1/')
+                            if len(parts) > 1:
+                                container_uri = parts[1]
+                                # Remove metadata/ or array/full/ prefix if present
+                                if container_uri.startswith('metadata/'):
+                                    container_uri = container_uri.replace('metadata/', '', 1)
+                                elif container_uri.startswith('array/full/'):
+                                    container_uri = container_uri.replace('array/full/', '', 1)
+                            else:
+                                logger.warning(f"Could not parse URL: {url}")
+                                continue
+                        
+                        # Add dataset for this specific image container
+                        datasets.append({
+                            "uri": container_uri,
+                            "cumulative_data_count": i + 1
+                        })
+                        
+                        # Log first few for debugging
+                        if i < 3:
+                            logger.info(f"Dataset {i}: uri={container_uri}")
                     
-                    # Create data project with the extracted components
+                    logger.info(f"Created {len(datasets)} datasets for special case")
+                    
+                    # Create data project with multiple datasets
                     data_project_dict = {
                         "root_uri": f"{base_uri}/api/v1/metadata",
                         "data_type": "tiled",
                         "datasets": datasets,
                         "project_id": f"replay_{selected_uuid}",
-                        "replay_mode": True  # Keep the replay_mode flag
+                        "replay_mode": True,
+                        "is_feature_vectors_special_case": True  # Add flag
                     }
                 else:
-                    # Fallback if parsing fails - use the initialized data_project_dict
-                    pass
+                    # Normal case: single dataset with slice-based access
+                    # Try to create a useful dataset structure
+                    # Typically path will be like /api/v1/array/full/smi/raw/UUID/primary/data/pil2M_image
+                    parts = path.split('/api/v1/')
+                    if len(parts) > 1:
+                        uri_path = parts[1]
+                        logger.info(f"Path after /api/v1/: {uri_path}")
+                        
+                        if uri_path.startswith(('array/full/', 'metadata/')):
+                            uri_path = uri_path.split('/', 2)[2]  # Get path after array/full/ or metadata/
+                            logger.info(f"Final URI path: {uri_path}")
+                        
+                        # Create a dataset with this path
+                        datasets = [
+                            {
+                                "uri": uri_path,
+                                "cumulative_data_count": len(df)
+                            }
+                        ]
+                        
+                        # Create data project with the extracted components
+                        data_project_dict = {
+                            "root_uri": f"{base_uri}/api/v1/metadata",
+                            "data_type": "tiled",
+                            "datasets": datasets,
+                            "project_id": f"replay_{selected_uuid}",
+                            "replay_mode": True
+                        }
+                    else:
+                        # Fallback if parsing fails - use the initialized data_project_dict
+                        pass
             except Exception as e:
                 logger.warning(f"Error parsing URL for data project: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
                 # Fallback to the initialized data_project_dict
                 pass
         else:
@@ -347,8 +411,6 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
         mark_interval = max(1, total_points // 5)  # Create ~5 marks
         marks = {i: str(i) for i in range(0, total_points+1, mark_interval)}
         
-        # Removed stats_text
-        
         # Return all outputs with data length as max and showing all data initially
         return scatter_fig, data_project_dict, replay_buffer, initial_range, total_points, marks
             
@@ -356,5 +418,4 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
         logger.error(f"Error loading experiment: {e}")
         logger.error(traceback.format_exc())
         default_marks = {i: str(i) for i in range(0, 101, 20)}
-        # Removed stats_text
         return no_update, data_project_dict, replay_buffer, [0, 100], 100, default_marks
