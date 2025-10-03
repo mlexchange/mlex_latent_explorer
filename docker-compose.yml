@@ -128,7 +128,7 @@ services:
       # Tiled
       DEFAULT_TILED_URI: '${DEFAULT_TILED_URI}'
       DATA_TILED_KEY: '${DATA_TILED_KEY}'
-      REMOTE_DATA_TILED_KEY: '${REMOTE_DATA_TILED_KEY}'
+      LIVE_TILED_API_KEY: '${LIVE_TILED_API_KEY}'
       RESULTS_TILED_URI: '${RESULTS_TILED_URI}'
       RESULTS_TILED_API_KEY: '${RESULTS_TILED_API_KEY}'
       # Prefect
@@ -251,8 +251,8 @@ services:
     volumes:
       - ./data/test_sim_data:/data/test_data:ro # Mount test data repository containing TIFF images
     environment:
-      - TILED_LIVE_API_KEY=${REMOTE_TILED_SINGLE_USER_API_KEY}
-      - DATA_TILED_KEY=${REMOTE_DATA_TILED_KEY}
+      - TILED_LIVE_API_KEY=${LIVE_TILED_API_KEY}
+      - DATA_TILED_KEY=${LIVE_TILED_API_KEY}
       - DYNACONF_TILED_POLLER__PUBLISH_ADDRESS=tcp://0.0.0.0:5000 # Make sure ZMQ publisher address is correctly set
     networks:
       mle_net:
@@ -265,12 +265,12 @@ services:
     profiles:
       - sim_replay
     volumes:
-      - ./data/vector_db_smi:/data/vector_db_smi:ro # Mount directory containing the vector database
+      - ./data/vector_db_replay:/data/vector_db_replay:ro # Mount directory containing the vector database
     environment:
       - TILED_ENV=${TILED_ENV}
-      - DB_PATH=/data/vector_db_smi/latent_vectors.db
-      - TILED_API_KEY=${REMOTE_TILED_SINGLE_USER_API_KEY}
-      - TILED_LIVE_API_KEY=${REMOTE_TILED_SINGLE_USER_API_KEY}
+      - DB_PATH=/data/vector_db_replay/latent_vectors.db
+      - TILED_API_KEY=${LIVE_TILED_API_KEY}
+      - TILED_LIVE_API_KEY=${LIVE_TILED_API_KEY}
       - DYNACONF_TILED_POLLER__PUBLISH_ADDRESS=tcp://0.0.0.0:5000
     networks:
       mle_net:

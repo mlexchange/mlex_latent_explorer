@@ -11,7 +11,7 @@ from file_manager.data_project import DataProject
 from mlex_utils.prefect_utils.core import get_children_flow_run_ids
 from PIL import Image
 
-from src.app_layout import DATA_TILED_KEY, REMOTE_DATA_TILED_KEY, NUM_IMGS_OVERVIEW, USER
+from src.app_layout import DATA_TILED_KEY, LIVE_TILED_API_KEY, NUM_IMGS_OVERVIEW, USER
 from src.utils.data_utils import hash_list_of_strings, tiled_results
 from src.utils.plot_utils import (
     generate_heatmap_plot,
@@ -382,12 +382,12 @@ def update_heatmap(
     
     if is_live_mode:
         # Use remote API key for live mode
-        api_key = REMOTE_DATA_TILED_KEY
-        logger.info("Using REMOTE_DATA_TILED_KEY for live mode heatmap")
+        api_key = LIVE_TILED_API_KEY
+        logger.info("Using LIVE_TILED_API_KEY for live mode heatmap")
     elif is_replay_mode:
         # Use remote API key for replay mode
-        api_key = REMOTE_DATA_TILED_KEY
-        logger.info("Using REMOTE_DATA_TILED_KEY for replay mode heatmap")
+        api_key = LIVE_TILED_API_KEY
+        logger.info("Using LIVE_TILED_API_KEY for replay mode heatmap")
     else:
         # Use regular DATA_TILED_KEY for offline mode
         api_key = DATA_TILED_KEY
