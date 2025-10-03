@@ -88,7 +88,18 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                     dbc.Select(
                                         id="live-mode-autoencoder-dropdown",
                                         options=[],
-                                        placeholder="Select an autoencoder model...",
+                                        placeholder="Select model name...",
+                                    ),
+                                ),
+                                html.P(),
+                                ControlItem(
+                                    "Autoencoder Version",
+                                    "live-mode-autoencoder-version-title",
+                                    dbc.Select(
+                                        id="live-mode-autoencoder-version-dropdown",
+                                        options=[],
+                                        placeholder="Select version...",
+                                        disabled=True,
                                     ),
                                 ),
                                 html.P(),
@@ -98,7 +109,18 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                     dbc.Select(
                                         id="live-mode-dimred-dropdown",
                                         options=[],
-                                        placeholder="Select a dimension reduction model...",
+                                        placeholder="Select model name...",
+                                    ),
+                                ),
+                                html.P(),
+                                ControlItem(
+                                    "Dimension Reduction Version",
+                                    "live-mode-dimred-version-title",
+                                    dbc.Select(
+                                        id="live-mode-dimred-version-dropdown",
+                                        options=[],
+                                        placeholder="Select version...",
+                                        disabled=True,
                                     ),
                                 ),
                                 html.P(),

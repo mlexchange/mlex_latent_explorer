@@ -69,7 +69,7 @@ class LatentSpaceReducer(Reducer):
         # Initialize Redis model store
         self.redis_model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
         
-        # Get model selections from Redis
+        # Get model selections from Redis (may include version in "name:version" format)
         self.autoencoder_model_name = self.redis_model_store.get_autoencoder_model()
         self.dimred_model_name = self.redis_model_store.get_dimred_model()
         
@@ -93,8 +93,20 @@ class LatentSpaceReducer(Reducer):
         self._update_loading_state(True, "initial")
 
         try:
-            self.current_torch_model = mlflow_client.load_model(self.autoencoder_model_name)
-            self.current_dim_reduction_model = mlflow_client.load_model(self.dimred_model_name)
+            # Parse model name and version for autoencoder
+            if self.autoencoder_model_name and ":" in self.autoencoder_model_name:
+                auto_name, auto_version = self.autoencoder_model_name.split(":", 1)
+                self.current_torch_model = mlflow_client.load_model(auto_name, version=auto_version)
+            else:
+                self.current_torch_model = mlflow_client.load_model(self.autoencoder_model_name)
+            
+            # Parse model name and version for dimred
+            if self.dimred_model_name and ":" in self.dimred_model_name:
+                dimred_name, dimred_version = self.dimred_model_name.split(":", 1)
+                self.current_dim_reduction_model = mlflow_client.load_model(dimred_name, version=dimred_version)
+            else:
+                self.current_dim_reduction_model = mlflow_client.load_model(self.dimred_model_name)
+            
             logger.info("Initial models loaded successfully")
         finally:
             # Reset loading flags
@@ -231,23 +243,48 @@ class LatentSpaceReducer(Reducer):
     
 
     def _handle_model_update(self, update):
-        """Handle a model update from Redis PubSub"""
+        """Handle a model update from Redis PubSub with version support"""
         try:
             model_type = update.get("model_type")
-            model_name = update.get("model_name")
+            model_id = update.get("model_name")
             
-            if not model_type or not model_name:
+            if not model_type or not model_id:
                 logger.warning(f"Invalid model update: {update}")
                 return
             
-            # Check if this is a duplicate update for the same model
-            if (model_type == "autoencoder" and model_name == self.autoencoder_model_name) or \
-            (model_type == "dimred" and model_name == self.dimred_model_name):
-                logger.info(f"Ignoring duplicate model update: {model_type} = {model_name} (already loaded)")
-                self._update_loading_state(False)
-                return
+            # Parse model name and version
+            if ":" in model_id:
+                model_name, model_version = model_id.split(":", 1)
+            else:
+                model_name = model_id
+                model_version = None
+            
+            # Check if this is a duplicate update
+            if model_type == "autoencoder":
+                if self.autoencoder_model_name and ":" in self.autoencoder_model_name:
+                    current_name, current_version = self.autoencoder_model_name.split(":", 1)
+                else:
+                    current_name = self.autoencoder_model_name
+                    current_version = None
+                
+                if model_name == current_name and model_version == current_version:
+                    logger.info(f"Ignoring duplicate autoencoder update: {model_id}")
+                    self._update_loading_state(False)
+                    return
                     
-            logger.info(f"Received model update: {model_type} = {model_name}")
+            elif model_type == "dimred":
+                if self.dimred_model_name and ":" in self.dimred_model_name:
+                    current_name, current_version = self.dimred_model_name.split(":", 1)
+                else:
+                    current_name = self.dimred_model_name
+                    current_version = None
+                
+                if model_name == current_name and model_version == current_version:
+                    logger.info(f"Ignoring duplicate dimred update: {model_id}")
+                    self._update_loading_state(False)
+                    return
+                    
+            logger.info(f"Received model update: {model_type} = {model_id}")
             
             # Set loading flags
             self._update_loading_state(True, model_type)
@@ -255,15 +292,40 @@ class LatentSpaceReducer(Reducer):
             try:
                 # Update the appropriate model
                 if model_type == "autoencoder":
-                    logger.info(f"Loading new autoencoder model: {model_name}...")
-                    self.autoencoder_model_name = model_name
-                    self.current_torch_model = self.mlflow_client.load_model(model_name)
-                    logger.info(f"Successfully loaded new autoencoder model: {model_name}")
+                    logger.info(f"Loading new autoencoder model: {model_id}...")
+                    # DON'T update name yet - wait until model is loaded
+                    # self.autoencoder_model_name = model_id  # ← REMOVE THIS
+                    
+                    # Load model with version if specified
+                    if model_version:
+                        new_model = self.mlflow_client.load_model(
+                            model_name, version=model_version
+                        )
+                    else:
+                        new_model = self.mlflow_client.load_model(model_name)
+                    
+                    # Only update name AFTER successful load
+                    self.current_torch_model = new_model
+                    self.autoencoder_model_name = model_id  # ← MOVE HERE
+                    logger.info(f"Successfully loaded new autoencoder model: {model_id}")
+                    
                 elif model_type == "dimred":
-                    logger.info(f"Loading new dimension reduction model: {model_name}...")
-                    self.dimred_model_name = model_name
-                    self.current_dim_reduction_model = self.mlflow_client.load_model(model_name)
-                    logger.info(f"Successfully loaded new dimension reduction model: {model_name}")
+                    logger.info(f"Loading new dimension reduction model: {model_id}...")
+                    # DON'T update name yet - wait until model is loaded
+                    # self.dimred_model_name = model_id  # ← REMOVE THIS
+                    
+                    # Load model with version if specified
+                    if model_version:
+                        new_model = self.mlflow_client.load_model(
+                            model_name, version=model_version
+                        )
+                    else:
+                        new_model = self.mlflow_client.load_model(model_name)
+                    
+                    # Only update name AFTER successful load
+                    self.current_dim_reduction_model = new_model
+                    self.dimred_model_name = model_id  # ← MOVE HERE
+                    logger.info(f"Successfully loaded new dimension reduction model: {model_id}")
                 else:
                     logger.warning(f"Unknown model type: {model_type}")
             finally:

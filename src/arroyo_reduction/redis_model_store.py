@@ -13,6 +13,8 @@ class RedisModelStore:
     Redis integration for model selections that supports both:
     1. Key-Value Store: For storing and retrieving model selections
     2. Pub/Sub: For real-time notification of model changes
+    
+    Models are stored in "name:version" format (e.g., "model_v1:3")
     """
     
     # Redis Key Constants
@@ -50,36 +52,49 @@ class RedisModelStore:
     # Key-Value Store Methods for Model Selection Storage
     # =====================================================================
     
-    def store_autoencoder_model(self, model_name: str) -> bool:
-        """Store autoencoder model name in Redis"""
+    def store_autoencoder_model(self, model_identifier: str) -> bool:
+        """
+        Store autoencoder model identifier in Redis
+        
+        Args:
+            model_identifier: Model identifier in "name:version" format (e.g., "model_v1:3")
+                            or just "name" for backward compatibility
+        """
         if self.redis_client is None:
             logger.warning("Redis client not available")
             return False
         
         try:
-            logger.info(f"Storing autoencoder model: {model_name}")
-            self.redis_client.set(self.KEY_AUTOENCODER_MODEL, model_name)
+            logger.info(f"Storing autoencoder model: {model_identifier}")
+            self.redis_client.set(self.KEY_AUTOENCODER_MODEL, model_identifier)
             
-            # Also publish update notification
-            self.publish_model_update("autoencoder", model_name)
+            # Parse model identifier for pub/sub notification
+            # The publish_model_update expects the full identifier
+            self.publish_model_update("autoencoder", model_identifier)
             
             return True
         except Exception as e:
             logger.error(f"Error storing autoencoder model in Redis: {e}")
             return False
     
-    def store_dimred_model(self, model_name: str) -> bool:
-        """Store dimension reduction model name in Redis"""
+    def store_dimred_model(self, model_identifier: str) -> bool:
+        """
+        Store dimension reduction model identifier in Redis
+        
+        Args:
+            model_identifier: Model identifier in "name:version" format (e.g., "umap_v1:2")
+                            or just "name" for backward compatibility
+        """
         if self.redis_client is None:
             logger.warning("Redis client not available")
             return False
         
         try:
-            logger.info(f"Storing dimension reduction model: {model_name}")
-            self.redis_client.set(self.KEY_DIMRED_MODEL, model_name)
+            logger.info(f"Storing dimension reduction model: {model_identifier}")
+            self.redis_client.set(self.KEY_DIMRED_MODEL, model_identifier)
             
-            # Also publish update notification
-            self.publish_model_update("dimred", model_name)
+            # Parse model identifier for pub/sub notification
+            self.publish_model_update("dimred", model_identifier)
             
             return True
         except Exception as e:
@@ -87,29 +102,39 @@ class RedisModelStore:
             return False
     
     def get_autoencoder_model(self) -> str:
-        """Get autoencoder model name from Redis"""
+        """
+        Get autoencoder model identifier from Redis
+        
+        Returns:
+            Model identifier in "name:version" format or just "name"
+        """
         if self.redis_client is None:
             logger.warning("Redis client not available")
             return None
         
         try:
-            model_name = self.redis_client.get(self.KEY_AUTOENCODER_MODEL)
-            logger.info(f"Retrieved autoencoder model: {model_name}")
-            return model_name
+            model_identifier = self.redis_client.get(self.KEY_AUTOENCODER_MODEL)
+            logger.info(f"Retrieved autoencoder model: {model_identifier}")
+            return model_identifier
         except Exception as e:
             logger.error(f"Error retrieving autoencoder model from Redis: {e}")
             return None
     
     def get_dimred_model(self) -> str:
-        """Get dimension reduction model name from Redis"""
+        """
+        Get dimension reduction model identifier from Redis
+        
+        Returns:
+            Model identifier in "name:version" format or just "name"
+        """
         if self.redis_client is None:
             logger.warning("Redis client not available")
             return None
         
         try:
-            model_name = self.redis_client.get(self.KEY_DIMRED_MODEL)
-            logger.info(f"Retrieved dimension reduction model: {model_name}")
-            return model_name
+            model_identifier = self.redis_client.get(self.KEY_DIMRED_MODEL)
+            logger.info(f"Retrieved dimension reduction model: {model_identifier}")
+            return model_identifier
         except Exception as e:
             logger.error(f"Error retrieving dimension reduction model from Redis: {e}")
             return None
@@ -118,13 +143,13 @@ class RedisModelStore:
     # Pub/Sub Methods for Real-time Model Updates
     # =====================================================================
     
-    def publish_model_update(self, model_type: str, model_name: str) -> bool:
+    def publish_model_update(self, model_type: str, model_identifier: str) -> bool:
         """
         Publish a model update notification to Redis
         
         Args:
             model_type: Type of model ('autoencoder' or 'dimred')
-            model_name: Name of the selected model
+            model_identifier: Full model identifier in "name:version" format
             
         Returns:
             bool: Success status
@@ -134,10 +159,10 @@ class RedisModelStore:
             return False
         
         try:
-            # Create message payload
+            # Create message payload with full identifier
             message = {
                 "model_type": model_type,
-                "model_name": model_name,
+                "model_name": model_identifier,  # This now contains "name:version"
                 "timestamp": time.time()
             }
             

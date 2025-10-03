@@ -16,7 +16,7 @@ MLFLOW_TRACKING_PASSWORD = os.getenv("MLFLOW_TRACKING_PASSWORD", "")
 # Define a cache directory that will be mounted as a volume
 MLFLOW_CACHE_DIR = os.getenv("MLFLOW_CACHE_DIR", os.path.join(tempfile.gettempdir(), "mlflow_cache"))
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("lse.mlflow_utils")
 
 
 class MLflowClient:
@@ -66,8 +66,8 @@ class MLflowClient:
         Models are compatible if autoencoder latent_dim matches dimension reduction input_dim.
         
         Args:
-            autoencoder_model (str): The autoencoder model ID or name
-            dim_reduction_model (str): The dimension reduction model ID or name
+            autoencoder_model (str): Autoencoder model name (or "name:version" format)
+            dim_reduction_model (str): Dimension reduction model name (or "name:version" format)
             
         Returns:
             bool: True if models are compatible, False otherwise
@@ -77,6 +77,7 @@ class MLflowClient:
         
         # Check dimension compatibility
         try:
+            # get_mlflow_params now handles "name:version" format automatically
             auto_params = self.get_mlflow_params(autoencoder_model)
             dimred_params = self.get_mlflow_params(dim_reduction_model)
             
@@ -105,10 +106,27 @@ class MLflowClient:
             logger.warning(f"MLflow server is not reachable: {e}")
             return False
 
-    def get_mlflow_params(self, mlflow_model_id):
+    def get_mlflow_params(self, mlflow_model_id, version=None):
+        """
+        Get MLflow model parameters for a specific version.
+        
+        Args:
+            mlflow_model_id: Model name or "name:version" format
+            version: Specific version (optional, can be parsed from mlflow_model_id)
+        
+        Returns:
+            dict: Model parameters
+        """
+        # Parse version from identifier if present
+        if version is None:
+            if isinstance(mlflow_model_id, str) and ":" in mlflow_model_id:
+                mlflow_model_id, version = mlflow_model_id.split(":", 1)
+            else:
+                version = "1"  # Default to version 1 for backward compatibility
+        
         model_version_details = self.client.get_model_version(
-            name=mlflow_model_id,  # The registered model name
-            version="1",  # The version you care about
+            name=mlflow_model_id,
+            version=str(version)
         )
         run_id = model_version_details.run_id
 
@@ -180,7 +198,42 @@ class MLflowClient:
         except Exception as e:
             logger.warning(f"Error retrieving MLflow models: {e}")
             return [{"label": "Error loading models", "value": None}]
-
+        
+    def get_model_versions(self, model_name):
+        """
+        Get all available versions for a specific model.
+        
+        Args:
+            model_name (str): Name of the model
+            
+        Returns:
+            list: List of version options sorted by version number (latest first)
+        """
+        try:
+            versions = self.client.search_model_versions(f"name='{model_name}'")
+            
+            if not versions:
+                return []
+            
+            # Sort versions by version number (descending - latest first)
+            sorted_versions = sorted(
+                versions, 
+                key=lambda v: int(v.version), 
+                reverse=True
+            )
+            
+            # Create dropdown options
+            version_options = [
+                {"label": f"Version {v.version}", "value": v.version}
+                for v in sorted_versions
+            ]
+            
+            return version_options
+            
+        except Exception as e:
+            logger.error(f"Error retrieving versions for model {model_name}: {e}")
+            return []
+            
     def _get_cache_path(self, model_name, version=None):
         """Get the cache path for a model"""
         # Create a unique filename based on model name and version
@@ -193,12 +246,13 @@ class MLflowClient:
             # Include version in the filename
             return os.path.join(self.cache_dir, f"{model_name}_v{version}")
 
-    def load_model(self, model_name):
+    def load_model(self, model_name, version=None):
         """
         Load a model from MLflow by name with disk caching
         
         Args:
             model_name: Name of the model in MLflow
+            version: Specific version to load (optional, defaults to latest)
             
         Returns:
             The loaded model or None if loading fails
@@ -207,77 +261,74 @@ class MLflowClient:
             logger.error("Cannot load model: model_name is None")
             return None
         
+        # Create a cache key that includes version if specified
+        cache_key = f"{model_name}:{version}" if version else model_name
+        
         # Check in-memory cache first
-        if model_name in self._model_cache:
-            logger.info(f"Using in-memory cached model: {model_name}")
-            return self._model_cache[model_name]
+        if cache_key in self._model_cache:
+            logger.info(f"Using in-memory cached model: {cache_key}")
+            return self._model_cache[cache_key]
         
         try:
-            # Get latest version using existing client
-            versions = self.client.search_model_versions(f"name='{model_name}'")
-            
-            if not versions:
-                logger.error(f"No versions found for model {model_name}")
-                return None
+            # Get the specific version or latest version
+            if version is None:
+                versions = self.client.search_model_versions(f"name='{model_name}'")
                 
-            latest_version = max([int(mv.version) for mv in versions])
-            model_uri = f"models:/{model_name}/{latest_version}"
+                if not versions:
+                    logger.error(f"No versions found for model {model_name}")
+                    return None
+                    
+                version = max([int(mv.version) for mv in versions])
+            
+            model_uri = f"models:/{model_name}/{version}"
             
             # Check disk cache
-            cache_path = self._get_cache_path(model_name, latest_version)
+            cache_path = self._get_cache_path(model_name, version)
             if os.path.exists(cache_path):
                 logger.info(f"Loading model from disk cache: {cache_path}")
                 try:
-                    # Load from cached MLflow model
                     model = mlflow.pyfunc.load_model(cache_path)
-                    
-                    # Store in memory cache
-                    self._model_cache[model_name] = model
-                    
-                    logger.info(f"Successfully loaded cached model: {model_name}")
+                    self._model_cache[cache_key] = model
+                    logger.info(f"Successfully loaded cached model: {cache_key}")
                     return model
                 except Exception as e:
                     logger.warning(f"Error loading model from cache: {e}")
-                    # Continue to download if cache load fails
             
             # Create cache directory if it doesn't exist
             os.makedirs(os.path.dirname(cache_path) if os.path.dirname(cache_path) else ".", exist_ok=True)
             
-            # Instead of loading and then saving, we'll download directly to the cache location
-            # This is more efficient and avoids the save_model error
-            logger.info(f"Downloading model {model_name}, version {latest_version} from MLflow to cache")
+            logger.info(f"Downloading model {model_name}, version {version} from MLflow to cache")
             
-            # Use mlflow.artifacts.download_artifacts to get the model artifacts
             try:
-                # First method: Download the model directly to the cache location
+                # Download the model directly to the cache location
                 download_path = mlflow.artifacts.download_artifacts(
-                    artifact_uri=f"models:/{model_name}/{latest_version}",
+                    artifact_uri=f"models:/{model_name}/{version}",
                     dst_path=cache_path
                 )
                 logger.info(f"Downloaded model artifacts to: {download_path}")
                 
-                # Now load the model from the cached location
+                # Load the model from the cached location
                 model = mlflow.pyfunc.load_model(download_path)
-                logger.info(f"Successfully loaded model from cache: {model_name}")
+                logger.info(f"Successfully loaded model from cache: {cache_key}")
                 
                 # Store in memory cache
-                self._model_cache[model_name] = model
+                self._model_cache[cache_key] = model
                 
                 return model
             except Exception as e:
                 logger.warning(f"Error downloading artifacts: {e}")
                 
-                # Fallback: Load the model directly from MLflow if download fails
+                # Fallback: Load the model directly from MLflow
                 logger.info(f"Falling back to direct model loading from MLflow")
                 model = mlflow.pyfunc.load_model(model_uri)
-                logger.info(f"Successfully loaded model: {model_name}")
+                logger.info(f"Successfully loaded model: {cache_key}")
                 
                 # Store in memory cache
-                self._model_cache[model_name] = model
+                self._model_cache[cache_key] = model
                 
                 return model
         except Exception as e:
-            logger.error(f"Error loading model {model_name}: {e}")
+            logger.error(f"Error loading model {cache_key}: {e}")
             return None
     
     @classmethod
