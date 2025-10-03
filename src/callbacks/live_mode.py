@@ -116,6 +116,7 @@ def update_model_dropdowns(dialog_open):
     Output("live-indices", "data", allow_duplicate=True),
     Output("model-loading-spinner", "style", allow_duplicate=True),
     Output("in-model-transition", "data", allow_duplicate=True),
+    Output("experiment-replay-controls", "style"),  # ADDED
     Input("live-model-continue", "n_clicks"),
     State("live-autoencoder-dropdown", "value"),
     State("live-dimred-dropdown", "value"),
@@ -220,6 +221,7 @@ def handle_model_continue(
         [],  # Clear indices
         spinner_style,  # Show the loading spinner
         True,  # Set transition state to True
+        {"display": "none"},  # Hide experiment replay controls - ADDED
     )
 
 
@@ -291,6 +293,7 @@ def toggle_continue_button(selected_autoencoder, selected_dimred):
     Output("live-indices", "data", allow_duplicate=True),
     Output("live-mode-canceled", "data", allow_duplicate=True),
     Output("selected-live-models", "data", allow_duplicate=True),
+    Output("experiment-replay-controls", "style", allow_duplicate=True),  # ADDED
     Input("go-live", "n_clicks"),
     State("selected-live-models", "data"),
     State("live-mode-canceled", "data"),
@@ -321,7 +324,8 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
             no_update,  # pause-button style
             no_update,  # live-indices data
             False,  # Reset the cancel flag
-            None,
+            None,  # selected-live-models data
+            no_update,  # experiment-replay-controls style - ADDED
         )
 
     # Check if continue was already clicked (selected_models is not None)
@@ -341,8 +345,8 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
 
         # Going back to offline mode
         return (
-            False,
-            False,
+            False,  # show-clusters value
+            False,  # show-feature-vectors value
             {},  # Show data selection controls
             {},  # Show dimension reduction controls
             {},  # Show clustering controls
@@ -367,13 +371,14 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
             [],  # Clear live indices
             False,  # Reset canceled flag
             None,  # Reset selected_models to None
+            {},  # Show experiment replay controls - ADDED
         )
 
     # First click or other odd clicks - going to live mode
     if n_clicks is not None and n_clicks % 2 == 1 and selected_models is not None:
         return (
-            False,
-            False,
+            False,  # show-clusters value
+            False,  # show-feature-vectors value
             {"display": "none"},  # Hide data selection controls
             {"display": "none"},  # Hide dimension reduction controls
             {"display": "none"},  # Hide clustering controls
@@ -400,6 +405,7 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
             [],  # Initialize empty live indices
             False,  # Reset canceled flag
             selected_models,  # Keep selected_models unchanged
+            {"display": "none"},  # Hide experiment replay controls - ADDED
         )
 
     raise PreventUpdate
