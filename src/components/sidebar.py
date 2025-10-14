@@ -82,6 +82,30 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                             id="live-mode-models",
                             title="Live Mode Models",
                             children=[
+                                # NEW: Add experiment name display at the top
+                                html.Div(
+                                    id="live-experiment-name-display",
+                                    children=[
+                                        html.Div(
+                                            [
+                                                html.Strong("Experiment: ", style={"color": "#00313C"}),
+                                                html.Span(
+                                                    id="live-experiment-name-text",
+                                                    children="",
+                                                    style={"color": "#D57800", "fontWeight": "500"}
+                                                ),
+                                            ],
+                                            style={
+                                                "padding": "10px",
+                                                "backgroundColor": "#f8f9fa",
+                                                "borderRadius": "5px",
+                                                "marginBottom": "15px",
+                                                "border": "1px solid #dee2e6"
+                                            }
+                                        ),
+                                    ],
+                                    style={"display": "none"}  # Hidden by default, shown in live mode
+                                ),
                                 ControlItem(
                                     "Autoencoder Model",
                                     "live-mode-autoencoder-title",
@@ -263,6 +287,41 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                                         height=18,
                                                     ),
                                                     id="refresh-daily-containers",
+                                                    color="light",
+                                                    size="sm",
+                                                    className="rounded-circle",
+                                                    style={"aspectRatio": "1 / 1"},
+                                                ),
+                                                width=1,
+                                                style={"padding-left": "0"},
+                                            ),
+                                        ], className="align-items-center"),
+                                    ]),
+                                ),
+                                html.P(),
+                                # NEW: Experiment Name dropdown
+                                ControlItem(
+                                    "Experiment Name",
+                                    "experiment-name-title",
+                                    html.Div([
+                                        dbc.Row([
+                                            dbc.Col(
+                                                dbc.Select(
+                                                    id="experiment-name-dropdown",
+                                                    options=[],
+                                                    value=None,
+                                                    placeholder="Select an experiment name",
+                                                ),
+                                                width=10,
+                                            ),
+                                            dbc.Col(
+                                                dbc.Button(
+                                                    DashIconify(
+                                                        icon="tabler:refresh",
+                                                        width=18,
+                                                        height=18,
+                                                    ),
+                                                    id="refresh-experiment-names",
                                                     color="light",
                                                     size="sm",
                                                     className="rounded-circle",

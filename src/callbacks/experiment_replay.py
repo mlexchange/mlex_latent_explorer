@@ -5,7 +5,12 @@ from dash import Input, Output, State, callback, no_update
 from dash.exceptions import PreventUpdate
 from file_manager.data_project import DataProject
 
-from src.utils.data_utils import get_daily_containers, get_uuids_in_container, tiled_results
+from src.utils.data_utils import (
+    get_daily_containers, 
+    get_experiment_names_in_container,  # NEW: Import new function
+    get_uuids_in_experiment,  # NEW: Import new function
+    tiled_results
+)
 from src.utils.plot_utils import (
     generate_scatter_data, 
     plot_empty_heatmap, 
@@ -42,19 +47,42 @@ def load_containers_on_render(active_item):
     """Load daily containers when the page is first loaded"""
     containers = get_daily_containers()
     return containers if containers else []
-        
+
+# NEW: Callback to load experiment names when container is selected
 @callback(
-    Output("experiment-uuid-dropdown", "options"),
-    Output("experiment-uuid-dropdown", "value"),
+    Output("experiment-name-dropdown", "options"),
+    Output("experiment-name-dropdown", "value"),
     Input("daily-container-dropdown", "value"),
+    Input("refresh-experiment-names", "n_clicks"),
     prevent_initial_call=True,
 )
-def load_experiment_uuids(selected_container):
-    """Load available experiment UUIDs from selected daily container"""
+def load_experiment_names(selected_container, refresh_clicks):
+    """Load available experiment names from selected daily container"""
     if not selected_container:
         return [], None
         
-    uuids = get_uuids_in_container(selected_container)
+    experiment_names = get_experiment_names_in_container(selected_container)
+    
+    if experiment_names:
+        return experiment_names, experiment_names[0]["value"]
+    else:
+        return [], None
+
+# MODIFIED: Now uses experiment name in addition to container
+@callback(
+    Output("experiment-uuid-dropdown", "options"),
+    Output("experiment-uuid-dropdown", "value"),
+    Input("experiment-name-dropdown", "value"),  # CHANGED: Now depends on experiment name
+    Input("refresh-experiment-uuids", "n_clicks"),
+    State("daily-container-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def load_experiment_uuids(selected_experiment, refresh_clicks, selected_container):
+    """Load available experiment UUIDs from selected experiment"""
+    if not selected_container or not selected_experiment:
+        return [], None
+        
+    uuids = get_uuids_in_experiment(selected_container, selected_experiment)  # CHANGED: Use new function
     
     if uuids:
         return uuids, uuids[0]["value"]
@@ -150,12 +178,13 @@ def filter_experiment_by_range(range_value, replay_buffer, data_project_dict):
     Output("replay-data-range", "marks", allow_duplicate=True),
     Input("load-experiment-button", "n_clicks"),
     State("daily-container-dropdown", "value"),
+    State("experiment-name-dropdown", "value"),  # NEW: Add experiment name state
     State("experiment-uuid-dropdown", "value"),
     prevent_initial_call=True,
 )
-def load_experiment_replay(n_clicks, selected_container, selected_uuid):
+def load_experiment_replay(n_clicks, selected_container, selected_experiment, selected_uuid):
     """Load feature vectors from selected experiment UUID and display in scatter plot"""
-    if not n_clicks or not selected_container or not selected_uuid:
+    if not n_clicks or not selected_container or not selected_experiment or not selected_uuid:  # CHANGED: Added selected_experiment check
         raise PreventUpdate
     
     # Initialize a minimal data project dictionary with replay_mode flag
@@ -172,12 +201,13 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
         "feature_vectors": [],
         "live_indices": [],
         "uuid": selected_uuid,
-        "container": selected_container
+        "container": selected_container,
+        "experiment_name": selected_experiment  # NEW: Add experiment name
     }
     
     try:
         # Connect to Tiled and load feature vectors
-        logger.info(f"Loading experiment UUID: {selected_uuid} from container: {selected_container}")
+        logger.info(f"Loading experiment UUID: {selected_uuid} from container: {selected_container}, experiment: {selected_experiment}")  # CHANGED: Added experiment to log
         
         if not tiled_results.check_dataloader_ready():
             # Default marks for error case
@@ -187,7 +217,7 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
         # Build the path to the selected experiment table
         container = tiled_results.data_client
         
-        # Navigate to lse_live_results/daily_run_YYYY-MM-DD/selected_uuid
+        # Navigate to lse_live_results/daily_run_YYYY-MM-DD/experiment_name/selected_uuid
         if "lse_live_results" not in container:
             default_marks = {i: str(i) for i in range(0, 101, 20)}
             return no_update, data_project_dict, replay_buffer, [0, 100], 100, default_marks
@@ -201,19 +231,26 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
             
         daily_container = container[selected_container]
         
+        # NEW: Navigate to the experiment name container
+        if selected_experiment not in daily_container:
+            default_marks = {i: str(i) for i in range(0, 101, 20)}
+            return no_update, data_project_dict, replay_buffer, [0, 100], 100, default_marks
+            
+        experiment_container = daily_container[selected_experiment]
+        
         # Check if the selected UUID exists in this container
-        if selected_uuid not in daily_container:
+        if selected_uuid not in experiment_container:  # CHANGED: Use experiment_container instead of daily_container
             default_marks = {i: str(i) for i in range(0, 101, 20)}
             return no_update, data_project_dict, replay_buffer, [0, 100], 100, default_marks
             
         # Get the DataFrame for the selected UUID
-        df = daily_container[selected_uuid].read()
+        df = experiment_container[selected_uuid].read()  # CHANGED: Use experiment_container instead of daily_container
         
         if df is None or df.empty:
             default_marks = {i: str(i) for i in range(0, 101, 20)}
             return no_update, data_project_dict, replay_buffer, [0, 100], 100, default_marks
         
-        logger.info(f"Loaded DataFrame with shape: {df.shape} from {selected_container}/{selected_uuid}")
+        logger.info(f"Loaded DataFrame with shape: {df.shape} from {selected_container}/{selected_experiment}/{selected_uuid}")  # CHANGED: Added experiment to log
         
         # Extract feature vectors from DataFrame
         feature_cols = [col for col in df.columns if col.startswith('feature_')]
@@ -282,6 +319,7 @@ def load_experiment_replay(n_clicks, selected_container, selected_uuid):
             "live_indices": live_indices,
             "uuid": selected_uuid,
             "container": selected_container,
+            "experiment_name": selected_experiment,  # NEW: Store experiment name
             "is_feature_vectors_special_case": is_feature_vectors_special_case  # Add flag
         }
         

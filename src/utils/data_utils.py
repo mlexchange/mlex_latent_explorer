@@ -135,15 +135,16 @@ def format_container_name(container_name):
         return f"Daily Run {date_str}"
     return container_name
 
-def get_uuids_in_container(container_name):
+# These functions support the new 3-level hierarchy: daily_container/experiment_name/uuid
+def get_experiment_names_in_container(container_name):
     """
-    Retrieve all available experiment UUIDs from a specific daily container
+    Retrieve all available experiment names from a specific daily container
     
     Args:
-        container_name (str): The name of the daily container
+        container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20")
         
     Returns:
-        list: List of dictionaries with {label: uuid, value: uuid}
+        list: List of dictionaries with {label: experiment_name, value: experiment_name}
     """
     try:
         # Check if tiled_results client is available
@@ -165,12 +166,72 @@ def get_uuids_in_container(container_name):
             logger.warning(f"Container {container_name} not found")
             return []
             
-        # Get all UUIDs in this container
-        uuids = list(container[container_name].keys())
+        daily_container = container[container_name]
+        
+        # Get all experiment names (containers) in this daily container
+        experiment_names = [key for key in daily_container.keys()]
+        
+        if not experiment_names:
+            logger.warning(f"No experiment names found in container {container_name}")
+            return []
+        
+        # Format as dropdown options
+        return [{"label": name, "value": name} for name in experiment_names]
+            
+    except Exception as e:
+        logger.error(f"Error retrieving experiment names from container {container_name}: {e}")
+        return []
+
+
+def get_uuids_in_experiment(container_name, experiment_name):
+    """
+    Retrieve all available experiment UUIDs from a specific experiment
+    
+    Args:
+        container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20")
+        experiment_name (str): The name of the experiment (user-entered name)
+        
+    Returns:
+        list: List of dictionaries with {label: uuid, value: uuid}
+    """
+    try:
+        # Check if tiled_results client is available
+        if not tiled_results.check_dataloader_ready():
+            logger.warning("Tiled results client not available")
+            return []
+        
+        # Get the daily run container
+        container = tiled_results.data_client
+        
+        # Navigate to the lse_live_results/container_name/experiment_name path
+        if "lse_live_results" not in container:
+            logger.warning("lse_live_results container not found")
+            return []
+            
+        container = container["lse_live_results"]
+        
+        if container_name not in container:
+            logger.warning(f"Container {container_name} not found")
+            return []
+            
+        daily_container = container[container_name]
+        
+        if experiment_name not in daily_container:
+            logger.warning(f"Experiment {experiment_name} not found in {container_name}")
+            return []
+        
+        experiment_container = daily_container[experiment_name]
+        
+        # Get all UUIDs (tables) in this experiment
+        uuids = list(experiment_container.keys())
+        
+        if not uuids:
+            logger.warning(f"No UUIDs found in {container_name}/{experiment_name}")
+            return []
         
         # Format as dropdown options
         return [{"label": uuid, "value": uuid} for uuid in uuids]
             
     except Exception as e:
-        logger.error(f"Error retrieving UUIDs from container {container_name}: {e}")
+        logger.error(f"Error retrieving UUIDs from {container_name}/{experiment_name}: {e}")
         return []

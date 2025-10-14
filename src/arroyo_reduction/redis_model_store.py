@@ -20,6 +20,7 @@ class RedisModelStore:
     # Redis Key Constants
     KEY_AUTOENCODER_MODEL = "selected_mlflow_model"
     KEY_DIMRED_MODEL = "selected_dim_reduction_model"
+    KEY_EXPERIMENT_NAME = "experiment_name"  # NEW: Add this constant
     
     # Redis Channel Constants
     CHANNEL_MODEL_UPDATES = "model_updates"
@@ -47,7 +48,48 @@ class RedisModelStore:
         except Exception as e:
             self.redis_client = None
             logger.warning(f"Could not connect to Redis: {e}")
+            
+    # NEW: Add these methods after the existing model methods
+    def store_experiment_name(self, experiment_name: str) -> bool:
+        """
+        Store experiment name in Redis
+        
+        Args:
+            experiment_name: Name of the experiment (can be empty string to clear)
+            
+        Returns:
+            bool: Success status
+        """
+        if self.redis_client is None:
+            logger.warning("Redis client not available")
+            return False
+        
+        try:
+            logger.info(f"Storing experiment name: {experiment_name}")
+            self.redis_client.set(self.KEY_EXPERIMENT_NAME, experiment_name)
+            return True
+        except Exception as e:
+            logger.error(f"Error storing experiment name in Redis: {e}")
+            return False
     
+    def get_experiment_name(self) -> str:
+        """
+        Get experiment name from Redis
+        
+        Returns:
+            str: Experiment name or None if not set
+        """
+        if self.redis_client is None:
+            logger.warning("Redis client not available")
+            return None
+        
+        try:
+            experiment_name = self.redis_client.get(self.KEY_EXPERIMENT_NAME)
+            logger.debug(f"Retrieved experiment name: {experiment_name}")
+            return experiment_name
+        except Exception as e:
+            logger.error(f"Error retrieving experiment name from Redis: {e}")
+            return None
     # =====================================================================
     # Key-Value Store Methods for Model Selection Storage
     # =====================================================================

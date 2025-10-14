@@ -15,6 +15,14 @@ def create_model_selection_dialog():
                             html.P(
                                 "Please select models to use for processing live data stream:"
                             ),
+                            # NEW: Experiment Name Input
+                            html.H6("Experiment Name:"),
+                            dbc.Input(
+                                id="live-experiment-name-input",
+                                type="text",
+                                placeholder="Enter experiment name...",
+                                className="mb-3",
+                            ),
                             html.H6("Autoencoder Model:"),
                             dbc.Row(
                                 [

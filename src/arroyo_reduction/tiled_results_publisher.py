@@ -49,6 +49,9 @@ class TiledResultsPublisher(Publisher):
         # Keep track of the current UUID
         self.current_uuid = None
         
+        # NEW: Track current experiment name (will be set from message)
+        self.current_experiment_name = "default_experiment"
+        
         logger.info(f"Initialized publisher with UUID-based table grouping")
 
     async def start(self):
@@ -140,6 +143,26 @@ class TiledResultsPublisher(Publisher):
             logger.error(traceback.format_exc())
             raise  # Re-raise to propagate the error
     
+    # NEW: Method to get or create experiment container
+    def _get_experiment_container(self, experiment_name=None):
+        """Get or create the experiment container based on experiment name"""
+        try:
+            # Use provided experiment_name, or fall back to current, or default
+            exp_name = experiment_name or self.current_experiment_name or "default_experiment"
+            
+            # Check if experiment container exists in daily container
+            if exp_name not in self.daily_container:
+                logger.info(f"Creating experiment container: {exp_name}")
+                self.daily_container.create_container(exp_name)
+            
+            return self.daily_container[exp_name]
+        except Exception as e:
+            logger.error(f"Error getting experiment container: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            # Fallback to daily container
+            return self.daily_container
+    
     async def publish(self, message):
         """Publish a message to Tiled server."""
         if isinstance(message, SASStop):
@@ -178,8 +201,16 @@ class TiledResultsPublisher(Publisher):
                 tiled_url = getattr(message, "tiled_url", None)
                 uuid = self._extract_uuid_from_url(tiled_url)
                 
-                # Check if this UUID already exists
-                if uuid in self.existing_uuids:
+                # NEW: Get experiment name from message
+                experiment_name = getattr(message, "experiment_name", None)
+                if experiment_name:
+                    self.current_experiment_name = experiment_name
+                
+                # NEW: Get experiment container
+                experiment_container = self._get_experiment_container(experiment_name)
+                
+                # Check if this UUID already exists (CHANGED: check in experiment_container)
+                if uuid in experiment_container:
                     logger.debug(f"Skipping vector for existing UUID: {uuid}")
                     return None
                 
@@ -188,7 +219,7 @@ class TiledResultsPublisher(Publisher):
                 
                 if self.current_uuid is not None and uuid != self.current_uuid and self.current_uuid in self.uuid_dataframes:
                     # We have a new UUID, so write the data for the previous UUID (if it's not an existing UUID)
-                    if self.current_uuid not in self.existing_uuids and not self.uuid_dataframes[self.current_uuid].empty:
+                    if self.current_uuid not in experiment_container and not self.uuid_dataframes[self.current_uuid].empty:
                         logger.info(f"New UUID detected, marking previous UUID for writing: {self.current_uuid}")
                         uuid_to_write = self.current_uuid
                 
@@ -243,8 +274,11 @@ class TiledResultsPublisher(Publisher):
     def _write_table_to_tiled_sync(self, table_key):
         """Synchronous implementation of write_table_to_tiled to be run in a thread."""
         try:
-            # Check if this UUID already exists
-            if table_key in self.existing_uuids:
+            # NEW: Get experiment container instead of using daily_container
+            experiment_container = self._get_experiment_container(self.current_experiment_name)
+            
+            # Check if this UUID already exists (CHANGED: check in experiment_container)
+            if table_key in experiment_container:
                 logger.info(f"Skipping write for existing UUID: {table_key}")
                 return
             
@@ -264,8 +298,8 @@ class TiledResultsPublisher(Publisher):
             
             # Simply write the DataFrame to Tiled
             try:
-                # Use write_dataframe with the UUID as the key
-                self.daily_container.write_dataframe(df, key=table_key)
+                # Use write_dataframe with the UUID as the key (CHANGED: write to experiment_container)
+                experiment_container.write_dataframe(df, key=table_key)
                 
                 logger.info(f"Successfully wrote {len(df)} vectors to '{table_key}'")
                 
@@ -311,9 +345,12 @@ class TiledResultsPublisher(Publisher):
         try:
             logger.info("Publisher stopping, checking if current UUID needs writing")
             
-            # Check if the current UUID needs writing
+            # NEW: Get experiment container to check existing UUIDs
+            experiment_container = self._get_experiment_container(self.current_experiment_name)
+            
+            # Check if the current UUID needs writing (CHANGED: check in experiment_container)
             if (self.current_uuid is not None and 
-                self.current_uuid not in self.existing_uuids and 
+                self.current_uuid not in experiment_container and
                 self.current_uuid in self.uuid_dataframes and 
                 not self.uuid_dataframes[self.current_uuid].empty):
                 

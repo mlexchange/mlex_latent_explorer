@@ -88,12 +88,16 @@ class LatentSpaceOperator(Operator):
             current_autoencoder = self.reducer.autoencoder_model_name
             current_dimred = self.reducer.dimred_model_name
             
+            # NEW: Get experiment name from the reducer
+            experiment_name = self.reducer.experiment_name
+            
             response = LatentSpaceEvent(
                 tiled_url=message.tiled_url,
                 feature_vector=feature_vector[0].tolist(),
                 index=message.frame_number,
                 autoencoder_model=current_autoencoder,  # Add autoencoder model name
                 dimred_model=current_dimred,            # Add dimension reduction model name
+                experiment_name=experiment_name,        # NEW: Add experiment name
                 timestamp=start_time,                   # Add start timestamp
                 total_processing_time=total_processing_time,  # Add total processing time
                 autoencoder_time=timing_info.get('autoencoder_time'),  # Add autoencoder processing time

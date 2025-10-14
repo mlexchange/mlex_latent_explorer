@@ -72,7 +72,9 @@ class LatentSpaceReducer(Reducer):
         # Get model selections from Redis (may include version in "name:version" format)
         self.autoencoder_model_name = self.redis_model_store.get_autoencoder_model()
         self.dimred_model_name = self.redis_model_store.get_dimred_model()
+        self.experiment_name = self.redis_model_store.get_experiment_name()
         
+        logger.info(f"Using experiment name: {self.experiment_name}")
         logger.info(f"Using autoencoder model: {self.autoencoder_model_name}")
         logger.info(f"Using dimension reduction model: {self.dimred_model_name}")
         

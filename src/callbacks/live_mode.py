@@ -124,7 +124,10 @@ def update_model_dropdowns(dialog_open):
     Output("model-loading-spinner", "style", allow_duplicate=True),
     Output("in-model-transition", "data", allow_duplicate=True),
     Output("experiment-replay-controls", "style"),
+    Output("live-experiment-name-display", "style", allow_duplicate=True),  # NEW: ADD THIS LINE
+    Output("live-experiment-name-text", "children", allow_duplicate=True),  # NEW: ADD THIS LINE
     Input("live-model-continue", "n_clicks"),
+    State("live-experiment-name-input", "value"),  # NEW: ADD THIS LINE
     State("live-autoencoder-dropdown", "value"),
     State("live-autoencoder-version-dropdown", "value"),
     State("live-dimred-dropdown", "value"),
@@ -135,6 +138,7 @@ def update_model_dropdowns(dialog_open):
 )
 def handle_model_continue(
     continue_clicks,
+    experiment_name,  # NEW: ADD THIS LINE
     selected_autoencoder,
     selected_autoencoder_version,
     selected_dimred,
@@ -146,12 +150,18 @@ def handle_model_continue(
     if not continue_clicks:
         raise PreventUpdate
 
+    # NEW: ADD THIS VALIDATION BLOCK - START
+    if not experiment_name or not experiment_name.strip():
+        logger.warning("No experiment name provided")
+        raise PreventUpdate
+    # NEW: ADD THIS VALIDATION BLOCK - END
+
     # Check model compatibility before proceeding
     if not mlflow_client.check_model_compatibility(
         selected_autoencoder, selected_dimred
     ):
         logger.warning(
-            f"Incompatible models selected: {selected_autoencoder}, {selected_dimred}"
+            f"Incompatible models selected: {selected_autoencoder} and {selected_dimred}"
         )
         return no_update
 
@@ -166,6 +176,11 @@ def handle_model_continue(
 
         logger.info(f"Storing dimension reduction model from dialog: {dimred_id}")
         redis_model_store.store_dimred_model(dimred_id)
+        
+        # NEW: ADD THIS BLOCK - START
+        logger.info(f"Storing experiment name from dialog: {experiment_name.strip()}")
+        redis_model_store.store_experiment_name(experiment_name.strip())
+        # NEW: ADD THIS BLOCK - END
     except Exception as e:
         logger.error(f"Error storing models in Redis: {e}")
         return no_update
@@ -175,6 +190,7 @@ def handle_model_continue(
         "autoencoder_version": selected_autoencoder_version,
         "dimred": selected_dimred,
         "dimred_version": selected_dimred_version,
+        "experiment_name": experiment_name.strip(),  # NEW: ADD THIS LINE
     }
 
     # Get version options for sidebar
@@ -237,6 +253,8 @@ def handle_model_continue(
         spinner_style,  # Show loading spinner
         True,  # Set transition state
         {"display": "none"},  # Hide experiment replay controls
+        {"display": "block"},  # NEW: ADD THIS LINE - Show experiment name display
+        experiment_name.strip(),  # NEW: ADD THIS LINE - Set experiment name text
     )
 
 @callback(
@@ -265,17 +283,23 @@ def handle_model_cancel(cancel_clicks, go_live_clicks):
     Output("live-model-continue", "disabled"),
     Output("live-model-continue", "color", allow_duplicate=True),
     Output("live-model-continue", "children", allow_duplicate=True),
+    Input("live-experiment-name-input", "value"),  # NEW: ADD THIS LINE
     Input("live-autoencoder-dropdown", "value"),
     Input("live-dimred-dropdown", "value"),
     Input("live-autoencoder-version-dropdown", "value"),
     Input("live-dimred-version-dropdown", "value"),
     prevent_initial_call=True,
 )
-def toggle_continue_button(selected_autoencoder, selected_dimred, auto_version, dimred_version):
+def toggle_continue_button(experiment_name, selected_autoencoder, selected_dimred, auto_version, dimred_version):  # NEW: ADD experiment_name parameter
     """
     Disable the continue button if models or versions are not selected or are incompatible
     Also update the button color and text to indicate state
     """
+    # NEW: ADD THIS CHECK BLOCK - START
+    if not experiment_name or not experiment_name.strip():
+        return True, "secondary", "Continue"
+    # NEW: ADD THIS CHECK BLOCK - END
+    
     # Check if any required field is not selected
     if (selected_autoencoder is None or selected_dimred is None or 
         auto_version is None or dimred_version is None):
@@ -312,6 +336,8 @@ def toggle_continue_button(selected_autoencoder, selected_dimred, auto_version, 
     Output("live-mode-canceled", "data", allow_duplicate=True),
     Output("selected-live-models", "data", allow_duplicate=True),
     Output("experiment-replay-controls", "style", allow_duplicate=True),  # ADDED
+    Output("live-experiment-name-display", "style", allow_duplicate=True),  # NEW: ADD THIS LINE
+    Output("live-experiment-name-text", "children", allow_duplicate=True),  # NEW: ADD THIS LINE
     Input("go-live", "n_clicks"),
     State("selected-live-models", "data"),
     State("live-mode-canceled", "data"),
@@ -344,6 +370,8 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
             False,  # Reset the cancel flag
             None,  # selected-live-models data
             no_update,  # experiment-replay-controls style - ADDED
+            no_update,  # NEW: ADD THIS LINE - experiment-name-display style
+            no_update,  # NEW: ADD THIS LINE - experiment-name-text
         )
 
     # Check if continue was already clicked (selected_models is not None)
@@ -356,6 +384,10 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
 
                 # Reset dimension reduction model to empty string
                 redis_model_store.store_dimred_model("")
+
+                # NEW: ADD THIS BLOCK - START
+                redis_model_store.store_experiment_name("")
+                # NEW: ADD THIS BLOCK - END
 
                 logger.info("Published model reset messages to Redis")
             except Exception as e:
@@ -390,10 +422,14 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
             False,  # Reset canceled flag
             None,  # Reset selected_models to None
             {},  # Show experiment replay controls - ADDED
+            {"display": "none"},  # NEW: ADD THIS LINE - Hide experiment name display
+            "",  # NEW: ADD THIS LINE - Clear experiment name text
         )
 
     # First click or other odd clicks - going to live mode
     if n_clicks is not None and n_clicks % 2 == 1 and selected_models is not None:
+        experiment_name = selected_models.get("experiment_name", "")  # NEW: ADD THIS LINE
+        
         return (
             False,  # show-clusters value
             False,  # show-feature-vectors value
@@ -424,6 +460,8 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
             False,  # Reset canceled flag
             selected_models,  # Keep selected_models unchanged
             {"display": "none"},  # Hide experiment replay controls - ADDED
+            {"display": "block" if experiment_name else "none"},  # NEW: ADD THIS LINE - Show/hide experiment display
+            experiment_name,  # NEW: ADD THIS LINE - Set experiment name text
         )
 
     raise PreventUpdate
