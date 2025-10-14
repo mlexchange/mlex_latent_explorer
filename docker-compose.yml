@@ -241,53 +241,29 @@ services:
     networks:
       mle_net:
 
-  # Simulator 2: real image simulator service
-  sim_realistic:
+  # Simulator 2: Unified real image simulator
+  sim_unified:
     image: ghcr.io/als-computing/arroyosas:main
-    container_name: sim_realistic
-    command: python -m arroyosas.app.real_image_sim_cli
+    container_name: sim_unified
+    command: >
+      python -m arroyosas.app.unified_sim_cli
+      --mode ${SIM_MODE:-direct}
     profiles:
       - sim
     volumes:
-      - ./data/test_sim_data:/data/test_data:ro # Mount test data repository containing TIFF images
+      - ./data:/data:rw
     environment:
-      - TILED_LIVE_API_KEY=${LIVE_TILED_API_KEY}
-      - DATA_TILED_KEY=${LIVE_TILED_API_KEY}
-      - DYNACONF_TILED_POLLER__PUBLISH_ADDRESS=tcp://0.0.0.0:5000 # Make sure ZMQ publisher address is correctly set
-    networks:
-      mle_net:
-
-  # Simulator 3: replay the runs saved in local db during smi beamtime
-  sim_replay:
-    image: ghcr.io/als-computing/arroyosas:main
-    container_name: sim_replay
-    command: python -m arroyosas.app.db_replay_sim_cli
-    profiles:
-      - sim_replay
-    volumes:
-      - ./data/vector_db_replay:/data/vector_db_replay:ro # Mount directory containing the vector database
-    environment:
-      - TILED_ENV=${TILED_ENV}
-      - DB_PATH=/data/vector_db_replay/latent_vectors.db
-      - TILED_API_KEY=${LIVE_TILED_API_KEY}
-      - TILED_LIVE_API_KEY=${LIVE_TILED_API_KEY}
+      # SIM_MODE: use direct, db_replay or local_tiled
+      - SIM_MODE=${SIM_MODE:-direct} 
+      # API key
+      - TILED_LIVE_API_KEY=${LIVE_TILED_API_KEY} #TILED_LIVE_API_KEY is required by DynaconfFormat
+      # db_replay mode
+      - DB_PATH=${DB_PATH:-/data/vector_db_replay/latent_vectors.db}
+      - TILED_ENV=${TILED_ENV:-dev}
+      # local_tiled mode
+      - URL_FILE=${URL_FILE:-/data/tiled_url/Nafion_p25_30_run_1.json}
+      # ZMQ
       - DYNACONF_TILED_POLLER__PUBLISH_ADDRESS=tcp://0.0.0.0:5000
-    networks:
-      mle_net:
-
-  # Simulator 4: Read images from Tiled using a saved URL and send via ZMQ
-  sim_local_tiled:
-    image: ghcr.io/als-computing/arroyosas:main
-    container_name: sim_local_tiled
-    command: python -m arroyosas.app.local_tiled_sim_cli
-    profiles:
-      - sim_local_tiled
-    volumes:
-      - ./data:/data:rw  # Mount directory for the URL file
-    environment:
-      - URL_FILE=/data/tiled_url/Nafion_p25_30_run_1.json
-      - TILED_API_KEY=${TILED_SINGLE_USER_API_KEY}
-      - TILED_LIVE_API_KEY=${TILED_SINGLE_USER_API_KEY}
       - DYNACONF_TILED_POLLER__ZMQ_FRAME_PUBLISHER__ADDRESS=tcp://0.0.0.0:5000
     networks:
       mle_net:
