@@ -24,6 +24,7 @@ class TestModelCallbacks:
         """Test handling continue button with compatible models"""
         # Setup
         continue_clicks = 1
+        experiment_name = "test_experiment"  # ADD THIS LINE
         selected_auto = "compatible_auto"
         selected_dimred = "compatible_dimred"
         auto_version = "3"
@@ -48,6 +49,7 @@ class TestModelCallbacks:
             # Execute
             results = handle_model_continue(
                 continue_clicks,
+                experiment_name,  # ADD THIS LINE
                 selected_auto,
                 auto_version,
                 selected_dimred,
@@ -62,6 +64,7 @@ class TestModelCallbacks:
         
         mock_redis_store.store_autoencoder_model.assert_called_once_with(expected_auto)
         mock_redis_store.store_dimred_model.assert_called_once_with(expected_dimred)
+        mock_redis_store.store_experiment_name.assert_called_once_with(experiment_name)  # ADD THIS LINE
         
         # Verify dialog closed (first result should be False)
         assert results[0] is False
@@ -72,6 +75,7 @@ class TestModelCallbacks:
         assert selected_models["autoencoder_version"] == auto_version
         assert selected_models["dimred"] == selected_dimred
         assert selected_models["dimred_version"] == dimred_version
+        assert selected_models["experiment_name"] == experiment_name  # ADD THIS LINE
 
     def test_handle_model_continue_incompatible(
         self, mock_redis_store, mock_live_mode_mlflow_client
@@ -79,6 +83,7 @@ class TestModelCallbacks:
         """Test handling continue button with incompatible models"""
         # Setup
         continue_clicks = 1
+        experiment_name = "test_experiment"  # ADD THIS LINE
         selected_auto = "incompatible"
         selected_dimred = "compatible_dimred"
         auto_version = "1"
@@ -92,6 +97,7 @@ class TestModelCallbacks:
         # Execute
         result = handle_model_continue(
             continue_clicks,
+            experiment_name,  # ADD THIS LINE
             selected_auto,
             auto_version,
             selected_dimred,
@@ -103,6 +109,7 @@ class TestModelCallbacks:
         # Verify Redis calls were not made
         mock_redis_store.store_autoencoder_model.assert_not_called()
         mock_redis_store.store_dimred_model.assert_not_called()
+        mock_redis_store.store_experiment_name.assert_not_called()  # ADD THIS LINE
 
     def test_update_live_models(self, mock_redis_store, mock_live_mode_mlflow_client):
         """Test updating models from sidebar"""
