@@ -23,6 +23,9 @@ class LatentSpaceOperator(Operator):
         self.proxy_socket = proxy_socket
         self.reducer = reducer
         
+        # NEW: Track if flush was already sent
+        self._flush_sent = False
+        
         # Initialize RedisModelStore instead of direct Redis client
         try:
             self.redis_host = os.getenv("REDIS_HOST", "kvrocks")
@@ -58,8 +61,26 @@ class LatentSpaceOperator(Operator):
                 dimred_model = self.redis_model_store.get_dimred_model()
                 
                 if not autoencoder_model or not dimred_model:
+                    # NEW: Send flush only once when entering offline mode
+                    if not self._flush_sent:
+                        flush_event = LatentSpaceEvent(
+                            tiled_url="FLUSH_SIGNAL",
+                            feature_vector=[],
+                            index=-1,
+                            autoencoder_model="",
+                            dimred_model="",
+                            experiment_name="",
+                            timestamp=time.time()
+                        )
+                        await self.publish(flush_event)
+                        self._flush_sent = True
+                        logger.info("Sent flush signal when entering offline mode")
+                    
                     logger.info(f"In offline mode - skipping frame {message.frame_number}")
                     return None
+                else:
+                    # NEW: Reset flush flag when back in live mode
+                    self._flush_sent = False
             else:
                 # Model store couldn't be initialized, log a warning but continue processing
                 logger.debug("Redis Model Store not available, proceeding with processing")

@@ -165,6 +165,21 @@ class TiledResultsPublisher(Publisher):
     
     async def publish(self, message):
         """Publish a message to Tiled server."""
+        
+        # ============= NEW: ADD THESE 11 LINES =============
+        # Check for flush signal
+        if isinstance(message, LatentSpaceEvent):
+            if message.tiled_url == "FLUSH_SIGNAL":
+                logger.info("Received flush signal - writing pending data")
+                if (self.current_uuid and 
+                    self.current_uuid in self.uuid_dataframes and 
+                    not self.uuid_dataframes[self.current_uuid].empty):
+                    await self.write_table_to_tiled(self.current_uuid)
+                    logger.info(f"Flushed data for UUID {self.current_uuid}")
+                    self.current_uuid = None
+                return
+        # ============= END OF NEW LINES =============
+        
         if isinstance(message, SASStop):
             logger.info("Received Stop message, writing any remaining data to Tiled")
             await self.stop()
