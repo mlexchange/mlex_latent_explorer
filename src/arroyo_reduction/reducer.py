@@ -247,6 +247,14 @@ class LatentSpaceReducer(Reducer):
     def _handle_model_update(self, update):
         """Handle a model update from Redis PubSub with version support"""
         try:
+            # NEW: Check if this is an experiment name update
+            if update.get("update_type") == "experiment_name":
+                new_experiment_name = update.get("experiment_name")
+                logger.info(f"Received experiment name update: {new_experiment_name}")
+                self.experiment_name = new_experiment_name
+                return
+            
+            # Otherwise handle model updates as before
             model_type = update.get("model_type")
             model_id = update.get("model_name")
             

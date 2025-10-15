@@ -67,6 +67,10 @@ class RedisModelStore:
         try:
             logger.info(f"Storing experiment name: {experiment_name}")
             self.redis_client.set(self.KEY_EXPERIMENT_NAME, experiment_name)
+            
+            # NEW: Add this line to publish the experiment name update
+            self.publish_experiment_update(experiment_name)
+            
             return True
         except Exception as e:
             logger.error(f"Error storing experiment name in Redis: {e}")
@@ -90,6 +94,39 @@ class RedisModelStore:
         except Exception as e:
             logger.error(f"Error retrieving experiment name from Redis: {e}")
             return None
+    
+    # NEW: Add this new method
+    def publish_experiment_update(self, experiment_name: str) -> bool:
+        """
+        Publish an experiment name update notification to Redis
+        
+        Args:
+            experiment_name: Name of the experiment
+            
+        Returns:
+            bool: Success status
+        """
+        if self.redis_client is None:
+            logger.warning("Redis client not available for publishing experiment update")
+            return False
+        
+        try:
+            # Create message payload for experiment name
+            message = {
+                "update_type": "experiment_name",  # Different from model updates
+                "experiment_name": experiment_name,
+                "timestamp": time.time()
+            }
+            
+            # Publish to Redis channel
+            message_json = json.dumps(message)
+            result = self.redis_client.publish(self.CHANNEL_MODEL_UPDATES, message_json)
+            logger.info(f"Published experiment name update: {experiment_name}, received by {result} subscribers")
+            return True
+        except Exception as e:
+            logger.error(f"Error publishing experiment name update to Redis: {e}")
+            return False
+    
     # =====================================================================
     # Key-Value Store Methods for Model Selection Storage
     # =====================================================================
