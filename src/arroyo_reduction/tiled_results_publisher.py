@@ -19,7 +19,8 @@ logger = logging.getLogger("arroyo_reduction.tiled_results_publisher")
 # Environment variables for Tiled connections
 RESULTS_TILED_URI = os.getenv("RESULTS_TILED_URI", "http://tiled:8000")
 RESULTS_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
-
+# Get USER from environment
+USER = os.getenv("USER", "default_user")
 # Constants
 # Timezone for log timestamps
 CALIFORNIA_TZ = pytz.timezone('US/Pacific')
@@ -36,8 +37,10 @@ class TiledResultsPublisher(Publisher):
         self.tiled_uri = tiled_uri or RESULTS_TILED_URI
         self.tiled_api_key = tiled_api_key or RESULTS_TILED_API_KEY
         self.root_segments = root_segments or ["lse_live_results"]
+        self.user = USER  # Get user from environment
         self.client = None
         self.root_container = None
+        self.user_container = None  # Add user container
         self.daily_container = None
         
         # Dictionary to store DataFrames by UUID
@@ -49,10 +52,10 @@ class TiledResultsPublisher(Publisher):
         # Keep track of the current UUID
         self.current_uuid = None
         
-        # NEW: Track current experiment name (will be set from message)
+        # Track current experiment name (will be set from message)
         self.current_experiment_name = "default_experiment"
         
-        logger.info(f"Initialized publisher with UUID-based table grouping")
+        logger.info(f"Initialized publisher with UUID-based table grouping for user: {self.user}")
 
     async def start(self):
         """Connect to Tiled server and initialize containers."""
@@ -69,7 +72,7 @@ class TiledResultsPublisher(Publisher):
         try:
             self.client = from_uri(self.tiled_uri, api_key=self.tiled_api_key)
             
-            # Navigate to the root container and create the daily run container inside it
+            # Navigate to the root container and create the hierarchy
             self._setup_containers_sync()
             
             # List all existing tables in the daily container
@@ -87,12 +90,12 @@ class TiledResultsPublisher(Publisher):
                     logger.info(f"Examples of existing UUIDs: {', '.join(examples)}")
                     
             logger.info(f"Connected to Tiled server at {self.tiled_uri}")
-            logger.info(f"Using container path: {'/'.join(self.root_segments)}/{DAILY_RUN_ID}")
+            logger.info(f"Using container path: {'/'.join(self.root_segments)}/{self.user}/{DAILY_RUN_ID}")
         except Exception as e:
             logger.error(f"Error in _start_sync: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            raise  # Re-raise so the async method can catch it
+            raise
     
     def _extract_uuid_from_url(self, url):
         """Extract UUID from tiled_url."""
@@ -112,7 +115,7 @@ class TiledResultsPublisher(Publisher):
         return self.default_table_name
     
     def _setup_containers_sync(self):
-        """Set up the container structure (synchronous version)."""
+        """Set up the container structure with USER level (synchronous version)."""
         try:
             # Navigate through root_segments
             container = self.client
@@ -127,23 +130,30 @@ class TiledResultsPublisher(Publisher):
             # Store reference to the root container
             self.root_container = container
             
-            # Now create the daily run container inside the root container
-            if DAILY_RUN_ID not in self.root_container:
+            # Create or navigate to USER container
+            if self.user in self.root_container:
+                logger.info(f"Using existing user container: {self.user}")
+                self.user_container = self.root_container[self.user]
+            else:
+                logger.info(f"Creating user container: {self.user}")
+                self.user_container = self.root_container.create_container(self.user)
+            
+            # Now create the daily run container inside the user container
+            if DAILY_RUN_ID not in self.user_container:
                 logger.info(f"Creating daily container: {DAILY_RUN_ID}")
-                self.root_container.create_container(DAILY_RUN_ID)
+                self.user_container.create_container(DAILY_RUN_ID)
             else:
                 logger.info(f"Using existing daily container: {DAILY_RUN_ID}")
             
             # Store reference to daily container
-            self.daily_container = self.root_container[DAILY_RUN_ID]
+            self.daily_container = self.user_container[DAILY_RUN_ID]
             
         except Exception as e:
             logger.error(f"Error setting up containers: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            raise  # Re-raise to propagate the error
+            raise
     
-    # NEW: Method to get or create experiment container
     def _get_experiment_container(self, experiment_name=None):
         """Get or create the experiment container based on experiment name"""
         try:
@@ -166,7 +176,6 @@ class TiledResultsPublisher(Publisher):
     async def publish(self, message):
         """Publish a message to Tiled server."""
         
-        # ============= NEW: ADD THESE 11 LINES =============
         # Check for flush signal
         if isinstance(message, LatentSpaceEvent):
             if message.tiled_url == "FLUSH_SIGNAL":
@@ -178,7 +187,6 @@ class TiledResultsPublisher(Publisher):
                     logger.info(f"Flushed data for UUID {self.current_uuid}")
                     self.current_uuid = None
                 return
-        # ============= END OF NEW LINES =============
         
         if isinstance(message, SASStop):
             logger.info("Received Stop message, writing any remaining data to Tiled")
@@ -216,15 +224,15 @@ class TiledResultsPublisher(Publisher):
                 tiled_url = getattr(message, "tiled_url", None)
                 uuid = self._extract_uuid_from_url(tiled_url)
                 
-                # NEW: Get experiment name from message
+                # Get experiment name from message
                 experiment_name = getattr(message, "experiment_name", None)
                 if experiment_name:
                     self.current_experiment_name = experiment_name
                 
-                # NEW: Get experiment container
+                # Get experiment container
                 experiment_container = self._get_experiment_container(experiment_name)
                 
-                # Check if this UUID already exists (CHANGED: check in experiment_container)
+                # Check if this UUID already exists
                 if uuid in experiment_container:
                     logger.debug(f"Skipping vector for existing UUID: {uuid}")
                     return None
@@ -289,10 +297,10 @@ class TiledResultsPublisher(Publisher):
     def _write_table_to_tiled_sync(self, table_key):
         """Synchronous implementation of write_table_to_tiled to be run in a thread."""
         try:
-            # NEW: Get experiment container instead of using daily_container
+            # Get experiment container instead of using daily_container
             experiment_container = self._get_experiment_container(self.current_experiment_name)
             
-            # Check if this UUID already exists (CHANGED: check in experiment_container)
+            # Check if this UUID already exists
             if table_key in experiment_container:
                 logger.info(f"Skipping write for existing UUID: {table_key}")
                 return
@@ -304,7 +312,7 @@ class TiledResultsPublisher(Publisher):
                 return
                 
             # Log DataFrame info for debugging
-            logger.info(f"Writing {len(df)} vectors to new table '{table_key}'")
+            logger.info(f"Writing {len(df)} vectors to new table '{table_key}' in {self.user}/{DAILY_RUN_ID}/{self.current_experiment_name}")
             
             # Check if DataFrame is empty
             if df.empty:
@@ -313,7 +321,7 @@ class TiledResultsPublisher(Publisher):
             
             # Simply write the DataFrame to Tiled
             try:
-                # Use write_dataframe with the UUID as the key (CHANGED: write to experiment_container)
+                # Use write_dataframe with the UUID as the key
                 experiment_container.write_dataframe(df, key=table_key)
                 
                 logger.info(f"Successfully wrote {len(df)} vectors to '{table_key}'")
@@ -360,10 +368,10 @@ class TiledResultsPublisher(Publisher):
         try:
             logger.info("Publisher stopping, checking if current UUID needs writing")
             
-            # NEW: Get experiment container to check existing UUIDs
+            # Get experiment container to check existing UUIDs
             experiment_container = self._get_experiment_container(self.current_experiment_name)
             
-            # Check if the current UUID needs writing (CHANGED: check in experiment_container)
+            # Check if the current UUID needs writing
             if (self.current_uuid is not None and 
                 self.current_uuid not in experiment_container and
                 self.current_uuid in self.uuid_dataframes and 

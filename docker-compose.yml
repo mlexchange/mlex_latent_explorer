@@ -220,6 +220,8 @@ services:
       # Tiled Publisher
       RESULTS_TILED_URI: '${RESULTS_TILED_URI}'
       RESULTS_TILED_API_KEY: '${RESULTS_TILED_API_KEY}'
+      # User info
+      USER: ${USER}
     depends_on:
       - latent-space-explorer
     networks:

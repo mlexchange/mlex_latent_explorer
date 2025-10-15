@@ -89,31 +89,43 @@ def hash_list_of_strings(strings_list):
     return humanize(digest)
 
 
+# ============= UPDATED/NEW FUNCTIONS FOR USER HIERARCHY =============
+
 def get_daily_containers():
     """
-    Retrieve all available daily containers from Tiled
+    Retrieve all available daily containers for the current user from Tiled
     
     Returns:
         list: List of dictionaries with {label: container_name, value: container_name}
     """
     try:
+        # Get username from environment
+        username = os.getenv("USER", "default_user")
+        
         # Check if tiled_results client is available
         if not tiled_results.check_dataloader_ready():
             logger.warning("Tiled results client not available")
             return []
         
-        # Get the daily run container
+        # Get the root container
         container = tiled_results.data_client
         
-        # Navigate to the lse_live_results path
+        # Navigate to the lse_live_results/username path
         if "lse_live_results" in container:
             container = container["lse_live_results"]
             
+            # Check if user container exists
+            if username not in container:
+                logger.warning(f"User {username} not found in lse_live_results")
+                return []
+            
+            user_container = container[username]
+            
             # Find all daily run containers and sort in reverse chronological order
-            daily_runs = sorted([k for k in container.keys() if k.startswith("daily_run_")], reverse=True)
+            daily_runs = sorted([k for k in user_container.keys() if k.startswith("daily_run_")], reverse=True)
             
             if not daily_runs:
-                logger.warning("No daily run containers found")
+                logger.warning(f"No daily run containers found for user {username}")
                 return []
                 
             # Format as dropdown options with human-readable labels
@@ -127,6 +139,7 @@ def get_daily_containers():
         logger.error(f"Error retrieving daily containers: {e}")
         return []
 
+
 def format_container_name(container_name):
     """Format a container name for display in the dropdown"""
     if container_name.startswith("daily_run_"):
@@ -135,10 +148,10 @@ def format_container_name(container_name):
         return f"Daily Run {date_str}"
     return container_name
 
-# These functions support the new 3-level hierarchy: daily_container/experiment_name/uuid
+
 def get_experiment_names_in_container(container_name):
     """
-    Retrieve all available experiment names from a specific daily container
+    Retrieve all available experiment names from a specific daily container for the current user
     
     Args:
         container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20")
@@ -147,45 +160,54 @@ def get_experiment_names_in_container(container_name):
         list: List of dictionaries with {label: experiment_name, value: experiment_name}
     """
     try:
+        # Get username from environment
+        username = os.getenv("USER", "default_user")
+        
         # Check if tiled_results client is available
         if not tiled_results.check_dataloader_ready():
             logger.warning("Tiled results client not available")
             return []
         
-        # Get the daily run container
+        # Get the root container
         container = tiled_results.data_client
         
-        # Navigate to the lse_live_results/container_name path
+        # Navigate to the lse_live_results/username/container_name path
         if "lse_live_results" not in container:
             logger.warning("lse_live_results container not found")
             return []
             
         container = container["lse_live_results"]
         
-        if container_name not in container:
-            logger.warning(f"Container {container_name} not found")
+        if username not in container:
+            logger.warning(f"User {username} not found")
+            return []
+        
+        user_container = container[username]
+        
+        if container_name not in user_container:
+            logger.warning(f"Container {container_name} not found for user {username}")
             return []
             
-        daily_container = container[container_name]
+        daily_container = user_container[container_name]
         
         # Get all experiment names (containers) in this daily container
         experiment_names = [key for key in daily_container.keys()]
         
         if not experiment_names:
-            logger.warning(f"No experiment names found in container {container_name}")
+            logger.warning(f"No experiment names found in {username}/{container_name}")
             return []
         
         # Format as dropdown options
         return [{"label": name, "value": name} for name in experiment_names]
             
     except Exception as e:
-        logger.error(f"Error retrieving experiment names from container {container_name}: {e}")
+        logger.error(f"Error retrieving experiment names from {container_name}: {e}")
         return []
 
 
 def get_uuids_in_experiment(container_name, experiment_name):
     """
-    Retrieve all available experiment UUIDs from a specific experiment
+    Retrieve all available experiment UUIDs from a specific experiment for the current user
     
     Args:
         container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20")
@@ -195,29 +217,38 @@ def get_uuids_in_experiment(container_name, experiment_name):
         list: List of dictionaries with {label: uuid, value: uuid}
     """
     try:
+        # Get username from environment
+        username = os.getenv("USER", "default_user")
+        
         # Check if tiled_results client is available
         if not tiled_results.check_dataloader_ready():
             logger.warning("Tiled results client not available")
             return []
         
-        # Get the daily run container
+        # Get the root container
         container = tiled_results.data_client
         
-        # Navigate to the lse_live_results/container_name/experiment_name path
+        # Navigate to the lse_live_results/username/container_name/experiment_name path
         if "lse_live_results" not in container:
             logger.warning("lse_live_results container not found")
             return []
             
         container = container["lse_live_results"]
         
-        if container_name not in container:
-            logger.warning(f"Container {container_name} not found")
+        if username not in container:
+            logger.warning(f"User {username} not found")
+            return []
+        
+        user_container = container[username]
+        
+        if container_name not in user_container:
+            logger.warning(f"Container {container_name} not found for user {username}")
             return []
             
-        daily_container = container[container_name]
+        daily_container = user_container[container_name]
         
         if experiment_name not in daily_container:
-            logger.warning(f"Experiment {experiment_name} not found in {container_name}")
+            logger.warning(f"Experiment {experiment_name} not found in {username}/{container_name}")
             return []
         
         experiment_container = daily_container[experiment_name]
@@ -226,7 +257,7 @@ def get_uuids_in_experiment(container_name, experiment_name):
         uuids = list(experiment_container.keys())
         
         if not uuids:
-            logger.warning(f"No UUIDs found in {container_name}/{experiment_name}")
+            logger.warning(f"No UUIDs found in {username}/{container_name}/{experiment_name}")
             return []
         
         # Format as dropdown options
@@ -235,3 +266,71 @@ def get_uuids_in_experiment(container_name, experiment_name):
     except Exception as e:
         logger.error(f"Error retrieving UUIDs from {container_name}/{experiment_name}: {e}")
         return []
+
+
+def get_experiment_dataframe(container_name, experiment_name, uuid):
+    """
+    Retrieve the DataFrame for a specific UUID from an experiment
+    
+    Args:
+        container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20")
+        experiment_name (str): The name of the experiment
+        uuid (str): The UUID of the specific table to retrieve
+        
+    Returns:
+        pandas.DataFrame or None: The DataFrame containing the experiment data, or None if not found
+    """
+    try:
+        # Get username from environment
+        username = os.getenv("USER", "default_user")
+        
+        # Check if tiled_results client is available
+        if not tiled_results.check_dataloader_ready():
+            logger.warning("Tiled results client not available")
+            return None
+        
+        # Get the root container
+        container = tiled_results.data_client
+        
+        # Navigate to the lse_live_results/username/container_name/experiment_name path
+        if "lse_live_results" not in container:
+            logger.warning("lse_live_results container not found")
+            return None
+            
+        container = container["lse_live_results"]
+        
+        if username not in container:
+            logger.warning(f"User {username} not found")
+            return None
+        
+        user_container = container[username]
+        
+        if container_name not in user_container:
+            logger.warning(f"Container {container_name} not found for user {username}")
+            return None
+            
+        daily_container = user_container[container_name]
+        
+        if experiment_name not in daily_container:
+            logger.warning(f"Experiment {experiment_name} not found in {username}/{container_name}")
+            return None
+        
+        experiment_container = daily_container[experiment_name]
+        
+        if uuid not in experiment_container:
+            logger.warning(f"UUID {uuid} not found in {username}/{container_name}/{experiment_name}")
+            return None
+        
+        # Get and return the DataFrame
+        df = experiment_container[uuid].read()
+        
+        if df is not None and not df.empty:
+            logger.info(f"Successfully loaded DataFrame with shape {df.shape} from {username}/{container_name}/{experiment_name}/{uuid}")
+        else:
+            logger.warning(f"DataFrame is empty for {username}/{container_name}/{experiment_name}/{uuid}")
+            
+        return df
+        
+    except Exception as e:
+        logger.error(f"Error retrieving DataFrame from {container_name}/{experiment_name}/{uuid}: {e}")
+        return None
