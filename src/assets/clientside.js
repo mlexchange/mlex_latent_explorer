@@ -91,7 +91,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                         let dimred_model = data.dimred_model;
                         log.debug("Message models - Autoencoder:", autoencoder_model, "Dimred:", dimred_model);
 
-                        // MODIFIED SECTION START - Compare full "name:version" identifiers
+                        // Compare full "name:version" identifiers
                         if (selected_models !== null && selected_models !== undefined) {
                             // Construct full identifiers from selected_models
                             let current_autoencoder_id = selected_models.autoencoder;
@@ -130,7 +130,6 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                             };
                             transition_state = false;
                         }
-                        // MODIFIED SECTION END
 
                         // Process the data
                         let new_entry = {};
