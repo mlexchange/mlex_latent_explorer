@@ -16,7 +16,10 @@ description = "Latent Space Explorer"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.11"
 
-dependencies = [
+dependencies = []
+
+[project.optional-dependencies]
+lse = [
     "dash==2.9.3",
     "dash-core-components==2.0.0",
     "dash-bootstrap-components>=1.1.0",
@@ -45,7 +48,6 @@ dependencies = [
     "mlflow==2.22.0"
 ]
 
-[project.optional-dependencies]
 dev = [
     "black==24.2.0",
     "flake8==7.0.0",

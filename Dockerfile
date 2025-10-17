@@ -4,7 +4,7 @@ WORKDIR /app/work
 
 COPY . /app/work
 RUN pip install --upgrade pip
-RUN pip install .
+RUN pip install .[lse]
 
 ENV HOME /app/work
 
