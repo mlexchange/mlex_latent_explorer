@@ -60,9 +60,6 @@ else:
     print(f"⚠️ Invalid DIMRED_TYPE: {DIMRED_TYPE}. Must be 'joblib' or 'neural'.")
     sys.exit(1)
 
-# ✅ ADDED: Get transformation flag from config
-DIMRED_TRANSFORMATION = config.get("common", {}).get("dimred_transformation", False)
-
 # Get save settings
 SAVE_AUTOENCODER = config.get("save", {}).get("autoencoder", "true").lower() == "true"
 SAVE_DR = config.get("save", {}).get("dr", "true").lower() == "true"
@@ -100,35 +97,24 @@ else:
     print(f"❌ Error: No configuration found for {model_config_key} in the YAML file.")
     sys.exit(1)
 
-# ✅ MODIFIED: Load dimensionality reduction configuration based on type and transformation
+# Load dimensionality reduction configuration based on type
 if DIMRED_TYPE == "joblib":
-    # For traditional dimred, use the DR weights path from the autoencoder config
-    if DIMRED_TRANSFORMATION:
-        DR_WEIGHTS_PATH = model_config.get("dr_weights_path_transformed", model_config.get("dr_weights_path"))
-    else:
-        DR_WEIGHTS_PATH = model_config.get("dr_weights_path")
+    DR_WEIGHTS_PATH = model_config.get("dr_weights_path")
     
     DR_CONFIG = {
         "name": "SMI_DimRed", 
         "file": DR_WEIGHTS_PATH, 
         "type": "joblib", 
-        "input_dim": LATENT_DIM,
-        "use_transformation": DIMRED_TRANSFORMATION  # ✅ ADDED
+        "input_dim": LATENT_DIM
     }
 elif DIMRED_TYPE == "neural":
-    # For neural dimred, use the specific neural fields from model config
-    if DIMRED_TRANSFORMATION:
-        DR_WEIGHTS_PATH = model_config.get("dr_neural_weights_path_transformed", 
-                                          model_config.get("dr_neural_weights_path"))
-    else:
-        DR_WEIGHTS_PATH = model_config.get("dr_neural_weights_path")
+    DR_WEIGHTS_PATH = model_config.get("dr_neural_weights_path")
     
     DR_CONFIG = {
         "name": "SMI_DimRed",
         "weights_path": DR_WEIGHTS_PATH,
         "scaler_path": model_config.get("dr_neural_scaler_path"),
-        "input_dim": LATENT_DIM,
-        "use_transformation": DIMRED_TRANSFORMATION  # ✅ ADDED
+        "input_dim": LATENT_DIM
     }
 
 # Configure autoencoder model with a single configuration structure for both types
@@ -149,7 +135,6 @@ print("MLFLOW_TRACKING_USERNAME:", MLFLOW_TRACKING_USERNAME)
 print("DATASET:", DATASET)
 print("AUTOENCODER_TYPE:", AUTOENCODER_TYPE)
 print("DIMRED_TYPE:", DIMRED_TYPE)
-print("DIMRED_TRANSFORMATION:", DIMRED_TRANSFORMATION)  # ✅ ADDED
 print("SAVE_AUTOENCODER:", SAVE_AUTOENCODER)
 print("SAVE_DR:", SAVE_DR)
 print("MLFLOW_EXPERIMENT_NAME:", MLFLOW_EXPERIMENT_NAME)
@@ -182,8 +167,7 @@ if __name__ == "__main__":
         if SAVE_AUTOENCODER:
             print(f"  {AUTOENCODER_TYPE} model: {MLFLOW_AUTO_MODEL_NAME}")
         if SAVE_DR:
-            transformation_label = "[square+robust_scale]" if DIMRED_TRANSFORMATION else "[no_transformation]"  # ✅ ADDED
-            print(f"  {DIMRED_TYPE.capitalize()} dimensionality reduction model {transformation_label}: {MLFLOW_DR_MODEL_NAME}")  # ✅ MODIFIED
+            print(f"  {DIMRED_TYPE.capitalize()} dimensionality reduction model: {MLFLOW_DR_MODEL_NAME}")
         
         if not (SAVE_AUTOENCODER or SAVE_DR):
             print("  No models selected for saving. Check the 'save' section in mlflow_config.yaml.")
@@ -233,16 +217,15 @@ if __name__ == "__main__":
 
         # Report results
         print("\n---------- SUMMARY ----------")
-        transformation_label = "[square+robust_scale]" if DIMRED_TRANSFORMATION else "[no_transformation]"  # ✅ ADDED
         
         if SAVE_AUTOENCODER and SAVE_DR:
             if auto_success and dr_success:
                 print(f"\n✅ Both models saved successfully!")
             elif auto_success:
                 print(f"\n✅ {AUTOENCODER_TYPE} model saved successfully!")
-                print(f"❌ {DIMRED_TYPE.capitalize()} dimensionality reduction model {transformation_label} failed to save.")  # ✅ MODIFIED
+                print(f"❌ {DIMRED_TYPE.capitalize()} dimensionality reduction model failed to save.")
             elif dr_success:
-                print(f"\n✅ {DIMRED_TYPE.capitalize()} dimensionality reduction model {transformation_label} saved successfully!")  # ✅ MODIFIED
+                print(f"\n✅ {DIMRED_TYPE.capitalize()} dimensionality reduction model saved successfully!")
                 print(f"❌ {AUTOENCODER_TYPE} model failed to save.")
             else:
                 print(f"\n❌ Failed to save both models.")
@@ -253,9 +236,9 @@ if __name__ == "__main__":
                 print(f"\n❌ {AUTOENCODER_TYPE} model failed to save.")
         elif SAVE_DR:
             if dr_success:
-                print(f"\n✅ {DIMRED_TYPE.capitalize()} dimensionality reduction model {transformation_label} saved successfully!")  # ✅ MODIFIED
+                print(f"\n✅ {DIMRED_TYPE.capitalize()} dimensionality reduction model saved successfully!")
             else:
-                print(f"\n❌ {DIMRED_TYPE.capitalize()} dimensionality reduction model {transformation_label} failed to save.")  # ✅ MODIFIED
+                print(f"\n❌ {DIMRED_TYPE.capitalize()} dimensionality reduction model failed to save.")
 
     except Exception as e:
         print(f"\nError: {e}")

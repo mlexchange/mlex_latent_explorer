@@ -11,7 +11,6 @@ from datetime import datetime
 import joblib
 import mlflow
 import numpy as np
-from sklearn.preprocessing import RobustScaler  # ✅ ADDED
 
 
 def get_file_size_mb(filepath):
@@ -24,9 +23,8 @@ def get_file_size_mb(filepath):
 class DimRedModelWrapper(mlflow.pyfunc.PythonModel):
     """Wrapper for dimensionality reduction model with direct model access"""
 
-    def __init__(self, use_transformation=False):  # ✅ ADDED use_transformation
+    def __init__(self):
         self.model = None
-        self.use_transformation = use_transformation  # ✅ ADDED
 
     def load_context(self, context):
         """Load dimensionality reduction model from context artifacts"""
@@ -38,19 +36,6 @@ class DimRedModelWrapper(mlflow.pyfunc.PythonModel):
         print(f"Loading dimensionality reduction model from {model_path}")
         self.model = joblib.load(model_path)
         print("✅ Dimensionality reduction model loaded successfully")
-        print(f"Transformation enabled: {self.use_transformation}")  # ✅ ADDED
-
-    # ✅ ADDED METHOD
-    def _apply_transformation(self, features):
-        """Apply square + robust_scale transformation"""
-        # Step 1: Square transformation
-        transformed = np.sign(features) * (features ** 2)
-        
-        # Step 2: Robust scale
-        scaler = RobustScaler()
-        transformed = scaler.fit_transform(transformed)
-        
-        return transformed
 
     def predict(self, context, model_input):
         """
@@ -75,10 +60,6 @@ class DimRedModelWrapper(mlflow.pyfunc.PythonModel):
             raise ValueError(
                 f"Input must be a 2D array with shape (1, latent_dim), got shape {model_input.shape}"
             )
-
-        # ✅ ADDED: Apply feature transformation if enabled
-        if self.use_transformation:
-            model_input = self._apply_transformation(model_input)
 
         # Apply transformation
         coords = self.model.transform(model_input)
@@ -133,11 +114,8 @@ def save_dimred_model_with_wrapper(
         print(f"\nFile size: {joblib_size:.1f} MB")
 
         try:
-            use_transformation = model_config.get("use_transformation", False)  # ✅ ADDED
-            print(f"Transformation enabled: {use_transformation}")  # ✅ ADDED
-            
             # Create model wrapper
-            dimred_wrapper = DimRedModelWrapper(use_transformation=use_transformation)  # ✅ MODIFIED
+            dimred_wrapper = DimRedModelWrapper()
 
             # Log parameters
             mlflow.log_params(
@@ -146,8 +124,7 @@ def save_dimred_model_with_wrapper(
                     "model_type": model_config["type"],
                     "joblib_size_mb": joblib_size,
                     "using_wrapper": True,
-                    "input_dim": model_config["input_dim"],
-                    "use_transformation": use_transformation  # ✅ ADDED
+                    "input_dim": model_config["input_dim"]
                 }
             )
 

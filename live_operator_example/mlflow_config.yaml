@@ -1,9 +1,8 @@
 # Common settings
 common:
-  dataset: "trs"  # "smi" or "trs" - determines which dataset config to use
+  dataset: "smi"  # "smi" or "trs" - determines which dataset config to use
   autoencoder_type: "VAE"  # use VIT or VAE
   dimred_type: "joblib" #use joblib or neural
-  dimred_transformation: false  # ADDED: true for [square, robust_scale], false for no_transformation
 
 # Model configurations organized by dataset
 models:
@@ -40,13 +39,9 @@ models:
     dr_neural_model_name: "trs_dr_neural_pca_vae"
     weights_path: "../models/trs_vae/vae_model_128_weights.npz"
     code_path: "../models/vae/vae.py"
-    # Paths for no_transformation models
-    dr_weights_path: "../models/trs_vae/pca_model_no_transformation.joblib"
-    dr_neural_weights_path: "../models/trs_vae/neural_pca_model_no_transformation.pth"
+    dr_weights_path: "../models/trs_vae/pca_model.joblib"
+    dr_neural_weights_path: "../models/trs_vae/neural_pca_model.pth"
     dr_neural_scaler_path: "../models/trs_vae/scaler.pkl"
-    # ✅ ADDED: Paths for transformed models (when dimred_transformation: true)
-    dr_weights_path_transformed: "../models/trs_vae/pca_model_square_robust_scale.joblib"
-    dr_neural_weights_path_transformed: "../models/trs_vae/neural_pca_model_square_robust_scale.pth"
     latent_dim: 256
     image_size: [128, 128]
 

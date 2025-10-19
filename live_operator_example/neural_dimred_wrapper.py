@@ -13,7 +13,6 @@ import joblib
 import mlflow
 import numpy as np
 import torch
-from sklearn.preprocessing import RobustScaler  # ✅ ADDED
 
 
 def get_file_size_mb(filepath):
@@ -41,16 +40,15 @@ class SimpleDimRedApproximator(torch.nn.Module):
 
 class NeuralDimRedWrapper(mlflow.pyfunc.PythonModel):
     """
-    Wrapper for PyTorch-based dimensionality reduction approximator with scaler preprocessing
+    Wrapper for PyTorch-based dimensionality reduction approximator with StandardScaler preprocessing
     """
 
-    def __init__(self, input_dim=512, hidden_dims=[128, 64], output_dim=2, use_transformation=False):  # ✅ ADDED use_transformation
+    def __init__(self, input_dim=512, hidden_dims=[128, 64], output_dim=2):
         self.model = None
         self.scaler = None
         self.input_dim = input_dim
         self.hidden_dims = hidden_dims
         self.output_dim = output_dim
-        self.use_transformation = use_transformation  # ✅ ADDED
 
     def load_context(self, context):
         """Load neural dimensionality reduction model and scaler from context artifacts"""
@@ -71,7 +69,6 @@ class NeuralDimRedWrapper(mlflow.pyfunc.PythonModel):
 
         # Initialize model
         print(f"Initializing Neural DimRed with input_dim={self.input_dim}, output_dim={self.output_dim}")
-        print(f"Transformation enabled: {self.use_transformation}")  # ✅ ADDED
         self.model = SimpleDimRedApproximator(
             input_dim=self.input_dim,
             hidden_dims=self.hidden_dims,
@@ -95,7 +92,7 @@ class NeuralDimRedWrapper(mlflow.pyfunc.PythonModel):
                 if isinstance(state_dict, dict) and "network.0.weight" in state_dict:
                     # Direct state dict
                     self.model.load_state_dict(state_dict)
-                elif isinstance(state_dict, dict) and 'model_state_dict' in state_dict:  # ✅ ADDED
+                elif isinstance(state_dict, dict) and 'model_state_dict' in state_dict:
                     # Checkpoint format
                     self.model.load_state_dict(state_dict['model_state_dict'])
                 elif hasattr(state_dict, 'state_dict'):
@@ -115,18 +112,6 @@ class NeuralDimRedWrapper(mlflow.pyfunc.PythonModel):
         # Set model to eval mode and move to device
         self.model.eval()
         self.model = self.model.to(self.device)
-
-    # ✅ ADDED METHOD
-    def _apply_transformation(self, features):
-        """Apply square + robust_scale transformation"""
-        # Step 1: Square transformation
-        transformed = np.sign(features) * (features ** 2)
-        
-        # Step 2: Robust scale
-        scaler = RobustScaler()
-        transformed = scaler.fit_transform(transformed)
-        
-        return transformed
 
     def predict(self, context, model_input):
         """
@@ -157,11 +142,7 @@ class NeuralDimRedWrapper(mlflow.pyfunc.PythonModel):
                 f"Input dimension mismatch: expected {self.input_dim}, got {model_input.shape[1]}"
             )
 
-        # ✅ ADDED: Apply feature transformation if enabled
-        if self.use_transformation:
-            model_input = self._apply_transformation(model_input)
-
-        # Apply scaler if available
+        # Apply StandardScaler if available
         if self.scaler is not None:
             try:
                 model_input = self.scaler.transform(model_input)
@@ -242,15 +223,9 @@ def save_neural_dimred_model_with_wrapper(
         try:
             # Get model parameters
             input_dim = model_config.get("input_dim", 512)
-            use_transformation = model_config.get("use_transformation", False)  # ✅ ADDED
-            
-            print(f"Transformation enabled: {use_transformation}")  # ✅ ADDED
             
             # Create model wrapper with default hidden_dims and output_dim
-            neural_dimred_wrapper = NeuralDimRedWrapper(
-                input_dim=input_dim,
-                use_transformation=use_transformation  # ✅ ADDED
-            )
+            neural_dimred_wrapper = NeuralDimRedWrapper(input_dim=input_dim)
 
             # Log parameters
             params = {
@@ -259,8 +234,7 @@ def save_neural_dimred_model_with_wrapper(
                 "weights_size_mb": weights_size,
                 "using_wrapper": True,
                 "input_dim": input_dim,
-                "has_scaler": scaler_exists,
-                "use_transformation": use_transformation  # ✅ ADDED
+                "has_scaler": scaler_exists
             }
             if scaler_exists:
                 params["scaler_size_mb"] = scaler_size

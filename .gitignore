@@ -17,7 +17,7 @@ results/
 data/
 .DS_Store
 models/
-TRS_test/
+mlflow_local_test/
 
 # mlflow auth details
 basic_auth.ini
