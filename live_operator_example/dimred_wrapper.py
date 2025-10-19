@@ -1,7 +1,6 @@
-#!/usr/bin/env python
 """
-UMAP wrapper for MLflow.
-Provides functionality to load a UMAP model and register it with MLflow.
+Dimensionality reduction wrapper for MLflow.
+Provides functionality to load a dimensionality reduction model and register it with MLflow.
 """
 
 import os
@@ -12,6 +11,7 @@ from datetime import datetime
 import joblib
 import mlflow
 import numpy as np
+from sklearn.preprocessing import RobustScaler  # ✅ ADDED
 
 
 def get_file_size_mb(filepath):
@@ -21,36 +21,50 @@ def get_file_size_mb(filepath):
     return os.path.getsize(filepath) / (1024 * 1024)
 
 
-class UMAPModelWrapper(mlflow.pyfunc.PythonModel):
-    """Wrapper for UMAP model with direct model access"""
+class DimRedModelWrapper(mlflow.pyfunc.PythonModel):
+    """Wrapper for dimensionality reduction model with direct model access"""
 
-    def __init__(self):
+    def __init__(self, use_transformation=False):  # ✅ ADDED use_transformation
         self.model = None
+        self.use_transformation = use_transformation  # ✅ ADDED
 
     def load_context(self, context):
-        """Load UMAP model from context artifacts"""
-        # Load UMAP model
-        umap_path = context.artifacts.get("umap_model")
-        if not umap_path or not os.path.exists(umap_path):
-            raise FileNotFoundError(f"UMAP model not found in artifacts")
+        """Load dimensionality reduction model from context artifacts"""
+        # Load model
+        model_path = context.artifacts.get("dimred_model")
+        if not model_path or not os.path.exists(model_path):
+            raise FileNotFoundError(f"Dimensionality reduction model not found in artifacts")
 
-        print(f"Loading UMAP model from {umap_path}")
-        self.model = joblib.load(umap_path)
-        print("✓ UMAP model loaded successfully")
+        print(f"Loading dimensionality reduction model from {model_path}")
+        self.model = joblib.load(model_path)
+        print("✅ Dimensionality reduction model loaded successfully")
+        print(f"Transformation enabled: {self.use_transformation}")  # ✅ ADDED
+
+    # ✅ ADDED METHOD
+    def _apply_transformation(self, features):
+        """Apply square + robust_scale transformation"""
+        # Step 1: Square transformation
+        transformed = np.sign(features) * (features ** 2)
+        
+        # Step 2: Robust scale
+        scaler = RobustScaler()
+        transformed = scaler.fit_transform(transformed)
+        
+        return transformed
 
     def predict(self, context, model_input):
         """
-        Standard predict method for UMAP model
+        Standard predict method for dimensionality reduction model
 
         Args:
             context: MLflow context
             model_input: Input data as numpy array
 
         Returns:
-            Dictionary with UMAP coordinates
+            Dictionary with coordinates
         """
         if self.model is None:
-            raise RuntimeError("UMAP model not loaded. Call load_context first.")
+            raise RuntimeError("Dimensionality reduction model not loaded. Call load_context first.")
 
         # Validate input
         if not isinstance(model_input, np.ndarray):
@@ -62,14 +76,18 @@ class UMAPModelWrapper(mlflow.pyfunc.PythonModel):
                 f"Input must be a 2D array with shape (1, latent_dim), got shape {model_input.shape}"
             )
 
-        # Apply UMAP transformation
-        umap_coords = self.model.transform(model_input)
+        # ✅ ADDED: Apply feature transformation if enabled
+        if self.use_transformation:
+            model_input = self._apply_transformation(model_input)
+
+        # Apply transformation
+        coords = self.model.transform(model_input)
 
         # Return results
-        return {"umap_coords": umap_coords}
+        return {"coords": coords}
 
 
-def save_umap_model_with_wrapper(
+def save_dimred_model_with_wrapper(
     model_config, tracking_uri, experiment_name, model_name=None
 ):
     """
@@ -115,8 +133,11 @@ def save_umap_model_with_wrapper(
         print(f"\nFile size: {joblib_size:.1f} MB")
 
         try:
+            use_transformation = model_config.get("use_transformation", False)  # ✅ ADDED
+            print(f"Transformation enabled: {use_transformation}")  # ✅ ADDED
+            
             # Create model wrapper
-            umap_wrapper = UMAPModelWrapper()
+            dimred_wrapper = DimRedModelWrapper(use_transformation=use_transformation)  # ✅ MODIFIED
 
             # Log parameters
             mlflow.log_params(
@@ -126,6 +147,7 @@ def save_umap_model_with_wrapper(
                     "joblib_size_mb": joblib_size,
                     "using_wrapper": True,
                     "input_dim": model_config["input_dim"],
+                    "use_transformation": use_transformation  # ✅ ADDED
                 }
             )
 
@@ -135,7 +157,7 @@ def save_umap_model_with_wrapper(
             )
 
             # Create artifacts dictionary
-            artifacts = {"umap_model": model_config["file"]}
+            artifacts = {"dimred_model": model_config["file"]}
 
             # Define explicit requirements
             pip_requirements = [
@@ -151,14 +173,14 @@ def save_umap_model_with_wrapper(
                 print("\nLogging dimensionality reduction model wrapper to MLflow...")
                 mlflow.pyfunc.log_model(
                     artifact_path="model",
-                    python_model=umap_wrapper,
+                    python_model=dimred_wrapper,
                     artifacts=artifacts,
                     registered_model_name=model_name,
                     pip_requirements=pip_requirements,
                     code_path=[__file__],  # Include this file's path
                 )
                 print(
-                    f"✓ Dimensionality reduction model wrapper registered as '{model_name}'"
+                    f"✅ Dimensionality reduction model wrapper registered as '{model_name}'"
                 )
             except Exception as e:
                 print(f"⚠️ Error logging dimensionality reduction model wrapper: {e}")

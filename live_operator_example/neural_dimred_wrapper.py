@@ -1,7 +1,6 @@
-#!/usr/bin/env python
 """
-Neural UMAP wrapper for MLflow.
-Provides functionality to load a PyTorch-based UMAP approximator model and register it with MLflow.
+Neural dimensionality reduction wrapper for MLflow.
+Provides functionality to load a neural dimensionality reduction model and register it with MLflow.
 """
 
 import os
@@ -14,6 +13,7 @@ import joblib
 import mlflow
 import numpy as np
 import torch
+from sklearn.preprocessing import RobustScaler  # ✅ ADDED
 
 
 def get_file_size_mb(filepath):
@@ -23,8 +23,8 @@ def get_file_size_mb(filepath):
     return os.path.getsize(filepath) / (1024 * 1024)
 
 
-class SimpleUMAPApproximator(torch.nn.Module):
-    """PyTorch neural network that approximates UMAP dimensionality reduction"""
+class SimpleDimRedApproximator(torch.nn.Module):
+    """PyTorch neural network that approximates dimensionality reduction"""
     def __init__(self, input_dim, hidden_dims=[128, 64], output_dim=2):
         super().__init__()
         layers = []
@@ -39,20 +39,21 @@ class SimpleUMAPApproximator(torch.nn.Module):
         return self.network(x.view(x.size(0), -1))
 
 
-class NeuralUMAPWrapper(mlflow.pyfunc.PythonModel):
+class NeuralDimRedWrapper(mlflow.pyfunc.PythonModel):
     """
-    Wrapper for PyTorch-based UMAP approximator with scaler preprocessing
+    Wrapper for PyTorch-based dimensionality reduction approximator with scaler preprocessing
     """
 
-    def __init__(self, input_dim=512, hidden_dims=[128, 64], output_dim=2):
+    def __init__(self, input_dim=512, hidden_dims=[128, 64], output_dim=2, use_transformation=False):  # ✅ ADDED use_transformation
         self.model = None
         self.scaler = None
         self.input_dim = input_dim
         self.hidden_dims = hidden_dims
         self.output_dim = output_dim
+        self.use_transformation = use_transformation  # ✅ ADDED
 
     def load_context(self, context):
-        """Load neural UMAP model and scaler from context artifacts"""
+        """Load neural dimensionality reduction model and scaler from context artifacts"""
         # Load model weights
         model_path = context.artifacts.get("model_weights")
         if not model_path or not os.path.exists(model_path):
@@ -63,14 +64,15 @@ class NeuralUMAPWrapper(mlflow.pyfunc.PythonModel):
         if scaler_path and os.path.exists(scaler_path):
             print(f"Loading scaler from {scaler_path}")
             self.scaler = joblib.load(scaler_path)
-            print("✓ Scaler loaded successfully")
+            print("✅ Scaler loaded successfully")
         else:
             print("⚠️ No scaler found, will use raw input data")
             self.scaler = None
 
         # Initialize model
-        print(f"Initializing Neural UMAP with input_dim={self.input_dim}, output_dim={self.output_dim}")
-        self.model = SimpleUMAPApproximator(
+        print(f"Initializing Neural DimRed with input_dim={self.input_dim}, output_dim={self.output_dim}")
+        print(f"Transformation enabled: {self.use_transformation}")  # ✅ ADDED
+        self.model = SimpleDimRedApproximator(
             input_dim=self.input_dim,
             hidden_dims=self.hidden_dims,
             output_dim=self.output_dim
@@ -93,6 +95,9 @@ class NeuralUMAPWrapper(mlflow.pyfunc.PythonModel):
                 if isinstance(state_dict, dict) and "network.0.weight" in state_dict:
                     # Direct state dict
                     self.model.load_state_dict(state_dict)
+                elif isinstance(state_dict, dict) and 'model_state_dict' in state_dict:  # ✅ ADDED
+                    # Checkpoint format
+                    self.model.load_state_dict(state_dict['model_state_dict'])
                 elif hasattr(state_dict, 'state_dict'):
                     # Full model
                     self.model.load_state_dict(state_dict.state_dict())
@@ -101,7 +106,7 @@ class NeuralUMAPWrapper(mlflow.pyfunc.PythonModel):
             else:
                 raise ValueError(f"Unsupported model format: {model_path}")
             
-            print("✓ Neural UMAP model weights loaded successfully")
+            print("✅ Neural dimensionality reduction model weights loaded successfully")
         except Exception as e:
             print(f"⚠️ Error loading model weights: {e}")
             traceback.print_exc()
@@ -111,19 +116,31 @@ class NeuralUMAPWrapper(mlflow.pyfunc.PythonModel):
         self.model.eval()
         self.model = self.model.to(self.device)
 
+    # ✅ ADDED METHOD
+    def _apply_transformation(self, features):
+        """Apply square + robust_scale transformation"""
+        # Step 1: Square transformation
+        transformed = np.sign(features) * (features ** 2)
+        
+        # Step 2: Robust scale
+        scaler = RobustScaler()
+        transformed = scaler.fit_transform(transformed)
+        
+        return transformed
+
     def predict(self, context, model_input):
         """
-        Standard predict method for neural UMAP model
+        Standard predict method for neural dimensionality reduction model
 
         Args:
             context: MLflow context
             model_input: Input data as numpy array (latent vectors from autoencoder)
 
         Returns:
-            Dictionary with UMAP coordinates
+            Dictionary with coordinates
         """
         if self.model is None:
-            raise RuntimeError("Neural UMAP model not loaded. Call load_context first.")
+            raise RuntimeError("Neural dimensionality reduction model not loaded. Call load_context first.")
 
         # Validate input
         if not isinstance(model_input, np.ndarray):
@@ -140,6 +157,10 @@ class NeuralUMAPWrapper(mlflow.pyfunc.PythonModel):
                 f"Input dimension mismatch: expected {self.input_dim}, got {model_input.shape[1]}"
             )
 
+        # ✅ ADDED: Apply feature transformation if enabled
+        if self.use_transformation:
+            model_input = self._apply_transformation(model_input)
+
         # Apply scaler if available
         if self.scaler is not None:
             try:
@@ -153,18 +174,18 @@ class NeuralUMAPWrapper(mlflow.pyfunc.PythonModel):
 
         # Process with model
         with torch.no_grad():
-            # Apply neural UMAP transformation
-            umap_coords = self.model(input_tensor).cpu().numpy()
+            # Apply neural transformation
+            coords = self.model(input_tensor).cpu().numpy()
 
         # Return results
-        return {"umap_coords": umap_coords}
+        return {"coords": coords}
 
 
-def save_neural_umap_model_with_wrapper(
+def save_neural_dimred_model_with_wrapper(
     model_config, tracking_uri, experiment_name, model_name=None
 ):
     """
-    Save neural UMAP model with a PyFunc wrapper
+    Save neural dimensionality reduction model with a PyFunc wrapper
 
     Args:
         model_config: Dictionary with model configuration
@@ -184,12 +205,12 @@ def save_neural_umap_model_with_wrapper(
     if model_name is None:
         model_name = f"{model_config['name']}_v{datetime.now().strftime('%Y%m%d')}"
 
-    print(f"\nSaving neural UMAP model as: {model_name}")
+    print(f"\nSaving neural dimensionality reduction model as: {model_name}")
 
     start_time = time.time()
 
     with mlflow.start_run(
-        run_name=f"neural_umap_model_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        run_name=f"neural_dr_model_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     ) as run:
         print(f"Run ID: {run.info.run_id}")
         print(f"MLflow tracking URI: {tracking_uri}")
@@ -197,7 +218,7 @@ def save_neural_umap_model_with_wrapper(
         # Check file existence
         if not os.path.exists(model_config["weights_path"]):
             print(
-                f"⚠️ Neural UMAP model weights not found at {model_config['weights_path']}"
+                f"⚠️ Neural dimensionality reduction model weights not found at {model_config['weights_path']}"
             )
             return None, None
 
@@ -221,20 +242,25 @@ def save_neural_umap_model_with_wrapper(
         try:
             # Get model parameters
             input_dim = model_config.get("input_dim", 512)
+            use_transformation = model_config.get("use_transformation", False)  # ✅ ADDED
+            
+            print(f"Transformation enabled: {use_transformation}")  # ✅ ADDED
             
             # Create model wrapper with default hidden_dims and output_dim
-            neural_umap_wrapper = NeuralUMAPWrapper(
-                input_dim=input_dim
+            neural_dimred_wrapper = NeuralDimRedWrapper(
+                input_dim=input_dim,
+                use_transformation=use_transformation  # ✅ ADDED
             )
 
             # Log parameters
             params = {
                 "model_name": model_config.get("name", "SMI_NeuralDimRed"),
-                "model_type": "neural_umap",
+                "model_type": "neural_dimred",
                 "weights_size_mb": weights_size,
                 "using_wrapper": True,
                 "input_dim": input_dim,
-                "has_scaler": scaler_exists
+                "has_scaler": scaler_exists,
+                "use_transformation": use_transformation  # ✅ ADDED
             }
             if scaler_exists:
                 params["scaler_size_mb"] = scaler_size
@@ -260,22 +286,22 @@ def save_neural_umap_model_with_wrapper(
                 "mlflow==2.22.0"
             ]
 
-            # Log the neural UMAP model wrapper
+            # Log the neural dimensionality reduction model wrapper
             try:
-                print("\nLogging neural UMAP model wrapper to MLflow...")
+                print("\nLogging neural dimensionality reduction model wrapper to MLflow...")
                 mlflow.pyfunc.log_model(
                     artifact_path="model",
-                    python_model=neural_umap_wrapper,
+                    python_model=neural_dimred_wrapper,
                     artifacts=artifacts,
                     registered_model_name=model_name,
                     pip_requirements=pip_requirements,
                     code_path=[__file__],  # Include this file's path
                 )
                 print(
-                    f"✓ Neural UMAP model wrapper registered as '{model_name}'"
+                    f"✅ Neural dimensionality reduction model wrapper registered as '{model_name}'"
                 )
             except Exception as e:
-                print(f"⚠️ Error logging neural UMAP model wrapper: {e}")
+                print(f"⚠️ Error logging neural dimensionality reduction model wrapper: {e}")
                 traceback.print_exc()
                 return None, None
 
@@ -284,7 +310,7 @@ def save_neural_umap_model_with_wrapper(
             mlflow.log_metric("upload_time_seconds", total_time)
 
             print(
-                f"\n✅ Neural UMAP model saved successfully in {total_time:.1f}s!"
+                f"\n✅ Neural dimensionality reduction model saved successfully in {total_time:.1f}s!"
             )
             print(f"Model name: {model_name}")
             print(f"Run ID: {run.info.run_id}")
@@ -293,6 +319,6 @@ def save_neural_umap_model_with_wrapper(
             return model_name, run.info.run_id
 
         except Exception as e:
-            print(f"\n❌ Error saving neural UMAP model: {e}")
+            print(f"\n❌ Error saving neural dimensionality reduction model: {e}")
             traceback.print_exc()
             return None, None

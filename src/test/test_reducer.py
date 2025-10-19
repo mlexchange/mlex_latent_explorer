@@ -38,11 +38,11 @@ class TestReducer:
 
         # Create real numpy arrays with proper dimensions and types
         latent_features = np.random.rand(1, 64).astype(np.float32)
-        umap_coords = np.random.rand(1, 2).astype(np.float32)
+        dimred_coords = np.random.rand(1, 2).astype(np.float32)  # CHANGED: umap_coords -> dimred_coords
 
         # Set up the mocks to return real numpy arrays
         mocks["autoencoder"].predict.return_value = {"latent_features": latent_features}
-        mocks["dimred"].predict.return_value = {"umap_coords": umap_coords}
+        mocks["dimred"].predict.return_value = {"coords": dimred_coords}  # CHANGED: "umap_coords" -> "coords"
 
         # Set the models
         reducer.current_torch_model = mocks["autoencoder"]
@@ -61,11 +61,11 @@ class TestReducer:
         # 2. The dimred model should be called with the latent features
         mocks["dimred"].predict.assert_called_once_with(latent_features)
 
-        # 3. The result should be the actual numpy array from the mocked umap_coords
+        # 3. The result should be the actual numpy array from the mocked dimred_coords
         assert isinstance(result, np.ndarray)
-        assert result.shape == (1, 2)  # Check expected shape of UMAP coordinates
+        assert result.shape == (1, 2)  # Check expected shape of dimensionality reduction coordinates
         # Verify it's actually the same array we created
-        np.testing.assert_array_equal(result, umap_coords)
+        np.testing.assert_array_equal(result, dimred_coords)  # CHANGED: umap_coords -> dimred_coords
         
         # 4. Verify timing info is returned
         assert isinstance(timing_info, dict)

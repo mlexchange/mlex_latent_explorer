@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 MLflow Model Saving Utility
 
@@ -34,13 +33,14 @@ config = {}  # Initialize as empty dict
 try:
     with open(CONFIG_PATH, 'r') as file:
         config = yaml.safe_load(file)
-    print("✓ Loaded MLflow configuration from YAML")
+    print("✅ Loaded MLflow configuration from YAML")
 except Exception as e:
     print(f"⚠️ Error loading configuration: {e}")
     sys.exit(1)
 
 
-# Get autoencoder type from config
+# Get dataset and autoencoder type from config
+DATASET = config.get("common", {}).get("dataset", "smi").lower()
 AUTOENCODER_TYPE = config.get("common", {}).get("autoencoder_type", "VIT").upper()
 if AUTOENCODER_TYPE == "VIT":
     from vit_wrapper import save_vit_model_with_wrapper as save_model_fn
@@ -50,15 +50,18 @@ else:
     print(f"⚠️ Invalid AUTOENCODER_TYPE: {AUTOENCODER_TYPE}. Must be 'VIT' or 'VAE'.")
     sys.exit(1)
 
-# Get UMAP type from config
-UMAP_TYPE = config.get("common", {}).get("umap_type", "joblib").lower()
-if UMAP_TYPE == "joblib":
-    from umap_wrapper import save_umap_model_with_wrapper as save_umap_fn
-elif UMAP_TYPE == "neural":
-    from neural_umap_wrapper import save_neural_umap_model_with_wrapper as save_umap_fn
+# Get dimensionality reduction type from config
+DIMRED_TYPE = config.get("common", {}).get("dimred_type", "joblib").lower()
+if DIMRED_TYPE == "joblib":
+    from dimred_wrapper import save_dimred_model_with_wrapper as save_dimred_fn
+elif DIMRED_TYPE == "neural":
+    from neural_dimred_wrapper import save_neural_dimred_model_with_wrapper as save_dimred_fn
 else:
-    print(f"⚠️ Invalid UMAP_TYPE: {UMAP_TYPE}. Must be 'joblib' or 'neural'.")
+    print(f"⚠️ Invalid DIMRED_TYPE: {DIMRED_TYPE}. Must be 'joblib' or 'neural'.")
     sys.exit(1)
+
+# ✅ ADDED: Get transformation flag from config
+DIMRED_TRANSFORMATION = config.get("common", {}).get("dimred_transformation", False)
 
 # Get save settings
 SAVE_AUTOENCODER = config.get("save", {}).get("autoencoder", "true").lower() == "true"
@@ -75,8 +78,8 @@ os.environ["MLFLOW_TRACKING_USERNAME"] = MLFLOW_TRACKING_USERNAME
 os.environ["MLFLOW_TRACKING_PASSWORD"] = MLFLOW_TRACKING_PASSWORD
 os.environ['MLFLOW_TRACKING_INSECURE_TLS'] = MLFLOW_TRACKING_INSECURE_TLS
 
-# Load model-specific configuration based on autoencoder type
-model_config_key = "vit" if AUTOENCODER_TYPE == "VIT" else "vae"
+# Load model-specific configuration based on dataset and autoencoder type
+model_config_key = f"{DATASET}_{AUTOENCODER_TYPE.lower()}"
 model_config = config.get("models", {}).get(model_config_key, {})
 
 if model_config:
@@ -88,32 +91,44 @@ if model_config:
     MLFLOW_EXPERIMENT_NAME = model_config.get("experiment_name")
     MLFLOW_AUTO_MODEL_NAME = model_config.get("auto_model_name")
     
-    # Get appropriate UMAP model name based on type
-    if UMAP_TYPE == "joblib":
+    # Get appropriate dimred model name based on type
+    if DIMRED_TYPE == "joblib":
         MLFLOW_DR_MODEL_NAME = model_config.get("dr_model_name")
     else:  # neural
         MLFLOW_DR_MODEL_NAME = model_config.get("dr_neural_model_name")
 else:
-    print(f"❌ Error: No configuration found for {AUTOENCODER_TYPE} model in the YAML file.")
+    print(f"❌ Error: No configuration found for {model_config_key} in the YAML file.")
     sys.exit(1)
 
-# Load dimensionality reduction configuration based on UMAP type
-if UMAP_TYPE == "joblib":
-    # For traditional UMAP, use the DR weights path from the autoencoder config
-    DR_WEIGHTS_PATH = model_config.get("dr_weights_path")
+# ✅ MODIFIED: Load dimensionality reduction configuration based on type and transformation
+if DIMRED_TYPE == "joblib":
+    # For traditional dimred, use the DR weights path from the autoencoder config
+    if DIMRED_TRANSFORMATION:
+        DR_WEIGHTS_PATH = model_config.get("dr_weights_path_transformed", model_config.get("dr_weights_path"))
+    else:
+        DR_WEIGHTS_PATH = model_config.get("dr_weights_path")
+    
     DR_CONFIG = {
         "name": "SMI_DimRed", 
         "file": DR_WEIGHTS_PATH, 
         "type": "joblib", 
-        "input_dim": LATENT_DIM
+        "input_dim": LATENT_DIM,
+        "use_transformation": DIMRED_TRANSFORMATION  # ✅ ADDED
     }
-elif UMAP_TYPE == "neural":
-    # For neural UMAP, use the specific neural UMAP fields from model config
+elif DIMRED_TYPE == "neural":
+    # For neural dimred, use the specific neural fields from model config
+    if DIMRED_TRANSFORMATION:
+        DR_WEIGHTS_PATH = model_config.get("dr_neural_weights_path_transformed", 
+                                          model_config.get("dr_neural_weights_path"))
+    else:
+        DR_WEIGHTS_PATH = model_config.get("dr_neural_weights_path")
+    
     DR_CONFIG = {
         "name": "SMI_DimRed",
-        "weights_path": model_config.get("dr_neural_weights_path"),
+        "weights_path": DR_WEIGHTS_PATH,
         "scaler_path": model_config.get("dr_neural_scaler_path"),
-        "input_dim": LATENT_DIM  # Use same latent dim as autoencoder
+        "input_dim": LATENT_DIM,
+        "use_transformation": DIMRED_TRANSFORMATION  # ✅ ADDED
     }
 
 # Configure autoencoder model with a single configuration structure for both types
@@ -131,8 +146,10 @@ MODEL_CONFIG = {
 print("----------------------------------------------")
 print("MLFLOW_TRACKING_URI:", MLFLOW_TRACKING_URI)
 print("MLFLOW_TRACKING_USERNAME:", MLFLOW_TRACKING_USERNAME)
+print("DATASET:", DATASET)
 print("AUTOENCODER_TYPE:", AUTOENCODER_TYPE)
-print("UMAP_TYPE:", UMAP_TYPE)
+print("DIMRED_TYPE:", DIMRED_TYPE)
+print("DIMRED_TRANSFORMATION:", DIMRED_TRANSFORMATION)  # ✅ ADDED
 print("SAVE_AUTOENCODER:", SAVE_AUTOENCODER)
 print("SAVE_DR:", SAVE_DR)
 print("MLFLOW_EXPERIMENT_NAME:", MLFLOW_EXPERIMENT_NAME)
@@ -142,12 +159,12 @@ print("AUTOENCODER_WEIGHTS_PATH:", AUTOENCODER_WEIGHTS_PATH)
 print("AUTOENCODER_CODE_PATH:", AUTOENCODER_CODE_PATH)
 print("LATENT_DIM:", LATENT_DIM)
 print("IMAGE_SIZE:", IMAGE_SIZE)
-if UMAP_TYPE == "joblib":
+if DIMRED_TYPE == "joblib":
     print("DR_WEIGHTS_PATH:", DR_WEIGHTS_PATH)
-elif UMAP_TYPE == "neural":
-    print("NEURAL_UMAP_WEIGHTS_PATH:", DR_CONFIG["weights_path"])
-    print("NEURAL_UMAP_SCALER_PATH:", DR_CONFIG["scaler_path"])
-    print("NEURAL_UMAP_INPUT_DIM:", DR_CONFIG["input_dim"])
+elif DIMRED_TYPE == "neural":
+    print("NEURAL_DIMRED_WEIGHTS_PATH:", DR_CONFIG["weights_path"])
+    print("NEURAL_DIMRED_SCALER_PATH:", DR_CONFIG["scaler_path"])
+    print("NEURAL_DIMRED_INPUT_DIM:", DR_CONFIG["input_dim"])
 print("----------------------------------------------")
 
 if __name__ == "__main__":
@@ -156,7 +173,7 @@ if __name__ == "__main__":
         try:
             mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
             mlflow.search_experiments()
-            print(f"✓ MLflow server accessible at {MLFLOW_TRACKING_URI}")
+            print(f"✅ MLflow server accessible at {MLFLOW_TRACKING_URI}")
         except Exception as e:
             print(f"⚠️  Cannot connect to MLflow server at {MLFLOW_TRACKING_URI}: {e}")
             sys.exit(1)
@@ -165,7 +182,8 @@ if __name__ == "__main__":
         if SAVE_AUTOENCODER:
             print(f"  {AUTOENCODER_TYPE} model: {MLFLOW_AUTO_MODEL_NAME}")
         if SAVE_DR:
-            print(f"  {UMAP_TYPE.capitalize()} dimensionality reduction model: {MLFLOW_DR_MODEL_NAME}")
+            transformation_label = "[square+robust_scale]" if DIMRED_TRANSFORMATION else "[no_transformation]"  # ✅ ADDED
+            print(f"  {DIMRED_TYPE.capitalize()} dimensionality reduction model {transformation_label}: {MLFLOW_DR_MODEL_NAME}")  # ✅ MODIFIED
         
         if not (SAVE_AUTOENCODER or SAVE_DR):
             print("  No models selected for saving. Check the 'save' section in mlflow_config.yaml.")
@@ -192,16 +210,16 @@ if __name__ == "__main__":
 
         # Save dimensionality reduction model with wrapper if enabled
         if SAVE_DR:
-            if UMAP_TYPE == "joblib" and DR_CONFIG["file"]:
-                dr_name, dr_run_id = save_umap_fn(
+            if DIMRED_TYPE == "joblib" and DR_CONFIG["file"]:
+                dr_name, dr_run_id = save_dimred_fn(
                     DR_CONFIG,
                     MLFLOW_TRACKING_URI,
                     MLFLOW_EXPERIMENT_NAME,
                     MLFLOW_DR_MODEL_NAME,
                 )
                 dr_success = bool(dr_name)
-            elif UMAP_TYPE == "neural" and DR_CONFIG["weights_path"]:
-                dr_name, dr_run_id = save_umap_fn(
+            elif DIMRED_TYPE == "neural" and DR_CONFIG["weights_path"]:
+                dr_name, dr_run_id = save_dimred_fn(
                     DR_CONFIG,
                     MLFLOW_TRACKING_URI,
                     MLFLOW_EXPERIMENT_NAME,
@@ -209,20 +227,22 @@ if __name__ == "__main__":
                 )
                 dr_success = bool(dr_name)
             else:
-                print(f"\n⚠️ Skipping {UMAP_TYPE} dimensionality reduction model: missing configuration")
+                print(f"\n⚠️ Skipping {DIMRED_TYPE} dimensionality reduction model: missing configuration")
         else:
-            print(f"\n⚠️ Skipping {UMAP_TYPE} dimensionality reduction model: disabled in configuration")
+            print(f"\n⚠️ Skipping {DIMRED_TYPE} dimensionality reduction model: disabled in configuration")
 
         # Report results
         print("\n---------- SUMMARY ----------")
+        transformation_label = "[square+robust_scale]" if DIMRED_TRANSFORMATION else "[no_transformation]"  # ✅ ADDED
+        
         if SAVE_AUTOENCODER and SAVE_DR:
             if auto_success and dr_success:
                 print(f"\n✅ Both models saved successfully!")
             elif auto_success:
                 print(f"\n✅ {AUTOENCODER_TYPE} model saved successfully!")
-                print(f"❌ {UMAP_TYPE.capitalize()} dimensionality reduction model failed to save.")
+                print(f"❌ {DIMRED_TYPE.capitalize()} dimensionality reduction model {transformation_label} failed to save.")  # ✅ MODIFIED
             elif dr_success:
-                print(f"\n✅ {UMAP_TYPE.capitalize()} dimensionality reduction model saved successfully!")
+                print(f"\n✅ {DIMRED_TYPE.capitalize()} dimensionality reduction model {transformation_label} saved successfully!")  # ✅ MODIFIED
                 print(f"❌ {AUTOENCODER_TYPE} model failed to save.")
             else:
                 print(f"\n❌ Failed to save both models.")
@@ -233,9 +253,9 @@ if __name__ == "__main__":
                 print(f"\n❌ {AUTOENCODER_TYPE} model failed to save.")
         elif SAVE_DR:
             if dr_success:
-                print(f"\n✅ {UMAP_TYPE.capitalize()} dimensionality reduction model saved successfully!")
+                print(f"\n✅ {DIMRED_TYPE.capitalize()} dimensionality reduction model {transformation_label} saved successfully!")  # ✅ MODIFIED
             else:
-                print(f"\n❌ {UMAP_TYPE.capitalize()} dimensionality reduction model failed to save.")
+                print(f"\n❌ {DIMRED_TYPE.capitalize()} dimensionality reduction model {transformation_label} failed to save.")  # ✅ MODIFIED
 
     except Exception as e:
         print(f"\nError: {e}")

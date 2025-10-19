@@ -188,8 +188,8 @@ class LatentSpaceReducer(Reducer):
             # Start timing dimension reduction processing
             dimred_start = time.time()
             
-            umap_result = self.current_dim_reduction_model.predict(latent_features)  
-            f_vec = umap_result["umap_coords"]
+            dimred_result = self.current_dim_reduction_model.predict(latent_features)  
+            f_vec = dimred_result["coords"]
             
             # End timing dimension reduction processing
             dimred_end = time.time()
