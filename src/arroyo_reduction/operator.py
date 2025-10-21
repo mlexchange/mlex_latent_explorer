@@ -42,6 +42,7 @@ class LatentSpaceOperator(Operator):
             logger.info("Received Start Message")
             await self.publish(message)
         elif isinstance(message, RawFrameEvent):
+            await self.publish(message)
             result = await self.dispatch(message)
             if result is not None:  # Only publish if we got a valid result
                 await self.publish(result)

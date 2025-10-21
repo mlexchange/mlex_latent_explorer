@@ -12,6 +12,7 @@ from .redis_model_store import RedisModelStore
 from .vector_save import VectorSavePublisher
 from .tiled_results_publisher import TiledResultsPublisher
 from .xps_websocket_listener import XPSWebSocketListener
+from .xps_tiled_local_image_publisher import XPSTiledLocalImagePublisher  # NEW: Add this import
 
 settings = Dynaconf(
     envvar_prefix="",
@@ -55,6 +56,10 @@ async def start() -> None:
         tiled_publisher = TiledResultsPublisher.from_settings(app_settings.tiled_publisher)
         asyncio.create_task(tiled_publisher.start())
         
+        # NEW: Initialize the XPS-specific local image publisher
+        xps_local_image_publisher = XPSTiledLocalImagePublisher.from_settings(app_settings.local_image_publisher)
+        asyncio.create_task(xps_local_image_publisher.start())
+        
         # Initialize Redis model store instead of direct Redis client
         logger.info("Initializing Redis Model Store")
         redis_model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
@@ -88,6 +93,7 @@ async def start() -> None:
         operator.add_publisher(ws_publisher)
         operator.add_publisher(vector_save_publisher)
         operator.add_publisher(tiled_publisher)
+        operator.add_publisher(xps_local_image_publisher)  # NEW: Add this line
         
         # Use from_settings() pattern (consistent with ZMQFrameListener)
         listener = XPSWebSocketListener.from_settings(app_settings.xps_listener, operator)
