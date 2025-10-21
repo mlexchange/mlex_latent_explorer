@@ -189,6 +189,7 @@ services:
   # To run real image simulator, use
   # docker compose --profile arroyo --profile sim up
 
+  # Original SAXS arroyo service
   arroyo:
     build:
       context: .
@@ -222,6 +223,46 @@ services:
       RESULTS_TILED_API_KEY: '${RESULTS_TILED_API_KEY}'
       # User info
       USER: ${USER}
+    depends_on:
+      - latent-space-explorer
+    networks:
+      mle_net:
+
+  # NEW: XPS arroyo service (XPS_WEBSOCKET_URL environment variable REMOVED)
+  arroyo_xps:
+    build:
+      context: .
+      dockerfile: Dockerfile_arroyo_xps
+    container_name: arroyo_xps
+    profiles:
+      - arroyo_xps
+    volumes:
+      - .:/app:Z
+      - ./data/mlflow_cache:/mlflow_cache
+      - ./data/vector_save:/data/vector_save
+    ports:
+      - 127.0.0.1:8766:8765  # Different external port to avoid conflicts
+    environment:
+      NUMBA_DISABLE_JIT: ${NUMBA_DISABLE_JIT:-0}
+      NUMBA_CPU_NAME: ${NUMBA_CPU_NAME:-generic}
+      NUMBA_CPU_FEATURES: ${NUMBA_CPU_FEATURES:-+neon}
+      MLFLOW_CACHE_DIR: "/mlflow_cache"
+      PYTHONUNBUFFERED: 1
+      MALLOC_TRIM_THRESHOLD_: 0
+      # MLflow
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME}
+      MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD}
+      MLFLOW_TRACKING_INSECURE_TLS: ${MLFLOW_TRACKING_INSECURE_TLS:-False}
+      # Redis
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      # Tiled Publisher
+      RESULTS_TILED_URI: '${RESULTS_TILED_URI}'
+      RESULTS_TILED_API_KEY: '${RESULTS_TILED_API_KEY}'
+      # User info
+      USER: ${USER}
+      # XPS_WEBSOCKET_URL removed - now configured in settings.yaml
     depends_on:
       - latent-space-explorer
     networks:
