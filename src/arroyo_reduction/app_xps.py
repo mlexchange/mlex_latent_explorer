@@ -20,7 +20,7 @@ settings = Dynaconf(
     load_dotenv=True,
 )
 app = typer.Typer()
-logger = logging.getLogger("arroyo_reduction.xps")
+logger = logging.getLogger("arroyo_reduction")
 
 # Redis connection info
 REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
