@@ -10,7 +10,7 @@ lse_operator:
   listener:
     zmq_address: tcp://sim_unified:5000
   xps_listener:
-    websocket_url: ws://processor:8001/simImages
+    websocket_url: ws://sim_xps:8001/simImages
   vector_save:
     db_path: /data/vector_save/latent_vectors.db  # Path to SQLite database for saving vectors
   tiled_publisher:  # Added new section for TiledResultsPublisher

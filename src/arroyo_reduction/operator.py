@@ -3,9 +3,6 @@ import logging
 import os
 import time
 
-import msgpack
-import redis
-import zmq
 from arroyopy.operator import Operator
 from arroyopy.schemas import Start, Stop
 from arroyosas.schemas import RawFrameEvent, SASMessage
@@ -18,9 +15,8 @@ logger = logging.getLogger("arroyo_reduction.operator")
 
 
 class LatentSpaceOperator(Operator):
-    def __init__(self, proxy_socket: zmq.Socket, reducer: Reducer):
+    def __init__(self, reducer: Reducer):
         super().__init__()
-        self.proxy_socket = proxy_socket
         self.reducer = reducer
         
         # NEW: Track if flush was already sent
@@ -130,32 +126,11 @@ class LatentSpaceOperator(Operator):
             logger.error(f"Error sending message to broker {e}")
             return None
 
-    async def dispatch_workers(self, message: RawFrameEvent) -> LatentSpaceEvent:
-        """Dispatch the message to the worker and return the response. This is applicable
-        when the reducer is setup to run in a zqm req/rep worker pool. Currently unsupported."""
-
-        try:
-            message = message.model_dump()
-            message = msgpack.packb(message, use_bin_type=True)
-            await self.proxy_socket.send(message)
-            # logger.debug("sent frame to broker")
-            response = await self.proxy_socket.recv()
-            if response == b"ERROR":
-                logger.debug("Worker reported an error")
-                return None
-            # logger.debug("response from broker")
-            return LatentSpaceEvent(**msgpack.unpackb(response))
-        except Exception as e:
-            logger.error(f"Error sending message to broker {e}")
 
     @classmethod
     def from_settings(cls, settings, reducer_settings=None):
-        # Connect to the ZMQ Router/Dealer as a client
-        context = zmq.asyncio.Context()
-        socket = context.socket(zmq.REQ)
-        socket.setsockopt(zmq.SNDHWM, 10000)  # Allow up to 10,000 messages
-        socket.setsockopt(zmq.RCVHWM, 10000)
+
         # socket.connect(settings.zmq_broker.router_address)
         # logger.info(f"Connected to broker at {settings.zmq_broker.router_address}")
         reducer = LatentSpaceReducer()
-        return cls(socket, reducer)
+        return cls(reducer)

@@ -8,7 +8,7 @@ import websockets
 import uuid
 from arroyopy.listener import Listener
 from arroyopy.operator import Operator
-from arroyosas.schemas import RawFrameEvent, NumpyArrayModel
+from arroyosas.schemas import RawFrameEvent, SerializableNumpyArrayModel
 
 logger = logging.getLogger("arroyo_reduction.xps_websocket_listener")
 
@@ -73,12 +73,12 @@ class XPSWebSocketListener(Listener):
             return
         
         # Generate new UUID when frame_number is 0 (start of new run)
-        if shot_num == 0:
+        if shot_num == 1:
             self.current_uuid = str(uuid.uuid4())
             logger.info(f"Starting new XPS run with UUID: {self.current_uuid}")
         
         # Convert uint8 bytes back to numpy array
-        shot_mean = np.frombuffer(shot_mean_bytes, dtype=np.uint8)
+        shot_mean = np.frombuffer(shot_mean_bytes, dtype=np.uint8).reshape(width, height)
         
         logger.debug(f"Received shot_mean for shot {shot_num}: shape {shot_mean.shape}")
         
@@ -88,7 +88,7 @@ class XPSWebSocketListener(Listener):
         
         # Create a RawFrameEvent compatible with the operator
         frame_event = RawFrameEvent(
-            image=NumpyArrayModel(array=shot_mean),
+            image=SerializableNumpyArrayModel(array=shot_mean),
             frame_number=shot_num,
             tiled_url=tiled_url
         )

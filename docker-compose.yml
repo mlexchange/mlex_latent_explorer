@@ -330,6 +330,28 @@ services:
     networks:
       mle_net:
 
+  # XPS WebSocket Simulator - for testing XPS data processing
+  sim_xps:
+    image: ghcr.io/als-computing/arroyosas:main
+    container_name: sim_xps
+    command: >
+      python -m arroyosas.app.xps_websocket_simulator
+      --host 0.0.0.0
+      --port 8001
+      --data-file /data/shot_averages/combined_all_bin_averages.npy
+      --cycles 100
+      --pause 0.1
+    profiles:
+      - sim_xps
+    volumes:
+      - ./data/shot_averages:/data/shot_averages:ro
+    ports:
+      - 127.0.0.1:8001:8001
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      mle_net:
+
 networks:
   mle_net:
     name: mle_net
