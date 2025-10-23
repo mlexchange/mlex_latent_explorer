@@ -51,17 +51,19 @@ jobs:
           docker logs $CONTAINER_ID  # Show logs to confirm it's running
           docker stop $CONTAINER_ID  # Stop the container
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
+      - name: Extract metadata for XPS image
+        id: meta-xps
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            suffix=-arroyo-xps,onlatest=true
 
-      - name: Build and push Docker image
+      - name: Build and push XPS Docker image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: .
-          file: Dockerfile
+          file: Dockerfile_arroyo_xps
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-xps.outputs.tags }}
+          labels: ${{ steps.meta-xps.outputs.labels }}
