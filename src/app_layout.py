@@ -23,9 +23,9 @@ DATA_TILED_KEY = os.getenv("DATA_TILED_KEY", None)
 if DATA_TILED_KEY == "":
     DATA_TILED_KEY = None
 
-REMOTE_DATA_TILED_KEY = os.getenv("REMOTE_DATA_TILED_KEY", None)
-if REMOTE_DATA_TILED_KEY == "":
-    REMOTE_DATA_TILED_KEY = None
+LIVE_TILED_API_KEY = os.getenv("LIVE_TILED_API_KEY", None)
+if LIVE_TILED_API_KEY == "":
+    LIVE_TILED_API_KEY = None
     
 MODE = os.getenv("MODE", "dev")
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))

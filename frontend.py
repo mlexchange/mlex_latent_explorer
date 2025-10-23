@@ -63,6 +63,13 @@ from src.callbacks.live_mode import (  # noqa: F401
     toggle_pause_button_go_live,
     update_data_project_dict,
 )
+# Add this to the imports at the top
+from src.callbacks.experiment_replay import (  # noqa: F401
+    load_experiment_uuids,
+    toggle_load_button,
+    load_experiment_replay,
+    filter_experiment_by_range,
+)
 
 load_dotenv(".env")
 

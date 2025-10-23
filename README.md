@@ -123,39 +123,59 @@ docker compose --profile arroyo --profile sim up
 ```
 Note for Simulators:
 
-There are four available simulators:
+There are two main types of simulators available:
 
 (1) **Feature Vector Simulator**
    - Does not require Arroyo.
    - Run with:
-     ```bash
-     docker compose --profile vector_sim up
-     ```
+        ```bash
+        docker compose --profile vector_sim up
+        ```
 
-(2) **Public Tiled Dataset Simulator**
-   - Reads images from a public Tiled dataset and sends them to Arroyo.
+(2) **Real Image Simulator**
+   - Requires Arroyo and offers three modes
    - Run with:
-     ```bash
-     docker compose --profile arroyo --profile sim up
-     ```
+        ```bash
+        docker compose --profile sim up
+        ```
 
-(3) **Previous Experiment Simulator**
-   - Reads Tiled URLs stored in a local `.db` from a previous experiment.
-   - Re-reads those images and sends them to Arroyo.
-      ```bash
-      docker compose --profile arroyo --profile sim_replay up
-      ```
+      **Mode 1: Public Tiled Dataset Simulator**
+        - Reads images from a public Tiled dataset and sends them to Arroyo.
+        - In .env, set:
+          ```
+          SIM_MODE="direct" 
+          LIVE_TILED_API_KEY=
+          ```
 
-(4) **Local Tiled Simulator**
-   - Requires you to first start a local Tiled instance and ingest data.
-   - Steps:
-     ```bash
-     docker compose up tiled tiled_db
-     docker compose --profile ingest_images up --no-deps ingest_local_images
-     docker compose --profile arroyo --profile sim_local_tiled up
-     ```
+      **Mode 2: Previous SMI Experiment Simulator**
+        - Reads Tiled URLs stored in a local `.db` file from a previous SMI experiment.
+        - Generating an NSLS-II Tiled API Key (A BNL account and DUO authentication are required):
+          ```python
+          from tiled.client import from_uri
 
-   - When using this simulator, update `lse_operator.operator.zmq_address` in `settings.yaml` accordingly (e.g., `tcp://sim_local_tiled:5000` for the 4th simulator).
+          c = from_uri("https://tiled-dev.nsls2.bnl.gov")
+          # You will be prompted for your password
+          # Then your DUO app will ping you
+          c.context.create_api_key()
+          ```
+        - In .env, set:
+            ```
+            SIM_MODE="db_replay" 
+            LIVE_TILED_API_KEY=<nsls-ii-tiled-key>
+            ```
+
+      **Mode 3: Local Tiled Simulator**
+        - Requires starting a local Tiled instance and ingesting data first.
+        - Start local Tiled instance and ingest data:
+            ```bash
+            docker compose up tiled tiled_db
+            docker compose --profile ingest_images up --no-deps ingest_local_images
+            ```
+        - In .env, set:
+            ```
+            SIM_MODE="local_tiled" 
+            LIVE_TILED_API_KEY=<local-tiled-key>
+            ```
 
 
 4. Register models with MLflow:

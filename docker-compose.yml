@@ -128,7 +128,7 @@ services:
       # Tiled
       DEFAULT_TILED_URI: '${DEFAULT_TILED_URI}'
       DATA_TILED_KEY: '${DATA_TILED_KEY}'
-      REMOTE_DATA_TILED_KEY: '${REMOTE_DATA_TILED_KEY}'
+      LIVE_TILED_API_KEY: '${LIVE_TILED_API_KEY}'
       RESULTS_TILED_URI: '${RESULTS_TILED_URI}'
       RESULTS_TILED_API_KEY: '${RESULTS_TILED_API_KEY}'
       # Prefect
@@ -189,6 +189,7 @@ services:
   # To run real image simulator, use
   # docker compose --profile arroyo --profile sim up
 
+  # Original SAXS arroyo service
   arroyo:
     build:
       context: .
@@ -220,6 +221,48 @@ services:
       # Tiled Publisher
       RESULTS_TILED_URI: '${RESULTS_TILED_URI}'
       RESULTS_TILED_API_KEY: '${RESULTS_TILED_API_KEY}'
+      # User info
+      USER: ${USER}
+    depends_on:
+      - latent-space-explorer
+    networks:
+      mle_net:
+
+  # NEW: XPS arroyo service (XPS_WEBSOCKET_URL environment variable REMOVED)
+  arroyo_xps:
+    build:
+      context: .
+      dockerfile: Dockerfile_arroyo_xps
+    container_name: arroyo_xps
+    profiles:
+      - arroyo_xps
+    volumes:
+      - .:/app:Z
+      - ./data/mlflow_cache:/mlflow_cache
+      - ./data/vector_save:/data/vector_save
+    ports:
+      - 127.0.0.1:8765:8765  
+    environment:
+      NUMBA_DISABLE_JIT: ${NUMBA_DISABLE_JIT:-0}
+      NUMBA_CPU_NAME: ${NUMBA_CPU_NAME:-generic}
+      NUMBA_CPU_FEATURES: ${NUMBA_CPU_FEATURES:-+neon}
+      MLFLOW_CACHE_DIR: "/mlflow_cache"
+      PYTHONUNBUFFERED: 1
+      MALLOC_TRIM_THRESHOLD_: 0
+      # MLflow
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME}
+      MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD}
+      MLFLOW_TRACKING_INSECURE_TLS: ${MLFLOW_TRACKING_INSECURE_TLS:-False}
+      # Redis
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      # Tiled Publisher
+      RESULTS_TILED_URI: '${RESULTS_TILED_URI}'
+      RESULTS_TILED_API_KEY: '${RESULTS_TILED_API_KEY}'
+      # User info
+      USER: ${USER}
+      # XPS_WEBSOCKET_URL removed - now configured in settings.yaml
     depends_on:
       - latent-space-explorer
     networks:
@@ -241,53 +284,29 @@ services:
     networks:
       mle_net:
 
-  # Simulator 2: real image simulator service
-  sim_realistic:
+  # Simulator 2: Unified real image simulator
+  sim_unified:
     image: ghcr.io/als-computing/arroyosas:main
-    container_name: sim_realistic
-    command: python -m arroyosas.app.real_image_sim_cli
+    container_name: sim_unified
+    command: >
+      python -m arroyosas.app.unified_sim_cli
+      --mode ${SIM_MODE:-direct}
     profiles:
       - sim
     volumes:
-      - ./data/test_sim_data:/data/test_data:ro # Mount test data repository containing TIFF images
+      - ./data:/data:rw
     environment:
-      - TILED_LIVE_API_KEY=${REMOTE_TILED_SINGLE_USER_API_KEY}
-      - DATA_TILED_KEY=${REMOTE_DATA_TILED_KEY}
-      - DYNACONF_TILED_POLLER__PUBLISH_ADDRESS=tcp://0.0.0.0:5000 # Make sure ZMQ publisher address is correctly set
-    networks:
-      mle_net:
-
-  # Simulator 3: replay the runs saved in local db during smi beamtime
-  sim_replay:
-    image: ghcr.io/als-computing/arroyosas:main
-    container_name: sim_replay
-    command: python -m arroyosas.app.db_replay_sim_cli
-    profiles:
-      - sim_replay
-    volumes:
-      - ./data/vector_db_smi:/data/vector_db_smi:ro # Mount directory containing the vector database
-    environment:
-      - TILED_ENV=${TILED_ENV}
-      - DB_PATH=/data/vector_db_smi/latent_vectors.db
-      - TILED_API_KEY=${REMOTE_TILED_SINGLE_USER_API_KEY}
-      - TILED_LIVE_API_KEY=${REMOTE_TILED_SINGLE_USER_API_KEY}
+      # SIM_MODE: use direct, db_replay or local_tiled
+      - SIM_MODE=${SIM_MODE:-direct} 
+      # API key
+      - TILED_LIVE_API_KEY=${LIVE_TILED_API_KEY} #TILED_LIVE_API_KEY is required by DynaconfFormat
+      # db_replay mode
+      - DB_PATH=${DB_PATH:-/data/vector_db_replay/latent_vectors.db}
+      - TILED_ENV=${TILED_ENV:-dev}
+      # local_tiled mode
+      - URL_FILE=${URL_FILE:-/data/tiled_url/Nafion_p25_30_run_1.json}
+      # ZMQ
       - DYNACONF_TILED_POLLER__PUBLISH_ADDRESS=tcp://0.0.0.0:5000
-    networks:
-      mle_net:
-
-  # Simulator 4: Read images from Tiled using a saved URL and send via ZMQ
-  sim_local_tiled:
-    image: ghcr.io/als-computing/arroyosas:main
-    container_name: sim_local_tiled
-    command: python -m arroyosas.app.local_tiled_sim_cli
-    profiles:
-      - sim_local_tiled
-    volumes:
-      - ./data:/data:rw  # Mount directory for the URL file
-    environment:
-      - URL_FILE=/data/tiled_url/Nafion_p25_30_run_1.json
-      - TILED_API_KEY=${TILED_SINGLE_USER_API_KEY}
-      - TILED_LIVE_API_KEY=${TILED_SINGLE_USER_API_KEY}
       - DYNACONF_TILED_POLLER__ZMQ_FRAME_PUBLISHER__ADDRESS=tcp://0.0.0.0:5000
     networks:
       mle_net:
@@ -308,6 +327,30 @@ services:
       - TILED_API_KEY=${TILED_SINGLE_USER_API_KEY}
       - TILED_CONTAINER=Nafion_p25_30_run_1
       - URL_FILE=/data/tiled_url/Nafion_p25_30_run_1.json
+    networks:
+      mle_net:
+
+  # XPS WebSocket Simulator - for testing XPS data processing
+  sim_xps:
+    image: ghcr.io/als-computing/arroyosas:main
+    container_name: sim_xps
+    command: >
+      python -m arroyosas.app.xps_websocket_simulator
+      --host 0.0.0.0
+      --port 8001
+      --data-file /data/shot_averages/combined_all_bin_averages.npy
+      --cycles 1
+      --pause 1
+    profiles:
+      - sim_xps
+    volumes:
+      - ./data/shot_averages:/data/shot_averages:ro
+    ports:
+      - 127.0.0.1:8001:8001
+    environment:
+      - PYTHONUNBUFFERED=1
+      - WEBSOCKET_PING_TIMEOUT=60  # Add this (default is ~20s)
+      - WEBSOCKET_PING_INTERVAL=20  # Add this (default is ~5s)
     networks:
       mle_net:
 

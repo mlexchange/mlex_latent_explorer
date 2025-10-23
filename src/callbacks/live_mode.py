@@ -90,6 +90,7 @@ def update_model_dropdowns(dialog_open):
 
 
 
+
 @callback(
     Output("live-model-dialog", "is_open", allow_duplicate=True),
     Output("selected-live-models", "data"),
@@ -98,10 +99,16 @@ def update_model_dropdowns(dialog_open):
     Output("clustering-controls", "style"),
     Output("data-overview-card", "style"),
     Output("live-mode-models", "style"),
-    Output("live-mode-autoencoder-dropdown", "options"),
-    Output("live-mode-autoencoder-dropdown", "value"),
-    Output("live-mode-dimred-dropdown", "options"),
-    Output("live-mode-dimred-dropdown", "value"),
+    Output("live-mode-autoencoder-dropdown", "options", allow_duplicate=True),
+    Output("live-mode-autoencoder-dropdown", "value", allow_duplicate=True),
+    Output("live-mode-autoencoder-version-dropdown", "options", allow_duplicate=True),
+    Output("live-mode-autoencoder-version-dropdown", "value", allow_duplicate=True),
+    Output("live-mode-autoencoder-version-dropdown", "disabled", allow_duplicate=True),
+    Output("live-mode-dimred-dropdown", "options", allow_duplicate=True),
+    Output("live-mode-dimred-dropdown", "value", allow_duplicate=True),
+    Output("live-mode-dimred-version-dropdown", "options", allow_duplicate=True),
+    Output("live-mode-dimred-version-dropdown", "value", allow_duplicate=True),
+    Output("live-mode-dimred-version-dropdown", "disabled", allow_duplicate=True),
     Output("sidebar", "active_item"),
     Output("image-card", "style"),
     Output("scatter", "style"),
@@ -116,61 +123,81 @@ def update_model_dropdowns(dialog_open):
     Output("live-indices", "data", allow_duplicate=True),
     Output("model-loading-spinner", "style", allow_duplicate=True),
     Output("in-model-transition", "data", allow_duplicate=True),
+    Output("experiment-replay-controls", "style"),
+    Output("live-experiment-name-display", "style", allow_duplicate=True),  # NEW: ADD THIS LINE
+    Output("live-experiment-name-text", "children", allow_duplicate=True),  # NEW: ADD THIS LINE
     Input("live-model-continue", "n_clicks"),
+    State("live-experiment-name-input", "value"),  # NEW: ADD THIS LINE
     State("live-autoencoder-dropdown", "value"),
+    State("live-autoencoder-version-dropdown", "value"),
     State("live-dimred-dropdown", "value"),
+    State("live-dimred-version-dropdown", "value"),
     State("live-autoencoder-dropdown", "options"),
     State("live-dimred-dropdown", "options"),
     prevent_initial_call=True,
 )
 def handle_model_continue(
     continue_clicks,
+    experiment_name,  # NEW: ADD THIS LINE
     selected_autoencoder,
+    selected_autoencoder_version,
     selected_dimred,
+    selected_dimred_version,
     autoencoder_options,
     dimred_options,
 ):
-    """
-    Handle the Continue button click in the model selection dialog.
-    This function:
-    1. Checks model compatibility
-    2. Stores models in Redis if compatible
-    3. Updates UI elements for Live Mode
-    4. Shows loading spinner
-    """
+    """Handle the Continue button click with version selection"""
     if not continue_clicks:
         raise PreventUpdate
+
+    # NEW: ADD THIS VALIDATION BLOCK - START
+    if not experiment_name or not experiment_name.strip():
+        logger.warning("No experiment name provided")
+        raise PreventUpdate
+    # NEW: ADD THIS VALIDATION BLOCK - END
 
     # Check model compatibility before proceeding
     if not mlflow_client.check_model_compatibility(
         selected_autoencoder, selected_dimred
     ):
         logger.warning(
-            f"Incompatible models selected: {selected_autoencoder}, {selected_dimred}"
+            f"Incompatible models selected: {selected_autoencoder} and {selected_dimred}"
         )
-        # Prevent dialog from closing
         return no_update
 
-    # Store models in Redis
+    # Store models with versions in Redis
     try:
-        # Store autoencoder model
-        logger.info(f"Storing autoencoder model from dialog: {selected_autoencoder}")
-        redis_model_store.store_autoencoder_model(selected_autoencoder)
+        # Create model identifiers with versions
+        autoencoder_id = f"{selected_autoencoder}:{selected_autoencoder_version}"
+        dimred_id = f"{selected_dimred}:{selected_dimred_version}"
+        
+        logger.info(f"Storing autoencoder model from dialog: {autoencoder_id}")
+        redis_model_store.store_autoencoder_model(autoencoder_id)
 
-        # Store dimension reduction model
-        logger.info(f"Storing dimension reduction model from dialog: {selected_dimred}")
-        redis_model_store.store_dimred_model(selected_dimred)
+        logger.info(f"Storing dimension reduction model from dialog: {dimred_id}")
+        redis_model_store.store_dimred_model(dimred_id)
+        
+        # NEW: ADD THIS BLOCK - START
+        logger.info(f"Storing experiment name from dialog: {experiment_name.strip()}")
+        redis_model_store.store_experiment_name(experiment_name.strip())
+        # NEW: ADD THIS BLOCK - END
     except Exception as e:
         logger.error(f"Error storing models in Redis: {e}")
         return no_update
 
-    # Models are compatible and stored in Redis, proceed with closing dialog and transition
     selected_models = {
         "autoencoder": selected_autoencoder,
+        "autoencoder_version": selected_autoencoder_version,
         "dimred": selected_dimred,
+        "dimred_version": selected_dimred_version,
+        "experiment_name": experiment_name.strip(),  # NEW: ADD THIS LINE
     }
 
-    # Show loading spinner and set transition state to True
+    # Get version options for sidebar
+    autoencoder_versions = mlflow_client.get_model_versions(selected_autoencoder)
+    dimred_versions = mlflow_client.get_model_versions(selected_dimred)
+
+    # Show loading spinner
     spinner_style = {
         "position": "fixed",
         "top": 0,
@@ -179,10 +206,9 @@ def handle_model_continue(
         "height": "100%",
         "backgroundColor": "rgba(0, 0, 0, 0.7)",
         "zIndex": 9998,
-        "display": "block",  # Show the spinner
+        "display": "block",
     }
 
-    # Transition to live mode UI
     return (
         False,  # Close dialog
         selected_models,  # Save selected models
@@ -191,10 +217,16 @@ def handle_model_continue(
         {"display": "none"},  # Hide clustering controls
         {"display": "none"},  # Hide data overview card
         {},  # Show live mode models section
-        autoencoder_options,  # Copy options from dialog to sidebar
-        selected_autoencoder,  # Set selected autoencoder
-        dimred_options,  # Copy options from dialog to sidebar
-        selected_dimred,  # Set selected dimension reduction model
+        autoencoder_options,  # Copy options to sidebar
+        selected_autoencoder,  # Set selected autoencoder name
+        autoencoder_versions,  # Set autoencoder version options
+        selected_autoencoder_version,  # Set selected autoencoder version
+        False,  # Enable autoencoder version dropdown
+        dimred_options,  # Copy options to sidebar
+        selected_dimred,  # Set selected dimred name
+        dimred_versions,  # Set dimred version options
+        selected_dimred_version,  # Set selected dimred version
+        False,  # Enable dimred version dropdown
         ["item-1"],  # Active sidebar item
         {"width": "100%", "height": "85vh"},  # Image card style
         {"height": "65vh"},  # Scatter style
@@ -213,15 +245,17 @@ def handle_model_continue(
             "font-size": "1.5rem",
             "padding": "5px",
         },
-        plot_empty_scatter(),  # Clear scatter when continuing
-        plot_empty_heatmap(),  # Clear heatmap when continuing
-        "Number of images selected: 0",  # Reset stats text
+        plot_empty_scatter(),  # Clear scatter
+        plot_empty_heatmap(),  # Clear heatmap
+        "Number of images selected: 0",  # Reset stats
         {},  # Clear buffer
         [],  # Clear indices
-        spinner_style,  # Show the loading spinner
-        True,  # Set transition state to True
+        spinner_style,  # Show loading spinner
+        True,  # Set transition state
+        {"display": "none"},  # Hide experiment replay controls
+        {"display": "block"},  # NEW: ADD THIS LINE - Show experiment name display
+        experiment_name.strip(),  # NEW: ADD THIS LINE - Set experiment name text
     )
-
 
 @callback(
     Output("live-model-dialog", "is_open", allow_duplicate=True),
@@ -243,21 +277,32 @@ def handle_model_cancel(cancel_clicks, go_live_clicks):
     raise PreventUpdate
 
 
+# Replace the existing toggle_continue_button callback in live_mode.py
+
 @callback(
     Output("live-model-continue", "disabled"),
     Output("live-model-continue", "color", allow_duplicate=True),
     Output("live-model-continue", "children", allow_duplicate=True),
+    Input("live-experiment-name-input", "value"),  # NEW: ADD THIS LINE
     Input("live-autoencoder-dropdown", "value"),
     Input("live-dimred-dropdown", "value"),
-    prevent_initial_call=True,  # Add this to prevent initial call
+    Input("live-autoencoder-version-dropdown", "value"),
+    Input("live-dimred-version-dropdown", "value"),
+    prevent_initial_call=True,
 )
-def toggle_continue_button(selected_autoencoder, selected_dimred):
+def toggle_continue_button(experiment_name, selected_autoencoder, selected_dimred, auto_version, dimred_version):  # NEW: ADD experiment_name parameter
     """
-    Disable the continue button if models are not selected or are incompatible
+    Disable the continue button if models or versions are not selected or are incompatible
     Also update the button color and text to indicate state
     """
-    # First check if either model is not selected
-    if selected_autoencoder is None or selected_dimred is None:
+    # NEW: ADD THIS CHECK BLOCK - START
+    if not experiment_name or not experiment_name.strip():
+        return True, "secondary", "Continue"
+    # NEW: ADD THIS CHECK BLOCK - END
+    
+    # Check if any required field is not selected
+    if (selected_autoencoder is None or selected_dimred is None or 
+        auto_version is None or dimred_version is None):
         return True, "secondary", "Continue"  # Disabled with neutral color
 
     # Check if models are compatible
@@ -271,7 +316,6 @@ def toggle_continue_button(selected_autoencoder, selected_dimred):
     else:
         # Models are incompatible - disable with danger color
         return True, "danger", "Incompatible Models"
-
 
 @callback(
     Output("show-clusters", "value", allow_duplicate=True),
@@ -291,6 +335,9 @@ def toggle_continue_button(selected_autoencoder, selected_dimred):
     Output("live-indices", "data", allow_duplicate=True),
     Output("live-mode-canceled", "data", allow_duplicate=True),
     Output("selected-live-models", "data", allow_duplicate=True),
+    Output("experiment-replay-controls", "style", allow_duplicate=True),  # ADDED
+    Output("live-experiment-name-display", "style", allow_duplicate=True),  # NEW: ADD THIS LINE
+    Output("live-experiment-name-text", "children", allow_duplicate=True),  # NEW: ADD THIS LINE
     Input("go-live", "n_clicks"),
     State("selected-live-models", "data"),
     State("live-mode-canceled", "data"),
@@ -321,7 +368,10 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
             no_update,  # pause-button style
             no_update,  # live-indices data
             False,  # Reset the cancel flag
-            None,
+            None,  # selected-live-models data
+            no_update,  # experiment-replay-controls style - ADDED
+            no_update,  # NEW: ADD THIS LINE - experiment-name-display style
+            no_update,  # NEW: ADD THIS LINE - experiment-name-text
         )
 
     # Check if continue was already clicked (selected_models is not None)
@@ -335,14 +385,18 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
                 # Reset dimension reduction model to empty string
                 redis_model_store.store_dimred_model("")
 
+                # NEW: ADD THIS BLOCK - START
+                redis_model_store.store_experiment_name("")
+                # NEW: ADD THIS BLOCK - END
+
                 logger.info("Published model reset messages to Redis")
             except Exception as e:
                 logger.error(f"Error publishing model reset messages to Redis: {e}")
 
         # Going back to offline mode
         return (
-            False,
-            False,
+            False,  # show-clusters value
+            False,  # show-feature-vectors value
             {},  # Show data selection controls
             {},  # Show dimension reduction controls
             {},  # Show clustering controls
@@ -367,13 +421,18 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
             [],  # Clear live indices
             False,  # Reset canceled flag
             None,  # Reset selected_models to None
+            {},  # Show experiment replay controls - ADDED
+            {"display": "none"},  # NEW: ADD THIS LINE - Hide experiment name display
+            "",  # NEW: ADD THIS LINE - Clear experiment name text
         )
 
     # First click or other odd clicks - going to live mode
     if n_clicks is not None and n_clicks % 2 == 1 and selected_models is not None:
+        experiment_name = selected_models.get("experiment_name", "")  # NEW: ADD THIS LINE
+        
         return (
-            False,
-            False,
+            False,  # show-clusters value
+            False,  # show-feature-vectors value
             {"display": "none"},  # Hide data selection controls
             {"display": "none"},  # Hide dimension reduction controls
             {"display": "none"},  # Hide clustering controls
@@ -400,6 +459,9 @@ def toggle_controls(n_clicks, selected_models, mode_canceled):
             [],  # Initialize empty live indices
             False,  # Reset canceled flag
             selected_models,  # Keep selected_models unchanged
+            {"display": "none"},  # Hide experiment replay controls - ADDED
+            {"display": "block" if experiment_name else "none"},  # NEW: ADD THIS LINE - Show/hide experiment display
+            experiment_name,  # NEW: ADD THIS LINE - Set experiment name text
         )
 
     raise PreventUpdate
@@ -488,16 +550,19 @@ def update_data_project_dict(n_clicks, selected_models):
     Output("buffer", "data", allow_duplicate=True),
     Input("update-live-models-button", "n_clicks"),
     State("live-mode-autoencoder-dropdown", "value"),
+    State("live-mode-autoencoder-version-dropdown", "value"),  # ADDED
     State("live-mode-dimred-dropdown", "value"),
+    State("live-mode-dimred-version-dropdown", "value"),  # ADDED
     State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
     prevent_initial_call=True,
 )
-def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_dict):
+def update_live_models(n_clicks, autoencoder_model, autoencoder_version, 
+                       dimred_model, dimred_version, data_project_dict):
     """
     Update the selected models when the sidebar update button is clicked.
     This function:
     1. Checks model compatibility
-    2. Stores models in Redis if compatible
+    2. Stores models with versions in Redis if compatible
     3. Updates data project dictionary
     4. Resets visualizations
     5. Shows loading spinner
@@ -505,7 +570,7 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
     if n_clicks is None:
         raise PreventUpdate
 
-    # Check model compatibility
+    # Check model compatibility (names only, since dimensions don't change between versions)
     if not mlflow_client.check_model_compatibility(autoencoder_model, dimred_model):
         logger.warning(
             f"Incompatible models selected: {autoencoder_model}, {dimred_model}"
@@ -524,15 +589,17 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
             no_update,  # buffer.data
         )
 
+    # Create model identifiers with versions
+    autoencoder_id = f"{autoencoder_model}:{autoencoder_version}"
+    dimred_id = f"{dimred_model}:{dimred_version}"
+
     # Store models in Redis
     try:
-        # Store autoencoder model
-        logger.info(f"Storing autoencoder model from sidebar: {autoencoder_model}")
-        redis_model_store.store_autoencoder_model(autoencoder_model)
+        logger.info(f"Storing autoencoder model from sidebar: {autoencoder_id}")
+        redis_model_store.store_autoencoder_model(autoencoder_id)
 
-        # Store dimension reduction model
-        logger.info(f"Storing dimension reduction model from sidebar: {dimred_model}")
-        redis_model_store.store_dimred_model(dimred_model)
+        logger.info(f"Storing dimension reduction model from sidebar: {dimred_id}")
+        redis_model_store.store_dimred_model(dimred_id)
     except Exception as e:
         logger.error(f"Error storing models in Redis: {e}")
         return (
@@ -549,8 +616,13 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
             no_update,
         )
 
-    # Update the selected models
-    selected_models = {"autoencoder": autoencoder_model, "dimred": dimred_model}
+    # Update the selected models (include versions)
+    selected_models = {
+        "autoencoder": autoencoder_model,
+        "autoencoder_version": autoencoder_version,
+        "dimred": dimred_model,
+        "dimred_version": dimred_version
+    }
 
     # Update data project dict with new models
     data_project_dict = {
@@ -605,19 +677,25 @@ def update_live_models(n_clicks, autoencoder_model, dimred_model, data_project_d
     Output("update-live-models-button", "color", allow_duplicate=True),
     Output("update-live-models-button", "children", allow_duplicate=True),
     Input("live-mode-autoencoder-dropdown", "value"),
+    Input("live-mode-autoencoder-version-dropdown", "value"),  # ADDED
     Input("live-mode-dimred-dropdown", "value"),
+    Input("live-mode-dimred-version-dropdown", "value"),  # ADDED
     State("selected-live-models", "data"),
     prevent_initial_call=True,
 )
-def reset_update_button(autoencoder_model, dimred_model, selected_models):
+def reset_update_button(autoencoder_model, autoencoder_version, 
+                        dimred_model, dimred_version, selected_models):
     """
-    Reset the update button color when dropdowns change and check model compatibility
+    Reset the update button color when dropdowns change and check model compatibility.
+    Now also checks if versions have changed.
     """
-    # If no models are selected yet or either dropdown is empty
-    if selected_models is None or autoencoder_model is None or dimred_model is None:
+    # If no models are selected yet or any dropdown is empty
+    if (selected_models is None or 
+        autoencoder_model is None or dimred_model is None or
+        autoencoder_version is None or dimred_version is None):
         return True, "secondary", "Update Models"  # Disabled, secondary color
 
-    # Check if models are compatible using the shared compatibility check function
+    # Check if models are compatible (names only)
     is_compatible = mlflow_client.check_model_compatibility(
         autoencoder_model, dimred_model
     )
@@ -626,10 +704,13 @@ def reset_update_button(autoencoder_model, dimred_model, selected_models):
         # Models are incompatible - disable button with danger color
         return True, "danger", "Incompatible Models"
 
-    # Check if the current selection is different from what's already selected
-    models_changed = autoencoder_model != selected_models.get(
-        "autoencoder"
-    ) or dimred_model != selected_models.get("dimred")
+    # Check if EITHER name OR version changed
+    models_changed = (
+        autoencoder_model != selected_models.get("autoencoder") or
+        autoencoder_version != selected_models.get("autoencoder_version") or
+        dimred_model != selected_models.get("dimred") or
+        dimred_version != selected_models.get("dimred_version")
+    )
 
     if models_changed:
         # Models are compatible and changed - enable button with primary color
@@ -881,3 +962,96 @@ def force_data_reset(n_clicks):
         # Reset for both entering and exiting live mode
         return 0, 0, None
     raise PreventUpdate
+
+# Dialog version dropdowns
+@callback(
+    Output("live-autoencoder-version-dropdown", "options"),
+    Output("live-autoencoder-version-dropdown", "disabled"),
+    Output("live-autoencoder-version-dropdown", "value"),
+    Input("live-autoencoder-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def update_dialog_autoencoder_versions(selected_model):
+    """Load version options when autoencoder model name is selected in dialog"""
+    if not selected_model:
+        return [], True, None
+    
+    try:
+        versions = mlflow_client.get_model_versions(selected_model)
+        if versions:
+            # Default to latest version
+            return versions, False, versions[0]["value"]
+        return [], True, None
+    except Exception as e:
+        logger.error(f"Error loading autoencoder versions: {e}")
+        return [], True, None
+
+
+@callback(
+    Output("live-dimred-version-dropdown", "options"),
+    Output("live-dimred-version-dropdown", "disabled"),
+    Output("live-dimred-version-dropdown", "value"),
+    Input("live-dimred-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def update_dialog_dimred_versions(selected_model):
+    """Load version options when dimred model name is selected in dialog"""
+    if not selected_model:
+        return [], True, None
+    
+    try:
+        versions = mlflow_client.get_model_versions(selected_model)
+        if versions:
+            # Default to latest version
+            return versions, False, versions[0]["value"]
+        return [], True, None
+    except Exception as e:
+        logger.error(f"Error loading dimred versions: {e}")
+        return [], True, None
+
+
+# Sidebar version dropdowns
+@callback(
+    Output("live-mode-autoencoder-version-dropdown", "options"),
+    Output("live-mode-autoencoder-version-dropdown", "disabled"),
+    Output("live-mode-autoencoder-version-dropdown", "value"),
+    Input("live-mode-autoencoder-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def update_sidebar_autoencoder_versions(selected_model):
+    """Load version options when autoencoder model name is selected in sidebar"""
+    if not selected_model:
+        return [], True, None
+    
+    try:
+        versions = mlflow_client.get_model_versions(selected_model)
+        if versions:
+            # Default to latest version
+            return versions, False, versions[0]["value"]
+        return [], True, None
+    except Exception as e:
+        logger.error(f"Error loading autoencoder versions: {e}")
+        return [], True, None
+
+
+@callback(
+    Output("live-mode-dimred-version-dropdown", "options"),
+    Output("live-mode-dimred-version-dropdown", "disabled"),
+    Output("live-mode-dimred-version-dropdown", "value"),
+    Input("live-mode-dimred-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def update_sidebar_dimred_versions(selected_model):
+    """Load version options when dimred model name is selected in sidebar"""
+    if not selected_model:
+        return [], True, None
+    
+    try:
+        versions = mlflow_client.get_model_versions(selected_model)
+        if versions:
+            # Default to latest version
+            return versions, False, versions[0]["value"]
+        return [], True, None
+    except Exception as e:
+        logger.error(f"Error loading dimred versions: {e}")
+        return [], True, None

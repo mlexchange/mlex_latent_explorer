@@ -15,20 +15,62 @@ def create_model_selection_dialog():
                             html.P(
                                 "Please select models to use for processing live data stream:"
                             ),
+                            # NEW: Experiment Name Input
+                            html.H6("Experiment Name:"),
+                            dbc.Input(
+                                id="live-experiment-name-input",
+                                type="text",
+                                placeholder="Enter experiment name...",
+                                className="mb-3",
+                            ),
                             html.H6("Autoencoder Model:"),
-                            dbc.Select(
-                                id="live-autoencoder-dropdown",
-                                options=[],  # Will be populated by callback
-                                value=None,
-                                placeholder="Select an autoencoder model...",
+                            dbc.Row(
+                                [
+                                    dbc.Col(
+                                        dbc.Select(
+                                            id="live-autoencoder-dropdown",
+                                            options=[],
+                                            value=None,
+                                            placeholder="Select model name...",
+                                        ),
+                                        width=7,
+                                    ),
+                                    dbc.Col(
+                                        dbc.Select(
+                                            id="live-autoencoder-version-dropdown",
+                                            options=[],
+                                            value=None,
+                                            placeholder="Select version...",
+                                            disabled=True,
+                                        ),
+                                        width=5,
+                                    ),
+                                ],
                                 className="mb-3",
                             ),
                             html.H6("Dimension Reduction Model:"),
-                            dbc.Select(
-                                id="live-dimred-dropdown",
-                                options=[],  # Will be populated by callback
-                                value=None,
-                                placeholder="Select a dimension reduction model...",
+                            dbc.Row(
+                                [
+                                    dbc.Col(
+                                        dbc.Select(
+                                            id="live-dimred-dropdown",
+                                            options=[],
+                                            value=None,
+                                            placeholder="Select model name...",
+                                        ),
+                                        width=7,
+                                    ),
+                                    dbc.Col(
+                                        dbc.Select(
+                                            id="live-dimred-version-dropdown",
+                                            options=[],
+                                            value=None,
+                                            placeholder="Select version...",
+                                            disabled=True,
+                                        ),
+                                        width=5,
+                                    ),
+                                ],
                             ),
                         ]
                     ),
@@ -50,8 +92,8 @@ def create_model_selection_dialog():
                 ],
                 id="live-model-dialog",
                 is_open=False,
-                backdrop="static",  # Modal cannot be closed by clicking outside
-                keyboard=False,     # Modal cannot be closed by pressing escape
+                backdrop="static",
+                keyboard=False,
                 centered=True,
             ),
         ]

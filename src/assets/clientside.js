@@ -91,23 +91,33 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                         let dimred_model = data.dimred_model;
                         log.debug("Message models - Autoencoder:", autoencoder_model, "Dimred:", dimred_model);
 
-                        // Check if model names match currently selected models
+                        // Compare full "name:version" identifiers
                         if (selected_models !== null && selected_models !== undefined) {
-                            let current_autoencoder = selected_models.autoencoder;
-                            let current_dimred = selected_models.dimred;
-                            log.debug("Current selected models - Autoencoder:", current_autoencoder, "Dimred:", current_dimred);
+                            // Construct full identifiers from selected_models
+                            let current_autoencoder_id = selected_models.autoencoder;
+                            let current_dimred_id = selected_models.dimred;
+                            
+                            // Add version if available
+                            if (selected_models.autoencoder_version) {
+                                current_autoencoder_id = `${selected_models.autoencoder}:${selected_models.autoencoder_version}`;
+                            }
+                            if (selected_models.dimred_version) {
+                                current_dimred_id = `${selected_models.dimred}:${selected_models.dimred_version}`;
+                            }
+                            
+                            log.debug("Current selected model IDs - Autoencoder:", current_autoencoder_id, "Dimred:", current_dimred_id);
 
-                            // Skip buffer entries from different models
-                            if ((autoencoder_model && autoencoder_model !== current_autoencoder) ||
-                                (dimred_model && dimred_model !== current_dimred)) {
-                                log.info(`Skipping buffer entries from different models: got ${autoencoder_model}/${dimred_model}, expected ${current_autoencoder}/${current_dimred}`);
+                            // Skip buffer entries from different model versions
+                            if ((autoencoder_model && autoencoder_model !== current_autoencoder_id) ||
+                                (dimred_model && dimred_model !== current_dimred_id)) {
+                                log.info(`Skipping buffer entries from different model versions: got ${autoencoder_model}/${dimred_model}, expected ${current_autoencoder_id}/${current_dimred_id}`);
 
                                 // Return current state without modifications when models don't match
                                 return [buffer_data, data_project_dict, live_indices, spinner_style, transition_state];
                             }
 
                             // If we got a matching model message, hide the spinner
-                            log.info("Models match - hiding spinner");
+                            log.info("Model versions match - hiding spinner");
                             spinner_style = {
                                 "position": "fixed",
                                 "top": 0,
@@ -168,6 +178,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                         // Check for slice index in the query string
                         const params = new URLSearchParams(url.search);
                         const sliceParam = params.get('slice');
+                        let index = 0;
 
                         if (sliceParam) {
                             // Expecting format like "0,0,:,:" or "0:1,0:1679,0:1475"
