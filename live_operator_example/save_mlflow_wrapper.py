@@ -19,6 +19,7 @@ from pathlib import Path
 
 # Fix transformers compatibility BEFORE any imports
 os.environ["TRANSFORMERS_USE_TORCH_EXPORT"] = "0"
+os.environ['MLFLOW_ARTIFACT_ROOT'] = os.path.expanduser('~/mlflow_artifacts')
 
 import mlflow
 from dotenv import load_dotenv
