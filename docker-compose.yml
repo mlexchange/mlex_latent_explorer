@@ -241,7 +241,7 @@ services:
       - ./data/mlflow_cache:/mlflow_cache
       - ./data/vector_save:/data/vector_save
     ports:
-      - 127.0.0.1:8766:8765  # Different external port to avoid conflicts
+      - 127.0.0.1:8765:8765  
     environment:
       NUMBA_DISABLE_JIT: ${NUMBA_DISABLE_JIT:-0}
       NUMBA_CPU_NAME: ${NUMBA_CPU_NAME:-generic}
