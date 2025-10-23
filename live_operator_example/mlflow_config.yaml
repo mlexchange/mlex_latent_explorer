@@ -1,8 +1,8 @@
 # Common settings
 common:
-  dataset: "smi"  # "smi" or "trs" - determines which dataset config to use
+  dataset: "trs"  # "smi" or "trs" - determines which dataset config to use
   autoencoder_type: "VAE"  # use VIT or VAE
-  dimred_type: "joblib" #use joblib or neural
+  dimred_type: "neural" #use joblib or neural
 
 # Model configurations organized by dataset
 models:
