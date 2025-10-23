@@ -339,8 +339,8 @@ services:
       --host 0.0.0.0
       --port 8001
       --data-file /data/shot_averages/combined_all_bin_averages.npy
-      --cycles 100
-      --pause 0.1
+      --cycles 1
+      --pause 1
     profiles:
       - sim_xps
     volumes:
@@ -349,6 +349,8 @@ services:
       - 127.0.0.1:8001:8001
     environment:
       - PYTHONUNBUFFERED=1
+      - WEBSOCKET_PING_TIMEOUT=60  # Add this (default is ~20s)
+      - WEBSOCKET_PING_INTERVAL=20  # Add this (default is ~5s)
     networks:
       mle_net:
 
