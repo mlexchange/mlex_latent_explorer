@@ -11,7 +11,7 @@ from file_manager.data_project import DataProject
 from mlex_utils.prefect_utils.core import get_children_flow_run_ids
 from PIL import Image
 
-from src.app_layout import DATA_TILED_KEY, LIVE_TILED_API_KEY, NUM_IMGS_OVERVIEW, USER
+from src.app_layout import DATA_TILED_KEY, LIVE_TILED_API_KEY, NUM_IMGS_OVERVIEW, USER, long_callback_manager
 from src.utils.data_utils import hash_list_of_strings, tiled_results
 from src.utils.plot_utils import (
     generate_heatmap_plot,
@@ -19,6 +19,8 @@ from src.utils.plot_utils import (
     plot_empty_heatmap,
     plot_empty_scatter,
 )
+
+MAX_HEATMAP_SELECTION = 30
 
 # Add logger for display.py
 logger = logging.getLogger("lse.display")
@@ -320,16 +322,27 @@ def clear_selections(n_clicks, current_fig):
 
 
 @callback(
-    Output("heatmap", "figure"),
-    Output("stats-div", "children", allow_duplicate=True),
-    Input("scatter", "clickData"),
-    Input("scatter", "selectedData"),
-    Input("mean-std-toggle", "value"),
-    Input("log-transform", "value"),
-    Input("min-max-percentile", "value"),
-    State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
-    State("live-indices", "data"),
-    State("go-live", "n_clicks"),  # Add state for live mode
+    output=[
+        Output("heatmap", "figure"),
+        Output("stats-div", "children", allow_duplicate=True),
+    ],
+    inputs=[
+        Input("scatter", "clickData"),
+        Input("scatter", "selectedData"),
+        Input("mean-std-toggle", "value"),
+        Input("log-transform", "value"),
+        Input("min-max-percentile", "value"),
+    ],
+    state=[
+        State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
+        State("live-indices", "data"),
+        State("go-live", "n_clicks"),
+    ],
+    background=True,  # This makes it a long callback
+    manager=long_callback_manager,
+    running=[
+        (Output("stats-div", "children"), "Loading heatmap...", ""),
+    ],
     prevent_initial_call=True,
 )
 def update_heatmap(
@@ -340,7 +353,7 @@ def update_heatmap(
     percentiles,
     data_project_dict,
     live_indices,
-    go_live,  # New state parameter for live mode detection
+    go_live,
 ):
     """
     This callback update the heatmap
@@ -355,10 +368,19 @@ def update_heatmap(
         go_live:                n_clicks for live mode button
     Returns:
         fig:                    updated heatmap
+        stats:                  statistics text
     """
     # user select a group of points
     if selected_data is not None and len(selected_data["points"]) > 0:
         selected_indices = [point["pointIndex"] for point in selected_data["points"]]
+        
+        # Check if selection exceeds limit
+        if len(selected_indices) > MAX_HEATMAP_SELECTION:
+            return (
+                plot_empty_heatmap(),
+                f"⚠️ Selection too large ({len(selected_indices)} points). "
+                f"Please select {MAX_HEATMAP_SELECTION} or fewer points for heatmap display.",
+            )
 
     # user click on a single point
     elif click_data is not None and len(click_data["points"]) > 0:
