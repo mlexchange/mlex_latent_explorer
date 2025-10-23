@@ -370,16 +370,19 @@ def update_heatmap(
         fig:                    updated heatmap
         stats:                  statistics text
     """
+    # Check if in live mode
+    is_live_mode = go_live is not None and go_live % 2 == 1
+    
     # user select a group of points
     if selected_data is not None and len(selected_data["points"]) > 0:
         selected_indices = [point["pointIndex"] for point in selected_data["points"]]
         
-        # Check if selection exceeds limit
-        if len(selected_indices) > MAX_HEATMAP_SELECTION:
+        # Only apply MAX_HEATMAP_SELECTION limit in live mode
+        if is_live_mode and len(selected_indices) > MAX_HEATMAP_SELECTION:
             return (
                 plot_empty_heatmap(),
                 f"⚠️ Selection too large ({len(selected_indices)} points). "
-                f"Please select {MAX_HEATMAP_SELECTION} or fewer points for heatmap display.",
+                f"Please select {MAX_HEATMAP_SELECTION} or fewer points for heatmap display in live mode.",
             )
 
     # user click on a single point
@@ -399,7 +402,6 @@ def update_heatmap(
         selected_indices = [live_indices[i] for i in selected_indices]
 
     # Determine which API key to use based on live mode
-    is_live_mode = go_live is not None and go_live % 2 == 1
     is_replay_mode = data_project_dict.get("replay_mode", False)
     
     if is_live_mode:
