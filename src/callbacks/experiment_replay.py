@@ -1,5 +1,6 @@
 import logging
 import traceback
+import os
 import numpy as np
 from dash import Input, Output, State, callback, no_update
 from dash.exceptions import PreventUpdate
@@ -9,7 +10,7 @@ from src.utils.data_utils import (
     get_daily_containers, 
     get_experiment_names_in_container,  
     get_uuids_in_experiment,
-    get_experiment_dataframe,  # Add this import
+    get_experiment_dataframe,
     tiled_results
 )
 from src.utils.plot_utils import (
@@ -20,6 +21,10 @@ from src.utils.plot_utils import (
 )
 
 logger = logging.getLogger("lse.replay")
+
+# Get the replay prefix from environment variable
+TILED_REPLAY_PREFIX = os.getenv("TILED_REPLAY_PREFIX", None)
+logger.info(f"Using Tiled replay prefix: {TILED_REPLAY_PREFIX}")
 
 @callback(
     Output("daily-container-dropdown", "options"),
@@ -32,8 +37,8 @@ def load_daily_containers(n_clicks):
     if n_clicks is None:
         raise PreventUpdate
         
-    # CHANGED: Now calls get_daily_containers() without username parameter
-    containers = get_daily_containers()
+    # Use the prefix from environment variable
+    containers = get_daily_containers(TILED_REPLAY_PREFIX)
     
     if containers:
         return containers, containers[0]["value"]
@@ -47,8 +52,8 @@ def load_daily_containers(n_clicks):
 )
 def load_containers_on_render(active_item):
     """Load daily containers when the page is first loaded"""
-    # CHANGED: Now calls get_daily_containers() without username parameter
-    containers = get_daily_containers()
+    # Use the prefix from environment variable
+    containers = get_daily_containers(TILED_REPLAY_PREFIX)
     return containers if containers else []
 
 @callback(
@@ -63,8 +68,8 @@ def load_experiment_names(selected_container, refresh_clicks):
     if not selected_container:
         return [], None
         
-    # CHANGED: Now calls get_experiment_names_in_container() without username parameter
-    experiment_names = get_experiment_names_in_container(selected_container)
+    # Use the prefix from environment variable
+    experiment_names = get_experiment_names_in_container(selected_container, TILED_REPLAY_PREFIX)
     
     if experiment_names:
         return experiment_names, experiment_names[0]["value"]
@@ -84,8 +89,8 @@ def load_experiment_uuids(selected_experiment, refresh_clicks, selected_containe
     if not selected_container or not selected_experiment:
         return [], None
         
-    # CHANGED: Now calls get_uuids_in_experiment() without username parameter
-    uuids = get_uuids_in_experiment(selected_container, selected_experiment)
+    # Use the prefix from environment variable
+    uuids = get_uuids_in_experiment(selected_container, selected_experiment, TILED_REPLAY_PREFIX)
     
     if uuids:
         return uuids, uuids[0]["value"]
@@ -143,7 +148,7 @@ def filter_experiment_by_range(range_value, replay_buffer, data_project_dict):
         if start_idx >= end_idx or start_idx >= total_points or end_idx <= 0:
             # Return an empty scatter plot for invalid ranges
             empty_fig = plot_empty_scatter()
-            return empty_fig, total_points  # Remove marks from return
+            return empty_fig, total_points
         
         # Ensure end_idx doesn't exceed total_points
         end_idx = min(end_idx, total_points)
@@ -173,7 +178,6 @@ def filter_experiment_by_range(range_value, replay_buffer, data_project_dict):
 
 @callback(
     Output("scatter", "figure", allow_duplicate=True),
-    # Removed stats-div output
     Output({"base_id": "file-manager", "name": "data-project-dict"}, "data", allow_duplicate=True),
     Output("replay-buffer", "data"),
     Output("replay-data-range", "value"),
@@ -181,7 +185,7 @@ def filter_experiment_by_range(range_value, replay_buffer, data_project_dict):
     Output("replay-data-range", "marks", allow_duplicate=True),
     Input("load-experiment-button", "n_clicks"),
     State("daily-container-dropdown", "value"),
-    State("experiment-name-dropdown", "value"),  
+    State("experiment-name-dropdown", "value"),
     State("experiment-uuid-dropdown", "value"),
     prevent_initial_call=True,
 )
@@ -196,7 +200,7 @@ def load_experiment_replay(n_clicks, selected_container, selected_experiment, se
         "data_type": "tiled",
         "datasets": [],
         "project_id": f"replay_{selected_uuid}",
-        "replay_mode": True  # Flag to prevent update_data_overview from running
+        "replay_mode": True
     }
     
     # Initialize an empty structured replay buffer
@@ -212,8 +216,8 @@ def load_experiment_replay(n_clicks, selected_container, selected_experiment, se
         # Connect to Tiled and load feature vectors
         logger.info(f"Loading experiment UUID: {selected_uuid} from container: {selected_container}, experiment: {selected_experiment}")
         
-        # CHANGED: Use the new function to get the DataFrame directly
-        df = get_experiment_dataframe(selected_container, selected_experiment, selected_uuid)
+        # Use the prefix from environment variable
+        df = get_experiment_dataframe(selected_container, selected_experiment, selected_uuid, TILED_REPLAY_PREFIX)
         
         if df is None or df.empty:
             default_marks = {i: str(i) for i in range(0, 101, 20)}
@@ -250,14 +254,11 @@ def load_experiment_replay(n_clicks, selected_container, selected_experiment, se
             
             if is_feature_vectors_special_case:
                 # Special case: Each image is in its own container
-                # live_indices should be sequential [0, 1, 2, ...] because each scatter point
-                # maps to a dataset, and each dataset has only 1 image at index 0
                 logger.info("Processing feature_vectors special case - using sequential indices")
                 live_indices = list(range(len(df)))
                 logger.info(f"Set live_indices to sequential: {live_indices[:5]}...")
             else:
                 # Normal case: Extract slice indices from URLs
-                # Initialize live_indices as a list of the same length as feature_vectors
                 live_indices = [-1] * len(feature_vectors)
                 
                 for i, url in enumerate(tiled_urls):
@@ -289,7 +290,7 @@ def load_experiment_replay(n_clicks, selected_container, selected_experiment, se
             "uuid": selected_uuid,
             "container": selected_container,
             "experiment_name": selected_experiment,
-            "is_feature_vectors_special_case": is_feature_vectors_special_case  # Add flag
+            "is_feature_vectors_special_case": is_feature_vectors_special_case
         }
         
         # Let's try to create a more complete data project dictionary
@@ -315,9 +316,6 @@ def load_experiment_replay(n_clicks, selected_container, selected_experiment, se
                 
                 if is_feature_vectors_special_case:
                     # Special case: Each image is in its own container
-                    # URL example: /api/v1/metadata/Nafion_p25_30_run_1/local_images_1758157540_0170
-                    # We need to create one dataset per image
-                    
                     logger.info("Processing feature_vectors special case - creating datasets")
                     
                     datasets = []
@@ -364,19 +362,17 @@ def load_experiment_replay(n_clicks, selected_container, selected_experiment, se
                         "datasets": datasets,
                         "project_id": f"replay_{selected_uuid}",
                         "replay_mode": True,
-                        "is_feature_vectors_special_case": True  # Add flag
+                        "is_feature_vectors_special_case": True
                     }
                 else:
                     # Normal case: single dataset with slice-based access
-                    # Try to create a useful dataset structure
-                    # Typically path will be like /api/v1/array/full/smi/raw/UUID/primary/data/pil2M_image
                     parts = path.split('/api/v1/')
                     if len(parts) > 1:
                         uri_path = parts[1]
                         logger.info(f"Path after /api/v1/: {uri_path}")
                         
                         if uri_path.startswith(('array/full/', 'metadata/')):
-                            uri_path = uri_path.split('/', 2)[2]  # Get path after array/full/ or metadata/
+                            uri_path = uri_path.split('/', 2)[2]
                             logger.info(f"Final URI path: {uri_path}")
                         
                         # Create a dataset with this path
@@ -396,17 +392,12 @@ def load_experiment_replay(n_clicks, selected_container, selected_experiment, se
                             "replay_mode": True
                         }
                     else:
-                        # Fallback if parsing fails - use the initialized data_project_dict
+                        # Fallback if parsing fails
                         pass
             except Exception as e:
                 logger.warning(f"Error parsing URL for data project: {e}")
                 import traceback
                 logger.error(traceback.format_exc())
-                # Fallback to the initialized data_project_dict
-                pass
-        else:
-            # No URLs available - use the initialized data_project_dict
-            pass
         
         # Set total points as the data length
         total_points = len(feature_vectors)
@@ -415,7 +406,7 @@ def load_experiment_replay(n_clicks, selected_container, selected_experiment, se
         initial_range = [0, int(total_points)]
         
         # Create integer marks for slider
-        mark_interval = max(1, total_points // 5)  # Create ~5 marks
+        mark_interval = max(1, total_points // 5)
         marks = {i: str(i) for i in range(0, total_points+1, mark_interval)}
         
         # Return all outputs with data length as max and showing all data initially

@@ -91,9 +91,12 @@ def hash_list_of_strings(strings_list):
 
 # ============= UPDATED/NEW FUNCTIONS FOR USER HIERARCHY =============
 
-def get_daily_containers():
+def get_daily_containers(beamline_path=None):
     """
     Retrieve all available daily containers for the current user from Tiled
+    
+    Args:
+        beamline_path (str, optional): Path to beamline prefix (e.g., "beamlines/bl931/processed")
     
     Returns:
         list: List of dictionaries with {label: container_name, value: container_name}
@@ -109,6 +112,16 @@ def get_daily_containers():
         
         # Get the root container
         container = tiled_results.data_client
+        
+        # NEW: Navigate to beamline path if provided
+        if beamline_path:
+            path_parts = beamline_path.split('/')
+            for part in path_parts:
+                if part and part in container:
+                    container = container[part]
+                elif part:
+                    logger.warning(f"Beamline path segment '{part}' not found")
+                    return []
         
         # Navigate to the lse_live_results/username path
         if "lse_live_results" in container:
@@ -149,12 +162,13 @@ def format_container_name(container_name):
     return container_name
 
 
-def get_experiment_names_in_container(container_name):
+def get_experiment_names_in_container(container_name, beamline_path=None):
     """
     Retrieve all available experiment names from a specific daily container for the current user
     
     Args:
         container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20")
+        beamline_path (str, optional): Path to beamline prefix (e.g., "beamlines/bl931/processed")
         
     Returns:
         list: List of dictionaries with {label: experiment_name, value: experiment_name}
@@ -170,6 +184,16 @@ def get_experiment_names_in_container(container_name):
         
         # Get the root container
         container = tiled_results.data_client
+        
+        # NEW: Navigate to beamline path if provided
+        if beamline_path:
+            path_parts = beamline_path.split('/')
+            for part in path_parts:
+                if part and part in container:
+                    container = container[part]
+                elif part:
+                    logger.warning(f"Beamline path segment '{part}' not found")
+                    return []
         
         # Navigate to the lse_live_results/username/container_name path
         if "lse_live_results" not in container:
@@ -205,13 +229,14 @@ def get_experiment_names_in_container(container_name):
         return []
 
 
-def get_uuids_in_experiment(container_name, experiment_name):
+def get_uuids_in_experiment(container_name, experiment_name, beamline_path=None):
     """
     Retrieve all available experiment UUIDs from a specific experiment for the current user
     
     Args:
         container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20")
         experiment_name (str): The name of the experiment (user-entered name)
+        beamline_path (str, optional): Path to beamline prefix (e.g., "beamlines/bl931/processed")
         
     Returns:
         list: List of dictionaries with {label: uuid, value: uuid}
@@ -227,6 +252,16 @@ def get_uuids_in_experiment(container_name, experiment_name):
         
         # Get the root container
         container = tiled_results.data_client
+        
+        # NEW: Navigate to beamline path if provided
+        if beamline_path:
+            path_parts = beamline_path.split('/')
+            for part in path_parts:
+                if part and part in container:
+                    container = container[part]
+                elif part:
+                    logger.warning(f"Beamline path segment '{part}' not found")
+                    return []
         
         # Navigate to the lse_live_results/username/container_name/experiment_name path
         if "lse_live_results" not in container:
@@ -268,7 +303,7 @@ def get_uuids_in_experiment(container_name, experiment_name):
         return []
 
 
-def get_experiment_dataframe(container_name, experiment_name, uuid):
+def get_experiment_dataframe(container_name, experiment_name, uuid, beamline_path=None):
     """
     Retrieve the DataFrame for a specific UUID from an experiment
     
@@ -276,6 +311,7 @@ def get_experiment_dataframe(container_name, experiment_name, uuid):
         container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20")
         experiment_name (str): The name of the experiment
         uuid (str): The UUID of the specific table to retrieve
+        beamline_path (str, optional): Path to beamline prefix (e.g., "beamlines/bl931/processed")
         
     Returns:
         pandas.DataFrame or None: The DataFrame containing the experiment data, or None if not found
@@ -291,6 +327,16 @@ def get_experiment_dataframe(container_name, experiment_name, uuid):
         
         # Get the root container
         container = tiled_results.data_client
+        
+        # NEW: Navigate to beamline path if provided
+        if beamline_path:
+            path_parts = beamline_path.split('/')
+            for part in path_parts:
+                if part and part in container:
+                    container = container[part]
+                elif part:
+                    logger.warning(f"Beamline path segment '{part}' not found")
+                    return None
         
         # Navigate to the lse_live_results/username/container_name/experiment_name path
         if "lse_live_results" not in container:

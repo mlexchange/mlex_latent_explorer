@@ -32,10 +32,11 @@ UUID_PATTERN = r"([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"
 class TiledResultsPublisher(Publisher):
     """Publisher that saves latent space vectors to a Tiled server."""
 
-    def __init__(self, tiled_uri=None, tiled_api_key=None, root_segments=None):
+    def __init__(self, tiled_uri=None, tiled_api_key=None, root_segments=None, tiled_prefix=None):
         super().__init__()
         self.tiled_uri = tiled_uri or RESULTS_TILED_URI
         self.tiled_api_key = tiled_api_key or RESULTS_TILED_API_KEY
+        self.tiled_prefix = tiled_prefix  # NEW: Add prefix support
         self.root_segments = root_segments or ["lse_live_results"]
         self.user = USER  # Get user from environment
         self.client = None
@@ -72,8 +73,22 @@ class TiledResultsPublisher(Publisher):
         try:
             self.client = from_uri(self.tiled_uri, api_key=self.tiled_api_key)
             
+            # NEW: Navigate to prefix first if specified - ERROR if it doesn't exist
+            container = self.client
+            if self.tiled_prefix:
+                prefix_segments = self.tiled_prefix.split('/')
+                for segment in prefix_segments:
+                    if segment:  # Skip empty strings
+                        if segment in container:
+                            logger.info(f"Using existing prefix container: {segment}")
+                            container = container[segment]
+                        else:
+                            # Create the prefix path if it doesn't exist
+                            logger.info(f"Creating prefix container: {segment}")
+                            container = container.create_container(segment)
+            
             # Navigate to the root container and create the hierarchy
-            self._setup_containers_sync()
+            self._setup_containers_sync(container)
             
             # List all existing tables in the daily container
             if self.daily_container is not None:
@@ -90,7 +105,8 @@ class TiledResultsPublisher(Publisher):
                     logger.info(f"Examples of existing UUIDs: {', '.join(examples)}")
                     
             logger.info(f"Connected to Tiled server at {self.tiled_uri}")
-            logger.info(f"Using container path: {'/'.join(self.root_segments)}/{self.user}/{DAILY_RUN_ID}")
+            prefix_path = f"{self.tiled_prefix}/" if self.tiled_prefix else ""
+            logger.info(f"Using container path: {prefix_path}{'/'.join(self.root_segments)}/{self.user}/{DAILY_RUN_ID}")
         except Exception as e:
             logger.error(f"Error in _start_sync: {e}")
             import traceback
@@ -114,11 +130,13 @@ class TiledResultsPublisher(Publisher):
         logger.debug(f"No UUID found in URL, using default: {self.default_table_name}")
         return self.default_table_name
     
-    def _setup_containers_sync(self):
+    def _setup_containers_sync(self, starting_container=None):
         """Set up the container structure with USER level (synchronous version)."""
         try:
-            # Navigate through root_segments
-            container = self.client
+            # NEW: Start from provided container or client
+            container = starting_container if starting_container is not None else self.client
+            
+            # Navigate through root_segments (these we can create)
             for segment in self.root_segments:
                 if segment in container:
                     logger.info(f"Using existing container: {segment}")
@@ -389,4 +407,7 @@ class TiledResultsPublisher(Publisher):
     @classmethod
     def from_settings(cls, settings):
         """Create a TiledResultsPublisher from settings."""
-        return cls(root_segments=settings.get("root_segments"))
+        return cls(
+            root_segments=settings.get("root_segments"),
+            tiled_prefix=settings.get("tiled_prefix")  # NEW: Pass prefix from settings
+        )

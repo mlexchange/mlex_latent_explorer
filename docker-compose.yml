@@ -131,6 +131,7 @@ services:
       LIVE_TILED_API_KEY: '${LIVE_TILED_API_KEY}'
       RESULTS_TILED_URI: '${RESULTS_TILED_URI}'
       RESULTS_TILED_API_KEY: '${RESULTS_TILED_API_KEY}'
+      TILED_REPLAY_PREFIX: 'beamlines/bl931/processed'  # NEW: Add this line
       # Prefect
       PREFECT_API_URL: '${PREFECT_API_URL}'
       FLOW_NAME: '${FLOW_NAME}'
