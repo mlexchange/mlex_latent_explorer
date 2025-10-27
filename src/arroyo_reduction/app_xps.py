@@ -53,8 +53,8 @@ async def start() -> None:
         asyncio.create_task(vector_save_publisher.start())
         
         # Initialize the TiledResultsPublisher for saving vectors to Tiled
-        tiled_publisher = TiledResultsPublisher.from_settings(app_settings.tiled_publisher)
-        asyncio.create_task(tiled_publisher.start())
+        # tiled_publisher = TiledResultsPublisher.from_settings(app_settings.tiled_publisher)
+        # asyncio.create_task(tiled_publisher.start())
         
         # NEW: Initialize the XPS-specific local image publisher
         xps_local_image_publisher = XPSTiledLocalImagePublisher.from_settings(app_settings.local_image_publisher)
@@ -92,7 +92,7 @@ async def start() -> None:
         operator = LatentSpaceOperator.from_settings(app_settings, settings.lse_reducer)
         operator.add_publisher(ws_publisher)
         operator.add_publisher(vector_save_publisher)
-        operator.add_publisher(tiled_publisher)
+        # operator.add_publisher(tiled_publisher)
         operator.add_publisher(xps_local_image_publisher)  # NEW: Add this line
         
         # Use from_settings() pattern (consistent with ZMQFrameListener)
