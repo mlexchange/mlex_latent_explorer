@@ -16,9 +16,10 @@ lse_operator:
   tiled_publisher:  # Added new section for TiledResultsPublisher
     root_segments:
       - lse_live_results
-    tiled_prefix: beamlines/bl931/processed  # NEW: Add this line for prefix path
+    tiled_prefix: beamlines/bl931/processed  # Prefix path for feature vectors
   local_image_publisher:  # New section for TiledLocalImagePublisher
     container_name: live_data_cache  # Container for storing images
+    tiled_prefix: beamlines/bl931/processed  # Prefix path for XPS images
 
 lse_reducer:
   demo_mode: true

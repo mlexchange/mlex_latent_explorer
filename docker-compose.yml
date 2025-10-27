@@ -32,7 +32,7 @@ services:
 
   tiled:
     # see the file ./tiled/deploy/config.yml for detailed configuration of tiled
-    image: ghcr.io/bluesky/tiled:v0.1.0a118
+    image: ghcr.io/bluesky/tiled:main
     container_name: tiled-server
     ports:
       - "127.0.0.1:8000:8000"
