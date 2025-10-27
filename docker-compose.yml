@@ -152,7 +152,7 @@ services:
       MODE: "development"
       USER: ${USER}
       # Live mode
-      WEBSOCKET_URL: ${WEBSOCKET_URL:-ws://localhost:8765/lse}
+      WEBSOCKET_URL: ${WEBSOCKET_URL:-ws://localhost:8765/lse_operator}
       # MLflow
       MLFLOW_TRACKING_URI: '${MLFLOW_TRACKING_URI}'
       MLFLOW_TRACKING_USERNAME: '${MLFLOW_TRACKING_USERNAME}'
