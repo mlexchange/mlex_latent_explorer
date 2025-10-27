@@ -367,13 +367,20 @@ def get_experiment_dataframe(container_name, experiment_name, uuid, beamline_pat
             logger.warning(f"UUID {uuid} not found in {username}/{container_name}/{experiment_name}")
             return None
         
-        # Get and return the DataFrame
-        df = experiment_container[uuid].read()
+        # NEW: UUID is now a container, get the feature_vectors table inside it
+        uuid_container = experiment_container[uuid]
+        
+        if "feature_vectors" not in uuid_container:
+            logger.warning(f"feature_vectors table not found in {username}/{container_name}/{experiment_name}/{uuid}")
+            return None
+        
+        # Get and return the DataFrame from feature_vectors table
+        df = uuid_container["feature_vectors"].read()
         
         if df is not None and not df.empty:
-            logger.info(f"Successfully loaded DataFrame with shape {df.shape} from {username}/{container_name}/{experiment_name}/{uuid}")
+            logger.info(f"Successfully loaded DataFrame with shape {df.shape} from {username}/{container_name}/{experiment_name}/{uuid}/feature_vectors")
         else:
-            logger.warning(f"DataFrame is empty for {username}/{container_name}/{experiment_name}/{uuid}")
+            logger.warning(f"DataFrame is empty for {username}/{container_name}/{experiment_name}/{uuid}/feature_vectors")
             
         return df
         

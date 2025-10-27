@@ -250,19 +250,29 @@ class TiledResultsPublisher(Publisher):
                 # Get experiment container
                 experiment_container = self._get_experiment_container(experiment_name)
                 
-                # Check if this UUID already exists
+                # NEW: Check if UUID container exists (not UUID/feature_vectors table)
                 if uuid in experiment_container:
-                    logger.debug(f"Skipping vector for existing UUID: {uuid}")
-                    return None
+                    uuid_container = experiment_container[uuid]
+                    # Check if feature_vectors table exists inside UUID container
+                    if "feature_vectors" in uuid_container:
+                        logger.debug(f"Skipping vector for existing UUID: {uuid}")
+                        return None
                 
                 # Check if this is a new UUID
                 uuid_to_write = None
                 
                 if self.current_uuid is not None and uuid != self.current_uuid and self.current_uuid in self.uuid_dataframes:
-                    # We have a new UUID, so write the data for the previous UUID (if it's not an existing UUID)
-                    if self.current_uuid not in experiment_container and not self.uuid_dataframes[self.current_uuid].empty:
-                        logger.info(f"New UUID detected, marking previous UUID for writing: {self.current_uuid}")
-                        uuid_to_write = self.current_uuid
+                    # We have a new UUID, so write the data for the previous UUID
+                    if not self.uuid_dataframes[self.current_uuid].empty:
+                        # Check if the previous UUID's feature_vectors already exists
+                        prev_uuid_container = experiment_container.get(self.current_uuid)
+                        should_write = True
+                        if prev_uuid_container and "feature_vectors" in prev_uuid_container:
+                            should_write = False
+                        
+                        if should_write:
+                            logger.info(f"New UUID detected, marking previous UUID for writing: {self.current_uuid}")
+                            uuid_to_write = self.current_uuid
                 
                 # Update current UUID
                 self.current_uuid = uuid
@@ -318,10 +328,12 @@ class TiledResultsPublisher(Publisher):
             # Get experiment container instead of using daily_container
             experiment_container = self._get_experiment_container(self.current_experiment_name)
             
-            # Check if this UUID already exists
+            # NEW: Check if UUID container exists, and if feature_vectors table exists inside it
             if table_key in experiment_container:
-                logger.info(f"Skipping write for existing UUID: {table_key}")
-                return
+                uuid_container = experiment_container[table_key]
+                if "feature_vectors" in uuid_container:
+                    logger.info(f"Skipping write for existing UUID: {table_key} (feature_vectors already exists)")
+                    return
             
             # Get the DataFrame for this UUID
             df = self.uuid_dataframes.get(table_key)
@@ -330,19 +342,25 @@ class TiledResultsPublisher(Publisher):
                 return
                 
             # Log DataFrame info for debugging
-            logger.info(f"Writing {len(df)} vectors to new table '{table_key}' in {self.user}/{DAILY_RUN_ID}/{self.current_experiment_name}")
+            logger.info(f"Writing {len(df)} vectors to new table '{table_key}/feature_vectors' in {self.user}/{DAILY_RUN_ID}/{self.current_experiment_name}")
             
             # Check if DataFrame is empty
             if df.empty:
                 logger.warning(f"DataFrame for {table_key} is empty, nothing to write")
                 return
             
-            # Simply write the DataFrame to Tiled
+            # NEW: Create UUID container if it doesn't exist
+            if table_key not in experiment_container:
+                logger.info(f"Creating UUID container: {table_key}")
+                experiment_container.create_container(table_key)
+            
+            uuid_container = experiment_container[table_key]
+            
+            # Write the DataFrame as "feature_vectors" inside the UUID container
             try:
-                # Use write_dataframe with the UUID as the key
-                experiment_container.write_dataframe(df, key=table_key)
+                uuid_container.write_dataframe(df, key="feature_vectors")
                 
-                logger.info(f"Successfully wrote {len(df)} vectors to '{table_key}'")
+                logger.info(f"Successfully wrote {len(df)} vectors to '{table_key}/feature_vectors'")
                 
                 # Add this UUID to our set of existing UUIDs
                 self.existing_uuids.add(table_key)
@@ -391,9 +409,15 @@ class TiledResultsPublisher(Publisher):
             
             # Check if the current UUID needs writing
             if (self.current_uuid is not None and 
-                self.current_uuid not in experiment_container and
                 self.current_uuid in self.uuid_dataframes and 
                 not self.uuid_dataframes[self.current_uuid].empty):
+                
+                # Check if UUID container and feature_vectors table already exist
+                if self.current_uuid in experiment_container:
+                    uuid_container = experiment_container[self.current_uuid]
+                    if "feature_vectors" in uuid_container:
+                        logger.info(f"UUID {self.current_uuid} already has feature_vectors, skipping write")
+                        return None
                 
                 return self.current_uuid
             

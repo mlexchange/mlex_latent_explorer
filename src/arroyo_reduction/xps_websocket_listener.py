@@ -6,14 +6,21 @@ import numpy as np
 import os
 import websockets
 import uuid
+from datetime import datetime
+import pytz
 from arroyopy.listener import Listener
 from arroyopy.operator import Operator
 from arroyosas.schemas import RawFrameEvent, SerializableNumpyArrayModel
+
+from .redis_model_store import RedisModelStore  # NEW: Import RedisModelStore
 
 logger = logging.getLogger("arroyo_reduction.xps_websocket_listener")
 
 # Read base URL from environment variable
 RESULTS_TILED_URI = os.getenv("RESULTS_TILED_URI", "http://tiled:8000")
+
+# Timezone for daily run ID
+CALIFORNIA_TZ = pytz.timezone('US/Pacific')
 
 
 class XPSWebSocketListener(Listener):
@@ -27,6 +34,16 @@ class XPSWebSocketListener(Listener):
         self.tiled_base_uri = RESULTS_TILED_URI
         self.frame_counter = 0
         self.tiled_prefix = tiled_prefix or "beamlines/bl931/processed"
+        
+        # NEW: Initialize Redis model store to get experiment name
+        try:
+            redis_host = os.getenv("REDIS_HOST", "kvrocks")
+            redis_port = int(os.getenv("REDIS_PORT", 6666))
+            self.redis_model_store = RedisModelStore(host=redis_host, port=redis_port)
+            logger.info("Connected to Redis Model Store for experiment name")
+        except Exception as e:
+            logger.warning(f"Could not connect to Redis Model Store: {e}")
+            self.redis_model_store = None
         
     async def start(self):
         """Connect to XPS websocket and listen for messages"""
@@ -85,14 +102,37 @@ class XPSWebSocketListener(Listener):
         
         logger.debug(f"Received shot_mean for shot {shot_num}: shape {shot_mean.shape}")
         
-        # Construct tiled_url for the 3D array
+        # NEW: Get experiment name from Redis
+        experiment_name = "default_experiment"
+        if self.redis_model_store is not None:
+            redis_experiment_name = self.redis_model_store.get_experiment_name()
+            if redis_experiment_name:
+                experiment_name = redis_experiment_name
+                logger.debug(f"Using experiment name from Redis: {experiment_name}")
+            else:
+                logger.warning("No experiment name in Redis, using default")
+        else:
+            logger.warning("Redis not available, using default experiment name")
+        
+        # Get USER from environment
+        username = os.getenv("USER", "default_user")
+        
+        # Get current daily run ID (same as in tiled_results_publisher)
+        daily_run_id = f"daily_run_{datetime.now(CALIFORNIA_TZ).strftime('%Y-%m-%d')}"
+        
+        # Construct tiled_url pointing to the new structure
+        # Path: {prefix}/lse_live_results/{USER}/daily_run_xxx/{experiment_name}/{UUID}/xps_averaged_heatmaps
         prefix_path = f"{self.tiled_prefix}/" if self.tiled_prefix else ""
+        
+        # Build the URL to point to where the image WILL be stored
         # URL format for accessing slice of 3D array: array[frame:frame+1, 0:height, 0:width]
         tiled_url = (
             f"{self.tiled_base_uri}/api/v1/array/full/{prefix_path}"
-            f"live_data_cache/{self.current_uuid}/xps_averaged_heatmaps"
+            f"lse_live_results/{username}/{daily_run_id}/{experiment_name}/{self.current_uuid}/xps_averaged_heatmaps"
             f"?slice={self.frame_counter}:{self.frame_counter+1},0:{height},0:{width}"
         )
+        
+        logger.debug(f"Constructed tiled_url: {tiled_url}")
         
         # Create RawFrameEvent
         frame_event = RawFrameEvent(

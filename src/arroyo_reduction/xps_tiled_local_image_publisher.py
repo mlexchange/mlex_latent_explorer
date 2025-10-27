@@ -2,18 +2,29 @@ import asyncio
 import logging
 import os
 import re
+from datetime import datetime
 from urllib.parse import urlparse
 
 import numpy as np
+import pytz
 from arroyopy.publisher import Publisher
 from arroyosas.schemas import SASStop, RawFrameEvent
 from tiled.client import from_uri
 from tiled.client.array import ArrayClient
 
+from .redis_model_store import RedisModelStore  # NEW: Import RedisModelStore
+
 logger = logging.getLogger("arroyo_reduction.xps_tiled_local_image_publisher")
 
 # API key for Tiled authentication
 LOCAL_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
+
+# Timezone for daily run ID
+CALIFORNIA_TZ = pytz.timezone('US/Pacific')
+
+# Redis connection info
+REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
 
 
 class XPSTiledLocalImagePublisher(Publisher):
@@ -25,6 +36,14 @@ class XPSTiledLocalImagePublisher(Publisher):
         self.tiled_prefix = tiled_prefix
         self.client = None
         self.tiled_base_uri = None
+        
+        # NEW: Initialize Redis model store to get experiment name
+        try:
+            self.redis_model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
+            logger.info("Connected to Redis Model Store for experiment name")
+        except Exception as e:
+            logger.warning(f"Could not connect to Redis Model Store: {e}")
+            self.redis_model_store = None
 
         # Dictionary to track array clients for each UUID
         self.array_clients = {}  # {uuid: ArrayClient}
@@ -69,11 +88,35 @@ class XPSTiledLocalImagePublisher(Publisher):
         try:
             client = self._get_client(tiled_url)
             
-            # Build path segments from tiled_prefix
+            # NEW: Get experiment name from Redis
+            experiment_name = "default_experiment"
+            if self.redis_model_store is not None:
+                redis_experiment_name = self.redis_model_store.get_experiment_name()
+                if redis_experiment_name:
+                    experiment_name = redis_experiment_name
+                    logger.info(f"Using experiment name from Redis: {experiment_name}")
+                else:
+                    logger.warning("No experiment name in Redis, using default")
+            
+            # Get USER from environment
+            username = os.getenv("USER", "default_user")
+            
+            # Get current daily run ID (same as tiled_results_publisher)
+            daily_run_id = f"daily_run_{datetime.now(CALIFORNIA_TZ).strftime('%Y-%m-%d')}"
+            
+            # Build path: {prefix}/lse_live_results/USER/daily_run_xxx/experiment_name/UUID
             path_segments = []
             if self.tiled_prefix:
                 path_segments.extend([s for s in self.tiled_prefix.split('/') if s])
-            path_segments.extend(["live_data_cache", uuid])
+            
+            # Add the hierarchy to match tiled_results_publisher
+            path_segments.extend([
+                "lse_live_results",
+                username,
+                daily_run_id,
+                experiment_name,
+                uuid
+            ])
             
             # Navigate/create the container hierarchy
             container = client
@@ -98,7 +141,7 @@ class XPSTiledLocalImagePublisher(Publisher):
             
             # Cache the array client
             self.array_clients[uuid] = array_client
-            logger.info(f"Created new 3D array client for UUID: {uuid} with initial shape: {initial_array.shape}")
+            logger.info(f"Created new 3D array client for UUID: {uuid} at path: {'/'.join(path_segments)}/xps_averaged_heatmaps")
             
             return array_client
             
@@ -200,7 +243,7 @@ class XPSTiledLocalImagePublisher(Publisher):
 
     def get_local_url_for(self, original_url):
         """
-        Return the URL to access the full 3D array.
+        Return the URL to access the full 3D array in the new hierarchy.
         """
         if not original_url:
             return None
@@ -208,9 +251,21 @@ class XPSTiledLocalImagePublisher(Publisher):
         # Extract UUID
         uuid = self._extract_uuid_from_url(original_url)
         if uuid and self.tiled_base_uri:
-            # Build path with tiled_prefix
+            # NEW: Get experiment name from Redis
+            experiment_name = "default_experiment"
+            if self.redis_model_store is not None:
+                redis_experiment_name = self.redis_model_store.get_experiment_name()
+                if redis_experiment_name:
+                    experiment_name = redis_experiment_name
+            
+            # Get USER and daily_run_id
+            username = os.getenv("USER", "default_user")
+            daily_run_id = f"daily_run_{datetime.now(CALIFORNIA_TZ).strftime('%Y-%m-%d')}"
+            
+            # Build path with new hierarchy
             prefix_path = f"{self.tiled_prefix}/" if self.tiled_prefix else ""
-            # Return URL to the full 3D array
-            return f"{self.tiled_base_uri}/api/v1/array/full/{prefix_path}live_data_cache/{uuid}/xps_averaged_heatmaps"
+            
+            # Return URL to the full 3D array in new location
+            return f"{self.tiled_base_uri}/api/v1/array/full/{prefix_path}lse_live_results/{username}/{daily_run_id}/{experiment_name}/{uuid}/xps_averaged_heatmaps"
         
         return None
