@@ -160,8 +160,17 @@ def filter_experiment_by_range(range_value, replay_buffer, data_project_dict):
         if len(filtered_vectors) > 0:
             n_components = filtered_vectors.shape[1]
             
-            # Create a new scatter plot
-            scatter_fig = generate_scatter_data(filtered_vectors, n_components)
+            # CHANGED: Add time-based coloring with filtered indices
+            filtered_indices = np.arange(start_idx, end_idx)
+            
+            # Create a new scatter plot with time-based coloring
+            scatter_fig = generate_scatter_data(
+                filtered_vectors, 
+                n_components,
+                color_by="metadata",
+                metadata_array=filtered_indices,
+                metadata_label="Frame Index"
+            )
             
             return scatter_fig, total_points
                 
@@ -280,8 +289,17 @@ def load_experiment_replay(n_clicks, selected_container, selected_experiment, se
         n_components = 2  # Default to 2D
         if feature_vectors.shape[1] > 2:
             n_components = min(3, feature_vectors.shape[1])
-            
-        scatter_fig = generate_scatter_data(feature_vectors, n_components)
+        
+        # CHANGED: Add time-based coloring for initial load
+        time_array = np.arange(len(feature_vectors))
+        
+        scatter_fig = generate_scatter_data(
+            feature_vectors, 
+            n_components,
+            color_by="metadata",
+            metadata_array=time_array,
+            metadata_label="Frame Index"
+        )
         
         # Store data in the replay buffer
         replay_buffer = {
