@@ -95,10 +95,19 @@ class XPSWebSocketListener(Listener):
     
     async def _handle_message(self, message):
         """Parse XPS message and extract shot_mean for processing"""
-        # First message is JSON metadata (skip)
+        # First message is JSON metadata
         if isinstance(message, str):
             data = json.loads(message)
             logger.debug(f"Received XPS metadata: {data}")
+            
+            # Extract UUID from scan_name if this is a start message
+            if data.get('msg_type') == 'start':
+                scan_name = data.get('scan_name', '')
+                # Extract UUID from "temp name {uuid}" format
+                self.current_uuid = scan_name.replace('temp name ', '').strip()
+                self.frame_counter = 0
+                logger.info(f"Starting new XPS run with UUID from scan_name: {self.current_uuid}")
+            
             return
         
         # Second message is msgpack with images
@@ -112,12 +121,6 @@ class XPSWebSocketListener(Listener):
         if not shot_mean_bytes or not width or not height:
             logger.warning("Received XPS message without shot_mean data")
             return
-        
-        # Generate new UUID when shot_num is 1 (start of new run)
-        if shot_num == 1:
-            self.current_uuid = str(uuid.uuid4())
-            self.frame_counter = 0
-            logger.info(f"Starting new XPS run with UUID: {self.current_uuid}")
         
         # Convert bytes to numpy array
         shot_mean = np.frombuffer(shot_mean_bytes, dtype=np.uint8).reshape(width, height)
