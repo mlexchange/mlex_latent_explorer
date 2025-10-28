@@ -2,29 +2,18 @@ import asyncio
 import logging
 import os
 import re
-from datetime import datetime
 from urllib.parse import urlparse
 
 import numpy as np
-import pytz
 from arroyopy.publisher import Publisher
 from arroyosas.schemas import SASStop, RawFrameEvent
 from tiled.client import from_uri
 from tiled.client.array import ArrayClient
 
-from .redis_model_store import RedisModelStore  # NEW: Import RedisModelStore
-
 logger = logging.getLogger("arroyo_reduction.xps_tiled_local_image_publisher")
 
 # API key for Tiled authentication
 LOCAL_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
-
-# Timezone for daily run ID
-CALIFORNIA_TZ = pytz.timezone('US/Pacific')
-
-# Redis connection info
-REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
 
 
 class XPSTiledLocalImagePublisher(Publisher):
@@ -36,14 +25,6 @@ class XPSTiledLocalImagePublisher(Publisher):
         self.tiled_prefix = tiled_prefix
         self.client = None
         self.tiled_base_uri = None
-        
-        # NEW: Initialize Redis model store to get experiment name
-        try:
-            self.redis_model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
-            logger.info("Connected to Redis Model Store for experiment name")
-        except Exception as e:
-            logger.warning(f"Could not connect to Redis Model Store: {e}")
-            self.redis_model_store = None
 
         # Dictionary to track array clients for each UUID
         self.array_clients = {}  # {uuid: ArrayClient}
@@ -73,6 +54,27 @@ class XPSTiledLocalImagePublisher(Publisher):
             return match.group(1)
         return None
 
+    def _parse_path_from_url(self, url):
+        """Extract the container path from tiled_url.
+        
+        Example URL: http://tiled:8000/api/v1/array/full/prefix/lse_live_results/user/daily_run/exp/uuid/xps_averaged_heatmaps?slice=...
+        Returns: ['prefix', 'lse_live_results', 'user', 'daily_run', 'exp', 'uuid']
+        """
+        parsed_url = urlparse(url)
+        path = parsed_url.path
+        
+        # Remove '/api/v1/array/full/' prefix and '/xps_averaged_heatmaps' suffix
+        path = path.replace('/api/v1/array/full/', '')
+        
+        # Remove 'xps_averaged_heatmaps' from the end if present
+        if path.endswith('/xps_averaged_heatmaps'):
+            path = path[:-len('/xps_averaged_heatmaps')]
+        
+        # Split into segments and filter out empty strings
+        segments = [s for s in path.split('/') if s]
+        
+        return segments
+
     def _get_or_create_array_client(self, tiled_url, first_frame_image):
         """Get or create an array client for the UUID in the URL."""
         uuid = self._extract_uuid_from_url(tiled_url)
@@ -88,35 +90,10 @@ class XPSTiledLocalImagePublisher(Publisher):
         try:
             client = self._get_client(tiled_url)
             
-            # NEW: Get experiment name from Redis
-            experiment_name = "default_experiment"
-            if self.redis_model_store is not None:
-                redis_experiment_name = self.redis_model_store.get_experiment_name()
-                if redis_experiment_name:
-                    experiment_name = redis_experiment_name
-                    logger.info(f"Using experiment name from Redis: {experiment_name}")
-                else:
-                    logger.warning("No experiment name in Redis, using default")
+            # Parse the path from tiled_url to get all container segments
+            path_segments = self._parse_path_from_url(tiled_url)
             
-            # Get USER from environment
-            username = os.getenv("USER", "default_user")
-            
-            # Get current daily run ID (same as tiled_results_publisher)
-            daily_run_id = f"daily_run_{datetime.now(CALIFORNIA_TZ).strftime('%Y-%m-%d')}"
-            
-            # Build path: {prefix}/lse_live_results/USER/daily_run_xxx/experiment_name/UUID
-            path_segments = []
-            if self.tiled_prefix:
-                path_segments.extend([s for s in self.tiled_prefix.split('/') if s])
-            
-            # Add the hierarchy to match tiled_results_publisher
-            path_segments.extend([
-                "lse_live_results",
-                username,
-                daily_run_id,
-                experiment_name,
-                uuid
-            ])
+            logger.info(f"Parsed path segments from URL: {path_segments}")
             
             # Navigate/create the container hierarchy
             container = client
@@ -168,8 +145,7 @@ class XPSTiledLocalImagePublisher(Publisher):
             frame_to_append = array[None, :, :]
             logger.info(f"[PATCH] Frame to append shape: {frame_to_append.shape}, dtype: {frame_to_append.dtype}")
             
-            # FIXED: Only specify offset for the growing dimension (axis 0)
-            # Tutorial pattern: offset = (shape[axis_to_increment],)
+            # Only specify offset for the growing dimension (axis 0)
             offset = (num_frames,)
             logger.info(f"[PATCH] Patching at offset: {offset}")
             
@@ -240,32 +216,3 @@ class XPSTiledLocalImagePublisher(Publisher):
     def from_settings(cls, settings):
         """Create an XPSTiledLocalImagePublisher from settings."""
         return cls(tiled_prefix=settings.get("tiled_prefix"))
-
-    def get_local_url_for(self, original_url):
-        """
-        Return the URL to access the full 3D array in the new hierarchy.
-        """
-        if not original_url:
-            return None
-
-        # Extract UUID
-        uuid = self._extract_uuid_from_url(original_url)
-        if uuid and self.tiled_base_uri:
-            # NEW: Get experiment name from Redis
-            experiment_name = "default_experiment"
-            if self.redis_model_store is not None:
-                redis_experiment_name = self.redis_model_store.get_experiment_name()
-                if redis_experiment_name:
-                    experiment_name = redis_experiment_name
-            
-            # Get USER and daily_run_id
-            username = os.getenv("USER", "default_user")
-            daily_run_id = f"daily_run_{datetime.now(CALIFORNIA_TZ).strftime('%Y-%m-%d')}"
-            
-            # Build path with new hierarchy
-            prefix_path = f"{self.tiled_prefix}/" if self.tiled_prefix else ""
-            
-            # Return URL to the full 3D array in new location
-            return f"{self.tiled_base_uri}/api/v1/array/full/{prefix_path}lse_live_results/{username}/{daily_run_id}/{experiment_name}/{uuid}/xps_averaged_heatmaps"
-        
-        return None
