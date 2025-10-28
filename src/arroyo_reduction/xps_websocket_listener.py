@@ -12,7 +12,7 @@ from arroyopy.listener import Listener
 from arroyopy.operator import Operator
 from arroyosas.schemas import RawFrameEvent, SerializableNumpyArrayModel
 
-from .redis_model_store import RedisModelStore  # NEW: Import RedisModelStore
+from .redis_model_store import RedisModelStore
 
 logger = logging.getLogger("arroyo_reduction.xps_websocket_listener")
 
@@ -44,6 +44,28 @@ class XPSWebSocketListener(Listener):
         except Exception as e:
             logger.warning(f"Could not connect to Redis Model Store: {e}")
             self.redis_model_store = None
+
+    def _get_experiment_name(self):
+        """
+        Synchronous helper to get experiment name from Redis.
+        This will be called via asyncio.to_thread() to avoid blocking the event loop.
+        
+        Returns:
+            str: Experiment name or "default_experiment" if not available
+        """
+        if self.redis_model_store is None:
+            return "default_experiment"
+        
+        try:
+            redis_experiment_name = self.redis_model_store.get_experiment_name()
+            if redis_experiment_name:
+                return redis_experiment_name
+            else:
+                logger.warning("No experiment name in Redis, using default")
+                return "default_experiment"
+        except Exception as e:
+            logger.error(f"Error getting experiment name from Redis: {e}")
+            return "default_experiment"
         
     async def start(self):
         """Connect to XPS websocket and listen for messages"""
@@ -102,17 +124,9 @@ class XPSWebSocketListener(Listener):
         
         logger.debug(f"Received shot_mean for shot {shot_num}: shape {shot_mean.shape}")
         
-        # NEW: Get experiment name from Redis
-        experiment_name = "default_experiment"
-        if self.redis_model_store is not None:
-            redis_experiment_name = self.redis_model_store.get_experiment_name()
-            if redis_experiment_name:
-                experiment_name = redis_experiment_name
-                logger.debug(f"Using experiment name from Redis: {experiment_name}")
-            else:
-                logger.warning("No experiment name in Redis, using default")
-        else:
-            logger.warning("Redis not available, using default experiment name")
+        # Get experiment name from Redis (non-blocking)
+        experiment_name = await asyncio.to_thread(self._get_experiment_name)
+        logger.debug(f"Using experiment name: {experiment_name}")
         
         # Get USER from environment
         username = os.getenv("USER", "default_user")
