@@ -242,8 +242,3 @@ networks:
   mle_net:
     name: mle_net
     driver: bridge
-
-# If services are already running on a different docker compose, use the following network definition
-# networks:
-#   mle_net:
-#     external: true
