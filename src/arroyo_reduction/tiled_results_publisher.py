@@ -24,8 +24,8 @@ USER = os.getenv("USER", "default_user")
 # Constants
 # Timezone for log timestamps
 CALIFORNIA_TZ = pytz.timezone('US/Pacific')
-# Daily run ID that all instances will use
-DAILY_RUN_ID = f"daily_run_{datetime.now(CALIFORNIA_TZ).strftime('%Y-%m-%d')}"
+# REMOVED: Daily run ID that all instances will use
+# DAILY_RUN_ID = f"daily_run_{datetime.now(CALIFORNIA_TZ).strftime('%Y-%m-%d')}"
 # Regex pattern to extract UUID from tiled_url
 UUID_PATTERN = r"([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"
 
@@ -42,7 +42,10 @@ class TiledResultsPublisher(Publisher):
         self.client = None
         self.root_container = None
         self.user_container = None  # Add user container
-        self.daily_container = None
+        # CHANGED: Split daily_container into Year/Month/Day hierarchy
+        self.year_container = None
+        self.month_container = None
+        self.day_container = None
         
         # Dictionary to store DataFrames by UUID
         self.uuid_dataframes = {}
@@ -90,10 +93,10 @@ class TiledResultsPublisher(Publisher):
             # Navigate to the root container and create the hierarchy
             self._setup_containers_sync(container)
             
-            # List all existing tables in the daily container
-            if self.daily_container is not None:
-                table_keys = list(self.daily_container)
-                logger.info(f"Found {len(table_keys)} existing tables in daily container")
+            # List all existing tables in the day container (CHANGED from daily_container)
+            if self.day_container is not None:
+                table_keys = list(self.day_container)
+                logger.info(f"Found {len(table_keys)} existing tables in day container")
                 
                 # Add all existing tables to our set of existing UUIDs
                 self.existing_uuids.update(table_keys)
@@ -106,7 +109,9 @@ class TiledResultsPublisher(Publisher):
                     
             logger.info(f"Connected to Tiled server at {self.tiled_uri}")
             prefix_path = f"{self.tiled_prefix}/" if self.tiled_prefix else ""
-            logger.info(f"Using container path: {prefix_path}{'/'.join(self.root_segments)}/{self.user}/{DAILY_RUN_ID}")
+            # CHANGED: Log new path structure
+            now = datetime.now(CALIFORNIA_TZ)
+            logger.info(f"Using container path: {prefix_path}{'/'.join(self.root_segments)}/{self.user}/{now.year}/{now.month:02d}/{now.day:02d}")
         except Exception as e:
             logger.error(f"Error in _start_sync: {e}")
             import traceback
@@ -156,15 +161,36 @@ class TiledResultsPublisher(Publisher):
                 logger.info(f"Creating user container: {self.user}")
                 self.user_container = self.root_container.create_container(self.user)
             
-            # Now create the daily run container inside the user container
-            if DAILY_RUN_ID not in self.user_container:
-                logger.info(f"Creating daily container: {DAILY_RUN_ID}")
-                self.user_container.create_container(DAILY_RUN_ID)
-            else:
-                logger.info(f"Using existing daily container: {DAILY_RUN_ID}")
+            # CHANGED: Replace single daily_run container with Year/Month/Day hierarchy
+            # Get current date components
+            now = datetime.now(CALIFORNIA_TZ)
+            year_str = str(now.year)
+            month_str = f"{now.month:02d}"
+            day_str = f"{now.day:02d}"
             
-            # Store reference to daily container
-            self.daily_container = self.user_container[DAILY_RUN_ID]
+            # Create Year container
+            if year_str not in self.user_container:
+                logger.info(f"Creating year container: {year_str}")
+                self.user_container.create_container(year_str)
+            else:
+                logger.info(f"Using existing year container: {year_str}")
+            self.year_container = self.user_container[year_str]
+            
+            # Create Month container
+            if month_str not in self.year_container:
+                logger.info(f"Creating month container: {month_str}")
+                self.year_container.create_container(month_str)
+            else:
+                logger.info(f"Using existing month container: {month_str}")
+            self.month_container = self.year_container[month_str]
+            
+            # Create Day container
+            if day_str not in self.month_container:
+                logger.info(f"Creating day container: {day_str}")
+                self.month_container.create_container(day_str)
+            else:
+                logger.info(f"Using existing day container: {day_str}")
+            self.day_container = self.month_container[day_str]
             
         except Exception as e:
             logger.error(f"Error setting up containers: {e}")
@@ -178,18 +204,18 @@ class TiledResultsPublisher(Publisher):
             # Use provided experiment_name, or fall back to current, or default
             exp_name = experiment_name or self.current_experiment_name or "default_experiment"
             
-            # Check if experiment container exists in daily container
-            if exp_name not in self.daily_container:
+            # Check if experiment container exists in day container (CHANGED from daily_container)
+            if exp_name not in self.day_container:
                 logger.info(f"Creating experiment container: {exp_name}")
-                self.daily_container.create_container(exp_name)
+                self.day_container.create_container(exp_name)
             
-            return self.daily_container[exp_name]
+            return self.day_container[exp_name]
         except Exception as e:
             logger.error(f"Error getting experiment container: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            # Fallback to daily container
-            return self.daily_container
+            # Fallback to day container (CHANGED from daily_container)
+            return self.day_container
     
     async def publish(self, message):
         """Publish a message to Tiled server."""
@@ -230,9 +256,9 @@ class TiledResultsPublisher(Publisher):
     def _publish_sync(self, message):
         """Synchronous implementation of publish() to be run in a thread."""
         try:
-            # Ensure daily container exists
-            if self.daily_container is None:
-                logger.error("Daily container not initialized, cannot publish")
+            # Ensure day container exists (CHANGED from daily_container)
+            if self.day_container is None:
+                logger.error("Day container not initialized, cannot publish")
                 return None
 
             # Format vector and metadata
@@ -341,8 +367,9 @@ class TiledResultsPublisher(Publisher):
                 logger.warning(f"No DataFrame found for {table_key}")
                 return
                 
-            # Log DataFrame info for debugging
-            logger.info(f"Writing {len(df)} vectors to new table '{table_key}/feature_vectors' in {self.user}/{DAILY_RUN_ID}/{self.current_experiment_name}")
+            # Log DataFrame info for debugging (CHANGED: use current date instead of DAILY_RUN_ID)
+            now = datetime.now(CALIFORNIA_TZ)
+            logger.info(f"Writing {len(df)} vectors to new table '{table_key}/feature_vectors' in {self.user}/{now.year}/{now.month:02d}/{now.day:02d}/{self.current_experiment_name}")
             
             # Check if DataFrame is empty
             if df.empty:

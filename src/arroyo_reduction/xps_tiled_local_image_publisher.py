@@ -2,9 +2,11 @@ import asyncio
 import logging
 import os
 import re
+from datetime import datetime
 from urllib.parse import urlparse
 
 import numpy as np
+import pytz
 from arroyopy.publisher import Publisher
 from arroyosas.schemas import SASStop, RawFrameEvent
 from tiled.client import from_uri
@@ -14,6 +16,8 @@ logger = logging.getLogger("arroyo_reduction.xps_tiled_local_image_publisher")
 
 # API key for Tiled authentication
 LOCAL_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
+# Timezone for date components
+CALIFORNIA_TZ = pytz.timezone('US/Pacific')
 
 
 class XPSTiledLocalImagePublisher(Publisher):
@@ -57,8 +61,9 @@ class XPSTiledLocalImagePublisher(Publisher):
     def _parse_path_from_url(self, url):
         """Extract the container path from tiled_url.
         
-        Example URL: http://tiled:8000/api/v1/array/full/prefix/lse_live_results/user/daily_run/exp/uuid/xps_averaged_heatmaps?slice=...
-        Returns: ['prefix', 'lse_live_results', 'user', 'daily_run', 'exp', 'uuid']
+        Example URL (old): http://tiled:8000/api/v1/array/full/prefix/lse_live_results/user/daily_run/exp/uuid/xps_averaged_heatmaps?slice=...
+        Example URL (new): http://tiled:8000/api/v1/array/full/prefix/lse_live_results/user/2025/01/15/exp/uuid/xps_averaged_heatmaps?slice=...
+        Returns: ['prefix', 'lse_live_results', 'user', '2025', '01', '15', 'exp', 'uuid']
         """
         parsed_url = urlparse(url)
         path = parsed_url.path
@@ -106,7 +111,6 @@ class XPSTiledLocalImagePublisher(Publisher):
                         container = container.create_container(segment)
             
             # Create the 3D array with first frame: (1, height, width)
-            # Use [None, :, :] to add dimension like in the tutorial
             initial_array = first_frame_image[None, :, :]
             
             logger.info(f"Creating 3D array with shape: {initial_array.shape}, dtype: {initial_array.dtype}")

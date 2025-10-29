@@ -35,7 +35,7 @@ class XPSWebSocketListener(Listener):
         self.frame_counter = 0
         self.tiled_prefix = tiled_prefix or "beamlines/bl931/processed"
         
-        # NEW: Initialize Redis model store to get experiment name
+        # Initialize Redis model store to get experiment name
         try:
             redis_host = os.getenv("REDIS_HOST", "kvrocks")
             redis_port = int(os.getenv("REDIS_PORT", 6666))
@@ -134,18 +134,20 @@ class XPSWebSocketListener(Listener):
         # Get USER from environment
         username = os.getenv("USER", "default_user")
         
-        # Get current daily run ID (same as in tiled_results_publisher)
-        daily_run_id = f"daily_run_{datetime.now(CALIFORNIA_TZ).strftime('%Y-%m-%d')}"
+        # Get current date components for Year/Month/Day hierarchy
+        now = datetime.now(CALIFORNIA_TZ)
+        year_str = str(now.year)
+        month_str = f"{now.month:02d}"
+        day_str = f"{now.day:02d}"
         
         # Construct tiled_url pointing to the new structure
-        # Path: {prefix}/lse_live_results/{USER}/daily_run_xxx/{experiment_name}/{UUID}/xps_averaged_heatmaps
+        # OLD: {prefix}/lse_live_results/{USER}/daily_run_{YYYY-MM-DD}/{experiment_name}/{UUID}/xps_averaged_heatmaps
+        # NEW: {prefix}/lse_live_results/{USER}/{YYYY}/{MM}/{DD}/{experiment_name}/{UUID}/xps_averaged_heatmaps
         prefix_path = f"{self.tiled_prefix}/" if self.tiled_prefix else ""
         
-        # Build the URL to point to where the image WILL be stored
-        # URL format for accessing slice of 3D array: array[frame:frame+1, 0:height, 0:width]
         tiled_url = (
             f"{self.tiled_base_uri}/api/v1/array/full/{prefix_path}"
-            f"lse_live_results/{username}/{daily_run_id}/{experiment_name}/{self.current_uuid}/xps_averaged_heatmaps"
+            f"lse_live_results/{username}/{year_str}/{month_str}/{day_str}/{experiment_name}/{self.current_uuid}/xps_averaged_heatmaps"
             f"?slice={self.frame_counter}:{self.frame_counter+1},0:{height},0:{width}"
         )
         

@@ -2,6 +2,7 @@ import logging
 import traceback
 import os
 import numpy as np
+from datetime import datetime
 from dash import Input, Output, State, callback, no_update
 from dash.exceptions import PreventUpdate
 from file_manager.data_project import DataProject
@@ -26,71 +27,81 @@ logger = logging.getLogger("lse.replay")
 TILED_REPLAY_PREFIX = os.getenv("TILED_REPLAY_PREFIX", None)
 logger.info(f"Using Tiled replay prefix: {TILED_REPLAY_PREFIX}")
 
+# NEW: Callback to populate available dates when refresh button is clicked or page loads
 @callback(
-    Output("daily-container-dropdown", "options"),
-    Output("daily-container-dropdown", "value"),
-    Input("refresh-daily-containers", "n_clicks"),
-    prevent_initial_call=True,
-)
-def load_daily_containers(n_clicks):
-    """Load available daily containers from Tiled"""
-    if n_clicks is None:
-        raise PreventUpdate
-        
-    # Use the prefix from environment variable
-    containers = get_daily_containers(TILED_REPLAY_PREFIX)
-    
-    if containers:
-        return containers, containers[0]["value"]
-    else:
-        return [], None
-    
-@callback(
-    Output("daily-container-dropdown", "options", allow_duplicate=True),
+    Output("available-dates-store", "data"),
+    Output("replay-date-picker", "disabled_days"),
+    Input("refresh-available-dates", "n_clicks"),
     Input("sidebar", "active_item"),
-    prevent_initial_call="initial_duplicate",
+    prevent_initial_call=False,
 )
-def load_containers_on_render(active_item):
-    """Load daily containers when the page is first loaded"""
-    # Use the prefix from environment variable
+def load_available_dates(n_clicks, active_item):
+    """
+    Load available dates from Tiled and populate the date picker
+    
+    Returns:
+        tuple: (list of date strings, list of disabled dates)
+    """
+    # Get all available containers (dates)
     containers = get_daily_containers(TILED_REPLAY_PREFIX)
-    return containers if containers else []
+    
+    if not containers:
+        return [], []
+    
+    # Extract dates in YYYY-MM-DD format
+    available_dates = [container["value"] for container in containers]  # ["2025/01/15", ...]
+    
+    # Convert to datetime strings for the date picker store
+    date_strings = [date.replace("/", "-") for date in available_dates]  # ["2025-01-15", ...]
+    
+    # DatePickerSingle doesn't use disabled_days in the way we need
+    # So we just return empty list for disabled_days
+    return date_strings, []
 
+
+# NEW: Callback to load experiments when a date is selected
 @callback(
     Output("experiment-name-dropdown", "options"),
     Output("experiment-name-dropdown", "value"),
-    Input("daily-container-dropdown", "value"),
+    Input("replay-date-picker", "date"),
     Input("refresh-experiment-names", "n_clicks"),
     prevent_initial_call=True,
 )
-def load_experiment_names(selected_container, refresh_clicks):
-    """Load available experiment names from selected daily container"""
-    if not selected_container:
+def load_experiment_names(selected_date, refresh_clicks):
+    """Load available experiment names from selected date"""
+    if not selected_date:
         return [], None
-        
+    
+    # Convert date from YYYY-MM-DD to YYYY/MM/DD for the API
+    container_name = selected_date.replace("-", "/")
+    
     # Use the prefix from environment variable
-    experiment_names = get_experiment_names_in_container(selected_container, TILED_REPLAY_PREFIX)
+    experiment_names = get_experiment_names_in_container(container_name, TILED_REPLAY_PREFIX)
     
     if experiment_names:
         return experiment_names, experiment_names[0]["value"]
     else:
         return [], None
 
+
 @callback(
     Output("experiment-uuid-dropdown", "options"),
     Output("experiment-uuid-dropdown", "value"),
     Input("experiment-name-dropdown", "value"),  
     Input("refresh-experiment-uuids", "n_clicks"),
-    State("daily-container-dropdown", "value"),
+    State("replay-date-picker", "date"),
     prevent_initial_call=True,
 )
-def load_experiment_uuids(selected_experiment, refresh_clicks, selected_container):
+def load_experiment_uuids(selected_experiment, refresh_clicks, selected_date):
     """Load available experiment UUIDs from selected experiment"""
-    if not selected_container or not selected_experiment:
+    if not selected_date or not selected_experiment:
         return [], None
-        
+    
+    # Convert date from YYYY-MM-DD to YYYY/MM/DD for the API
+    container_name = selected_date.replace("-", "/")
+    
     # Use the prefix from environment variable
-    uuids = get_uuids_in_experiment(selected_container, selected_experiment, TILED_REPLAY_PREFIX)
+    uuids = get_uuids_in_experiment(container_name, selected_experiment, TILED_REPLAY_PREFIX)
     
     if uuids:
         return uuids, uuids[0]["value"]
@@ -160,7 +171,7 @@ def filter_experiment_by_range(range_value, replay_buffer, data_project_dict):
         if len(filtered_vectors) > 0:
             n_components = filtered_vectors.shape[1]
             
-            # CHANGED: Add time-based coloring with filtered indices
+            # Add time-based coloring with filtered indices
             filtered_indices = np.arange(start_idx, end_idx)
             
             # Create a new scatter plot with time-based coloring
@@ -193,15 +204,18 @@ def filter_experiment_by_range(range_value, replay_buffer, data_project_dict):
     Output("replay-data-range", "max"),
     Output("replay-data-range", "marks", allow_duplicate=True),
     Input("load-experiment-button", "n_clicks"),
-    State("daily-container-dropdown", "value"),
+    State("replay-date-picker", "date"),
     State("experiment-name-dropdown", "value"),
     State("experiment-uuid-dropdown", "value"),
     prevent_initial_call=True,
 )
-def load_experiment_replay(n_clicks, selected_container, selected_experiment, selected_uuid):
+def load_experiment_replay(n_clicks, selected_date, selected_experiment, selected_uuid):
     """Load feature vectors from selected experiment UUID and display in scatter plot"""
-    if not n_clicks or not selected_container or not selected_experiment or not selected_uuid:
+    if not n_clicks or not selected_date or not selected_experiment or not selected_uuid:
         raise PreventUpdate
+    
+    # Convert date from YYYY-MM-DD to YYYY/MM/DD for the API
+    selected_container = selected_date.replace("-", "/")
     
     # Initialize a minimal data project dictionary with replay_mode flag
     data_project_dict = {
@@ -223,7 +237,7 @@ def load_experiment_replay(n_clicks, selected_container, selected_experiment, se
     
     try:
         # Connect to Tiled and load feature vectors
-        logger.info(f"Loading experiment UUID: {selected_uuid} from container: {selected_container}, experiment: {selected_experiment}")
+        logger.info(f"Loading experiment UUID: {selected_uuid} from date: {selected_container}, experiment: {selected_experiment}")
         
         # Use the prefix from environment variable
         df = get_experiment_dataframe(selected_container, selected_experiment, selected_uuid, TILED_REPLAY_PREFIX)
@@ -290,7 +304,7 @@ def load_experiment_replay(n_clicks, selected_container, selected_experiment, se
         if feature_vectors.shape[1] > 2:
             n_components = min(3, feature_vectors.shape[1])
         
-        # CHANGED: Add time-based coloring for initial load
+        # Add time-based coloring for initial load
         time_array = np.arange(len(feature_vectors))
         
         scatter_fig = generate_scatter_data(
@@ -311,7 +325,6 @@ def load_experiment_replay(n_clicks, selected_container, selected_experiment, se
             "is_feature_vectors_special_case": is_feature_vectors_special_case
         }
         
-        # Let's try to create a more complete data project dictionary
         # Extract information from the first URL if available
         if tiled_urls:
             try:
