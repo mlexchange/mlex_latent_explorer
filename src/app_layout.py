@@ -22,6 +22,11 @@ WRITE_DIR = os.getenv("WRITE_DIR")
 DATA_TILED_KEY = os.getenv("DATA_TILED_KEY", None)
 if DATA_TILED_KEY == "":
     DATA_TILED_KEY = None
+
+LIVE_TILED_API_KEY = os.getenv("LIVE_TILED_API_KEY", None)
+if LIVE_TILED_API_KEY == "":
+    LIVE_TILED_API_KEY = None
+    
 MODE = os.getenv("MODE", "dev")
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 USER = os.getenv("USER")
@@ -143,7 +148,7 @@ app.layout = html.Div(
                             color="white",
                             spinner_style={"width": "4rem", "height": "4rem"},
                         ),
-                        html.H2("Loading Models...", className="mt-3")
+                        html.H2("Loading Models...", id="model-loading-spinner-text", className="mt-3")
                     ],
                     style={
                         "position": "absolute",

@@ -82,13 +82,48 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                             id="live-mode-models",
                             title="Live Mode Models",
                             children=[
+                                # NEW: Add experiment name display at the top
+                                html.Div(
+                                    id="live-experiment-name-display",
+                                    children=[
+                                        html.Div(
+                                            [
+                                                html.Strong("Experiment: ", style={"color": "#00313C"}),
+                                                html.Span(
+                                                    id="live-experiment-name-text",
+                                                    children="",
+                                                    style={"color": "#D57800", "fontWeight": "500"}
+                                                ),
+                                            ],
+                                            style={
+                                                "padding": "10px",
+                                                "backgroundColor": "#f8f9fa",
+                                                "borderRadius": "5px",
+                                                "marginBottom": "15px",
+                                                "border": "1px solid #dee2e6"
+                                            }
+                                        ),
+                                    ],
+                                    style={"display": "none"}  # Hidden by default, shown in live mode
+                                ),
                                 ControlItem(
                                     "Autoencoder Model",
                                     "live-mode-autoencoder-title",
                                     dbc.Select(
                                         id="live-mode-autoencoder-dropdown",
                                         options=[],
-                                        placeholder="Select an autoencoder model...",
+                                        placeholder="Select model name...",
+                                    ),
+                                ),
+                                html.P(),
+                                ControlItem(
+                                    "Autoencoder Version",
+                                    "live-mode-autoencoder-version-title",
+                                    dbc.Select(
+                                        id="live-mode-autoencoder-version-dropdown",
+                                        options=[],
+                                        placeholder="Select version...",
+                                        disabled=True,
                                     ),
                                 ),
                                 html.P(),
@@ -98,7 +133,18 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                     dbc.Select(
                                         id="live-mode-dimred-dropdown",
                                         options=[],
-                                        placeholder="Select a dimension reduction model...",
+                                        placeholder="Select model name...",
+                                    ),
+                                ),
+                                html.P(),
+                                ControlItem(
+                                    "Dimension Reduction Version",
+                                    "live-mode-dimred-version-title",
+                                    dbc.Select(
+                                        id="live-mode-dimred-version-dropdown",
+                                        options=[],
+                                        placeholder="Select version...",
+                                        disabled=True,
                                     ),
                                 ),
                                 html.P(),
@@ -212,6 +258,144 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                 ),
                             ],
                             title="Clustering",
+                        ),
+                        # Moved experiment replay section after clustering
+                        dbc.AccordionItem(
+                            id="experiment-replay-controls",
+                            title="Experiment Replay",
+                            children=[
+                                # First dropdown for daily container selection
+                                ControlItem(
+                                    "Daily Container",
+                                    "daily-container-title",
+                                    html.Div([
+                                        dbc.Row([
+                                            dbc.Col(
+                                                dbc.Select(
+                                                    id="daily-container-dropdown",
+                                                    options=[],
+                                                    value=None,
+                                                    placeholder="Select a daily container",
+                                                ),
+                                                width=10,
+                                            ),
+                                            dbc.Col(
+                                                dbc.Button(
+                                                    DashIconify(
+                                                        icon="tabler:refresh",
+                                                        width=18,
+                                                        height=18,
+                                                    ),
+                                                    id="refresh-daily-containers",
+                                                    color="light",
+                                                    size="sm",
+                                                    className="rounded-circle",
+                                                    style={"aspectRatio": "1 / 1"},
+                                                ),
+                                                width=1,
+                                                style={"padding-left": "0"},
+                                            ),
+                                        ], className="align-items-center"),
+                                    ]),
+                                ),
+                                html.P(),
+                                # NEW: Experiment Name dropdown
+                                ControlItem(
+                                    "Experiment Name",
+                                    "experiment-name-title",
+                                    html.Div([
+                                        dbc.Row([
+                                            dbc.Col(
+                                                dbc.Select(
+                                                    id="experiment-name-dropdown",
+                                                    options=[],
+                                                    value=None,
+                                                    placeholder="Select an experiment name",
+                                                ),
+                                                width=10,
+                                            ),
+                                            dbc.Col(
+                                                dbc.Button(
+                                                    DashIconify(
+                                                        icon="tabler:refresh",
+                                                        width=18,
+                                                        height=18,
+                                                    ),
+                                                    id="refresh-experiment-names",
+                                                    color="light",
+                                                    size="sm",
+                                                    className="rounded-circle",
+                                                    style={"aspectRatio": "1 / 1"},
+                                                ),
+                                                width=1,
+                                                style={"padding-left": "0"},
+                                            ),
+                                        ], className="align-items-center"),
+                                    ]),
+                                ),
+                                html.P(),
+                                # Second dropdown for UUID selection within the selected container
+                                ControlItem(
+                                    "Experiment UUID",
+                                    "experiment-uuid-title",
+                                    html.Div([
+                                        dbc.Row([
+                                            dbc.Col(
+                                                dbc.Select(
+                                                    id="experiment-uuid-dropdown",
+                                                    options=[],
+                                                    value=None,
+                                                    placeholder="Select an experiment UUID",
+                                                ),
+                                                width=10,
+                                            ),
+                                            dbc.Col(
+                                                dbc.Button(
+                                                    DashIconify(
+                                                        icon="tabler:refresh",
+                                                        width=18,
+                                                        height=18,
+                                                    ),
+                                                    id="refresh-experiment-uuids",
+                                                    color="light",
+                                                    size="sm",
+                                                    className="rounded-circle",
+                                                    style={"aspectRatio": "1 / 1"},
+                                                ),
+                                                width=1,
+                                                style={"padding-left": "0"},
+                                            ),
+                                        ], className="align-items-center"),  # Add this class to align row items
+                                    ]),
+                                ),
+                                html.P(),
+                                # Change from Data Percentage to Data Range
+                                ControlItem(
+                                    "Data Range",
+                                    "replay-data-range-title",
+                                    dcc.RangeSlider(
+                                        id="replay-data-range",
+                                        min=0,
+                                        max=100,
+                                        step=1,  # Add this to enforce integer steps
+                                        marks={i: str(i) for i in range(0, 101, 20)},  # Add default marks at intervals of 20
+                                        tooltip={
+                                            "placement": "bottom",
+                                            "always_visible": True,
+                                        },
+                                        value=[0, 100],
+                                    ),
+                                ),
+                                # Then add the button separately below
+                                html.Div(style={"height": "20px"}),
+                                dbc.Button(
+                                    "Load Experiment",
+                                    id="load-experiment-button",
+                                    color="primary",
+                                    className="w-100",
+                                    disabled=True,
+                                ),
+                            ],
                         ),
                     ],
                 ),

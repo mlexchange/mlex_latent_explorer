@@ -1,11 +1,35 @@
 import json
 import os
+import sys
 from uuid import uuid4
+
+# Configure logging at the earliest possible point
+import logging
+import sys
+
+# Set up basic configuration
+logging.basicConfig(
+    level=logging.INFO,  # Use DEBUG to see all logs
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+
+# Create logger for this module
+logger = logging.getLogger("lse")
+logger.info("Logging configured. Frontend module initializing.")
+
+# Explicitly set level for lse namespace
+logging.getLogger("lse").setLevel(logging.INFO)
+
+# Force propagation for all existing lse loggers
+for name in logging.root.manager.loggerDict:
+    if name.startswith('lse.'):
+        logging.getLogger(name).propagate = True
 
 from dash import Input, Output, html
 from dotenv import load_dotenv
 
-from src.app_layout import app, clustering_models, dim_reduction_models, mlex_components,latent_space_models
+from src.app_layout import app, clustering_models, dim_reduction_models, mlex_components
 from src.callbacks.display import (  # noqa: F401
     clear_selections,
     disable_buttons,
@@ -23,23 +47,28 @@ from src.callbacks.execute import (  # noqa: F401
     allow_run_clustering,
     allow_show_clusters,
     allow_show_feature_vectors,
+    load_mlflow_models_on_render,
+    refresh_mlflow_models,
     run_clustering,
     run_latent_space,
-    refresh_mlflow_models,
-    load_mlflow_models_on_render
 )
 from src.callbacks.infrastructure_check import (  # noqa: F401
     check_infra_state,
     update_infra_state,
 )
 from src.callbacks.live_mode import (  # noqa: F401
-    live_update_data_project_dict,
-    set_buffered_latent_vectors,
     set_live_latent_vectors,
     toggle_controls,
     toggle_pause_button,
     toggle_pause_button_go_live,
     update_data_project_dict,
+)
+# Add this to the imports at the top
+from src.callbacks.experiment_replay import (  # noqa: F401
+    load_experiment_uuids,
+    toggle_load_button,
+    load_experiment_replay,
+    filter_experiment_by_range,
 )
 
 load_dotenv(".env")

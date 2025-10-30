@@ -38,3 +38,8 @@ class LatentSpaceEvent(Event):
     index: int
     autoencoder_model: str = None  # Add autoencoder model name
     dimred_model: str = None       # Add dimension reduction model name
+    experiment_name: str = None    # NEW: Add experiment name
+    timestamp: float = None        # Add timestamp for when processing began
+    total_processing_time: float = None  # Total time to process the frame
+    autoencoder_time: float = None  # Time spent in autoencoder processing
+    dimred_time: float = None      # Time spent in dimension reduction processing

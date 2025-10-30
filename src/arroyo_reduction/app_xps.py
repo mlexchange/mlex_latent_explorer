@@ -4,14 +4,15 @@ import os
 import sys
 
 import typer
-from arroyosas.zmq import ZMQFrameListener
 from dynaconf import Dynaconf
 
 from .operator import LatentSpaceOperator
 from .publisher import LSEWSResultPublisher
 from .redis_model_store import RedisModelStore
 from .vector_save import VectorSavePublisher
-from .tiled_results_publisher import TiledResultsPublisher  # Add import
+from .tiled_results_publisher import TiledResultsPublisher
+from .xps_websocket_listener import XPSWebSocketListener
+from .xps_tiled_local_image_publisher import XPSTiledLocalImagePublisher  # NEW: Add this import
 
 settings = Dynaconf(
     envvar_prefix="",
@@ -30,7 +31,6 @@ def setup_logger(logger: logging.Logger, log_level: str = "INFO"):
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    # logger.setLevel(log_level)
     logger.setLevel(log_level.upper())
     logger.debug("DEBUG LOGGING SET")
 
@@ -41,11 +41,8 @@ setup_logger(logger, settings.logging_level)
 async def start() -> None:
     try:
         app_settings = settings.lse_operator
-        logger.info("Getting settings")
+        logger.info("Starting XPS Latent Space Encoder")
         logger.info(f"{settings.lse_operator}")
-
-        logger.info("Starting ZMQ PubSub Listener")
-        logger.info(f"ZMQPubSubListener settings: {app_settings}")
         
         # Initialize the WebSocket publisher first (so it's available for connections)
         ws_publisher = LSEWSResultPublisher.from_settings(app_settings.ws_publisher)
@@ -58,6 +55,10 @@ async def start() -> None:
         # Initialize the TiledResultsPublisher for saving vectors to Tiled
         tiled_publisher = TiledResultsPublisher.from_settings(app_settings.tiled_publisher)
         asyncio.create_task(tiled_publisher.start())
+        
+        # NEW: Initialize the XPS-specific local image publisher
+        xps_local_image_publisher = XPSTiledLocalImagePublisher.from_settings(app_settings.local_image_publisher)
+        asyncio.create_task(xps_local_image_publisher.start())
         
         # Initialize Redis model store instead of direct Redis client
         logger.info("Initializing Redis Model Store")
@@ -91,16 +92,18 @@ async def start() -> None:
         operator = LatentSpaceOperator.from_settings(app_settings, settings.lse_reducer)
         operator.add_publisher(ws_publisher)
         operator.add_publisher(vector_save_publisher)
-        operator.add_publisher(tiled_publisher)  # Add the Tiled publisher
+        operator.add_publisher(tiled_publisher)
+        operator.add_publisher(xps_local_image_publisher)  # NEW: Add this line
         
-        listener = ZMQFrameListener.from_settings(app_settings.listener, operator)
+        # Use from_settings() pattern (consistent with ZMQFrameListener)
+        listener = XPSWebSocketListener.from_settings(app_settings.xps_listener, operator)
         
         # Start the listener
-        logger.info("Starting to listen for messages from arroyo_sim")
+        logger.info("Starting to listen for XPS messages")
         await listener.start()
         
     except Exception as e:
-        logger.critical(f"Fatal error in main application: {e}")
+        logger.critical(f"Fatal error in XPS application: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

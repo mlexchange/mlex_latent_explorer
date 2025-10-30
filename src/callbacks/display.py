@@ -1,15 +1,17 @@
 import io
+import logging
 import math
 from base64 import b64encode
 
 import numpy as np
+import numba as nb
 from dash import ALL, Input, Output, Patch, State, callback, no_update
 from dash.exceptions import PreventUpdate
 from file_manager.data_project import DataProject
 from mlex_utils.prefect_utils.core import get_children_flow_run_ids
 from PIL import Image
 
-from src.app_layout import DATA_TILED_KEY, NUM_IMGS_OVERVIEW, USER
+from src.app_layout import DATA_TILED_KEY, LIVE_TILED_API_KEY, NUM_IMGS_OVERVIEW, USER, long_callback_manager
 from src.utils.data_utils import hash_list_of_strings, tiled_results
 from src.utils.plot_utils import (
     generate_heatmap_plot,
@@ -18,6 +20,54 @@ from src.utils.plot_utils import (
     plot_empty_scatter,
 )
 
+MAX_HEATMAP_SELECTION = 30
+
+# Add logger for display.py
+logger = logging.getLogger("lse.display")
+
+@nb.njit(parallel=True)
+def fast_mean(arr):
+    """
+    Custom Numba-accelerated mean calculation along axis 0
+    Works with 3D arrays like our image data
+    """
+    result = np.zeros((arr.shape[1], arr.shape[2]), dtype=np.float32)
+    for i in nb.prange(arr.shape[1]):
+        for j in nb.prange(arr.shape[2]):
+            sum_val = 0.0
+            for k in range(arr.shape[0]):
+                sum_val += arr[k, i, j]
+            result[i, j] = sum_val / arr.shape[0]
+    return result
+
+
+@nb.njit(parallel=True)
+def fast_std(arr):
+    """
+    Custom Numba-accelerated standard deviation calculation along axis 0
+    Works with 3D arrays like our image data
+    """
+    # First calculate the mean
+    mean = np.zeros((arr.shape[1], arr.shape[2]), dtype=np.float32)
+    for i in nb.prange(arr.shape[1]):
+        for j in nb.prange(arr.shape[2]):
+            sum_val = 0.0
+            for k in range(arr.shape[0]):
+                sum_val += arr[k, i, j]
+            mean[i, j] = sum_val / arr.shape[0]
+    
+    # Then calculate the variance
+    var = np.zeros((arr.shape[1], arr.shape[2]), dtype=np.float32)
+    for i in nb.prange(arr.shape[1]):
+        for j in nb.prange(arr.shape[2]):
+            sum_squared_diff = 0.0
+            for k in range(arr.shape[0]):
+                diff = arr[k, i, j] - mean[i, j]
+                sum_squared_diff += diff * diff
+            var[i, j] = sum_squared_diff / arr.shape[0]
+    
+    # Return the square root of the variance (standard deviation)
+    return np.sqrt(var)
 
 def get_empty_image():
     img = Image.fromarray(255 * (np.ones((32, 32)).astype(np.uint8)))
@@ -46,6 +96,11 @@ def update_data_overview(
 ):
     if go_live is not None and go_live % 2 == 1:
         raise PreventUpdate
+    
+    # Skip if in replay mode - check for the replay_mode flag
+    if data_project_dict and data_project_dict.get("replay_mode", False):
+        raise PreventUpdate
+    
     imgs = []
     if data_project_dict != {}:
         data_project = DataProject.from_dict(data_project_dict, api_key=DATA_TILED_KEY)
@@ -267,15 +322,27 @@ def clear_selections(n_clicks, current_fig):
 
 
 @callback(
-    Output("heatmap", "figure"),
-    Output("stats-div", "children", allow_duplicate=True),
-    Input("scatter", "clickData"),
-    Input("scatter", "selectedData"),
-    Input("mean-std-toggle", "value"),
-    Input("log-transform", "value"),
-    Input("min-max-percentile", "value"),
-    State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
-    State("live-indices", "data"),
+    output=[
+        Output("heatmap", "figure"),
+        Output("stats-div", "children", allow_duplicate=True),
+    ],
+    inputs=[
+        Input("scatter", "clickData"),
+        Input("scatter", "selectedData"),
+        Input("mean-std-toggle", "value"),
+        Input("log-transform", "value"),
+        Input("min-max-percentile", "value"),
+    ],
+    state=[
+        State({"base_id": "file-manager", "name": "data-project-dict"}, "data"),
+        State("live-indices", "data"),
+        State("go-live", "n_clicks"),
+    ],
+    background=True,  # This makes it a long callback
+    manager=long_callback_manager,
+    running=[
+        (Output("stats-div", "children"), "Loading heatmap...", ""),
+    ],
     prevent_initial_call=True,
 )
 def update_heatmap(
@@ -286,6 +353,7 @@ def update_heatmap(
     percentiles,
     data_project_dict,
     live_indices,
+    go_live,
 ):
     """
     This callback update the heatmap
@@ -296,12 +364,26 @@ def update_heatmap(
         log_transform:          log transform option
         percentiles:            percentiles for min-max scaling
         data_project_dict:      data project dictionary
+        live_indices:           indices for live mode
+        go_live:                n_clicks for live mode button
     Returns:
         fig:                    updated heatmap
+        stats:                  statistics text
     """
+    # Check if in live mode
+    is_live_mode = go_live is not None and go_live % 2 == 1
+    
     # user select a group of points
     if selected_data is not None and len(selected_data["points"]) > 0:
         selected_indices = [point["pointIndex"] for point in selected_data["points"]]
+        
+        # Only apply MAX_HEATMAP_SELECTION limit in live mode
+        if is_live_mode and len(selected_indices) > MAX_HEATMAP_SELECTION:
+            return (
+                plot_empty_heatmap(),
+                f"⚠️ Selection too large ({len(selected_indices)} points). "
+                f"Please select {MAX_HEATMAP_SELECTION} or fewer points for heatmap display in live mode.",
+            )
 
     # user click on a single point
     elif click_data is not None and len(click_data["points"]) > 0:
@@ -319,7 +401,23 @@ def update_heatmap(
     if len(live_indices) > 0:
         selected_indices = [live_indices[i] for i in selected_indices]
 
-    data_project = DataProject.from_dict(data_project_dict, api_key=DATA_TILED_KEY)
+    # Determine which API key to use based on live mode
+    is_replay_mode = data_project_dict.get("replay_mode", False)
+    
+    if is_live_mode:
+        # Use remote API key for live mode
+        api_key = LIVE_TILED_API_KEY
+        logger.info("Using LIVE_TILED_API_KEY for live mode heatmap")
+    elif is_replay_mode:
+        # Use remote API key for replay mode
+        api_key = LIVE_TILED_API_KEY
+        logger.info("Using LIVE_TILED_API_KEY for replay mode heatmap")
+    else:
+        # Use regular DATA_TILED_KEY for offline mode
+        api_key = DATA_TILED_KEY
+        logger.info("Using DATA_TILED_KEY for offline mode heatmap")
+
+    data_project = DataProject.from_dict(data_project_dict, api_key=api_key)
     selected_images, _ = data_project.read_datasets(
         selected_indices,
         resize=True,
@@ -331,9 +429,9 @@ def update_heatmap(
     selected_images = np.array(selected_images)
 
     if display_option == "mean":
-        plot_data = np.mean(selected_images, axis=0)
+        plot_data = fast_mean(selected_images)
     else:
-        plot_data = np.std(selected_images, axis=0)
+        plot_data = fast_std(selected_images)
 
     return (
         generate_heatmap_plot(plot_data),

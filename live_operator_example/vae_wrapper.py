@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
-ViT Autoencoder wrapper for MLflow.
-Provides functionality to load a ViT autoencoder model and register it with MLflow.
+VAE wrapper for MLflow.
+Provides functionality to load a VAE model and register it with MLflow.
 """
 
 import importlib.util
@@ -25,18 +25,9 @@ def get_file_size_mb(filepath):
     return os.path.getsize(filepath) / (1024 * 1024)
 
 
-# Add compatibility patch for torch if needed
-if not hasattr(torch, "get_default_device"):
-
-    def get_default_device():
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    torch.get_default_device = get_default_device
-
-
-class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
+class VAEModelWrapper(mlflow.pyfunc.PythonModel):
     """
-    Wrapper for ViT Autoencoder with direct model access and latent features functionality
+    Wrapper for VAE with direct model access and latent features functionality
     """
 
     def __init__(self, latent_dim=64, image_size=(512, 512)):
@@ -46,7 +37,7 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
         self.image_size = image_size
 
     def load_context(self, context):
-        """Load ViT model from context artifacts"""
+        """Load VAE model from context artifacts"""
         # Get the model code path
         model_code_path = context.artifacts.get("model_code")
         if not model_code_path or not os.path.exists(model_code_path):
@@ -63,13 +54,14 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
-        # Get latent dimension
-        latent_dim = self.latent_dim
-        print(f"Latent Dimension is: {latent_dim}")
-        print(f"Image Size is: {self.image_size}")
+        print(
+            f"Initializing VAE with latent_dim={self.latent_dim}, image_size={self.image_size}"
+        )
 
-        # Create model instance with explicit integer for latent_dim
-        self.model = module.Autoencoder(latent_dim=int(latent_dim))
+        # Create model instance directly using ConvVAE class
+        self.model = module.ConvVAE(
+            latent_dim=self.latent_dim, image_size=self.image_size
+        )
 
         # Load weights from NPZ file
         weights_path = context.artifacts.get("weights_path")
@@ -77,31 +69,20 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
             raise FileNotFoundError(f"Weights file not found at {weights_path}")
 
         # Load weights
-        weights = np.load(weights_path, allow_pickle=True)
-
-        # Check for state_dict key
-        if "state_dict" in weights.files:
-            state_dict = weights["state_dict"].item()
-        else:
-            state_dict = {k: weights[k] for k in weights.files}
+        weights_npz = np.load(weights_path)
 
         # Convert numpy arrays to PyTorch tensors
-        torch_state_dict = {}
-        for k, v in state_dict.items():
-            if isinstance(v, np.ndarray):
-                torch_state_dict[k] = torch.from_numpy(v)
-            else:
-                torch_state_dict[k] = v
+        state_dict = {key: torch.tensor(weights_npz[key]) for key in weights_npz.files}
 
         # Load state dict
         try:
-            self.model.load_state_dict(torch_state_dict, strict=True)
-            print("✓ Model weights loaded successfully (strict)")
+            self.model.load_state_dict(state_dict, strict=True)
+            print("✓ VAE model weights loaded successfully (strict)")
         except Exception as e:
             print(f"⚠️ Strict loading failed: {e}")
             print("Attempting non-strict loading...")
 
-            result = self.model.load_state_dict(torch_state_dict, strict=False)
+            result = self.model.load_state_dict(state_dict, strict=False)
             if result.missing_keys:
                 print(f"Missing keys: {result.missing_keys[:5]}...")
             if result.unexpected_keys:
@@ -124,21 +105,19 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
             [
                 transforms.Resize(self.image_size),
                 transforms.Grayscale(num_output_channels=1),
-                transforms.ToTensor(),  # Convert image to PyTorch tensor (0-1 range)
-                transforms.Normalize(
-                    (0.0,), (1.0,)
-                ),  # Normalize tensor to have mean 0 and std 1
+                transforms.ToTensor(),
+                transforms.Normalize((0.0,), (1.0,)),
             ]
         )
 
-        print(f"✓ ViT model loaded successfully with latent_dim={latent_dim}")
+        print(f"✓ VAE model loaded successfully")
 
     def predict(self, context, model_input):
         """
         Standard predict method (required by MLflow)
 
-        This method processes the input through the autoencoder model and returns both
-        the reconstruction and the latent features from the encoder.
+        This method processes the input through the VAE model and returns both
+        the reconstruction and the latent features.
 
         Args:
             context: MLflow context
@@ -148,7 +127,7 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
             Dictionary with reconstruction and latent features
         """
         if self.model is None:
-            raise RuntimeError("ViT model not loaded. Call load_context first.")
+            raise RuntimeError("VAE model not loaded. Call load_context first.")
 
         # Validate input
         if not isinstance(model_input, np.ndarray):
@@ -185,10 +164,9 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
 
         try:
             # Convert numpy array to PIL Image
-            # PIL.Image.fromarray handles both 2D and 3D arrays automatically
             pil_image = Image.fromarray(img_array)
 
-            # Apply transformations (resize, convert to tensor, normalize)
+            # Apply transformations
             tensor = self.transform(pil_image)
 
             # Add batch dimension and move to device
@@ -199,23 +177,28 @@ class VitAutoencoderWrapper(mlflow.pyfunc.PythonModel):
 
         # Process with model
         with torch.no_grad():
-            # Get reconstruction
-            reconstruction = self.model(tensor)
-            reconstruction_np = reconstruction.cpu().numpy()
+            # Forward pass through the model
+            x_reconstructed, mu, logvar = self.model(tensor)
 
-            # Get latent features directly from the encoder
-            latent, _ = self.model.encoder(tensor)
-            latent_features = latent.cpu().numpy()
+            # Convert reconstruction to numpy
+            reconstruction_np = x_reconstructed.cpu().numpy()
+
+            # Get latent features (mu is the mean vector in the latent space)
+            latent_features = mu.cpu().numpy()
 
         # Return results
-        return {"reconstruction": reconstruction_np, "latent_features": latent_features}
+        return {
+            "reconstruction": reconstruction_np,
+            "latent_features": latent_features,
+            "logvar": logvar.cpu().numpy(),  # Also return logvar for completeness
+        }
 
 
-def save_vit_model_with_wrapper(
+def save_vae_model_with_wrapper(
     model_config, tracking_uri, experiment_name, model_name=None
 ):
     """
-    Save autoencoder model using PyFunc wrapper with latent features functionality
+    Save VAE model using PyFunc wrapper with latent features functionality
 
     Args:
         model_config: Dictionary with model configuration
@@ -235,12 +218,12 @@ def save_vit_model_with_wrapper(
     if model_name is None:
         model_name = f"{model_config['name']}_v{datetime.now().strftime('%Y%m%d')}"
 
-    print(f"\nSaving autoencoder model with PyFunc wrapper as: {model_name}")
+    print(f"\nSaving VAE model with PyFunc wrapper as: {model_name}")
 
     start_time = time.time()
 
     with mlflow.start_run(
-        run_name=f"auto_model_wrapper_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        run_name=f"vae_model_wrapper_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     ) as run:
         print(f"Run ID: {run.info.run_id}")
         print(f"MLflow tracking URI: {tracking_uri}")
@@ -264,10 +247,8 @@ def save_vit_model_with_wrapper(
             latent_dim = model_config.get("latent_dim", 64)
             image_size = model_config.get("image_size", (512, 512))
 
-            # Create model wrapper with latent dimension and image size
-            vit_wrapper = VitAutoencoderWrapper(
-                latent_dim=latent_dim, image_size=image_size
-            )
+            # Create model wrapper
+            vae_wrapper = VAEModelWrapper(latent_dim=latent_dim, image_size=image_size)
 
             # Log model information
             mlflow.log_params(
@@ -285,7 +266,7 @@ def save_vit_model_with_wrapper(
             # Set tags
             mlflow.set_tags({"exp_type": "live_mode", "model_type": "autoencoder"})
 
-            # Create artifacts dictionary - only include files
+            # Create artifacts dictionary
             artifacts = {
                 "weights_path": model_config["state_dict"],
                 "model_code": model_config["python_file"],
@@ -300,11 +281,11 @@ def save_vit_model_with_wrapper(
                 "torchvision",
             ]
 
-            # Log the autoencoder model with PyFunc wrapper
-            print("\nLogging autoencoder model with PyFunc wrapper to MLflow...")
+            # Log the VAE model with PyFunc wrapper
+            print("\nLogging VAE model with PyFunc wrapper to MLflow...")
             mlflow.pyfunc.log_model(
                 artifact_path="model",
-                python_model=vit_wrapper,
+                python_model=vae_wrapper,
                 artifacts=artifacts,
                 registered_model_name=model_name,
                 pip_requirements=pip_requirements,
@@ -315,9 +296,7 @@ def save_vit_model_with_wrapper(
             total_time = time.time() - start_time
             mlflow.log_metric("upload_time_seconds", total_time)
 
-            print(
-                f"\n✅ Autoencoder model saved with PyFunc wrapper in {total_time:.1f}s!"
-            )
+            print(f"\n✅ VAE model saved with PyFunc wrapper in {total_time:.1f}s!")
             print(f"Model name: {model_name}")
             print(f"Run ID: {run.info.run_id}")
             print(f"MLflow UI: {tracking_uri}")
@@ -325,6 +304,6 @@ def save_vit_model_with_wrapper(
             return model_name, run.info.run_id
 
         except Exception as e:
-            print(f"\n❌ Error saving autoencoder model with wrapper: {e}")
+            print(f"\n❌ Error saving VAE model with wrapper: {e}")
             traceback.print_exc()
             return None, None
