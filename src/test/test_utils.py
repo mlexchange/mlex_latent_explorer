@@ -6,15 +6,6 @@ import pytest
 
 # Common fixtures for MLflow testing
 @pytest.fixture
-def mock_mlflow_client():
-    """Mock MLflowModelClient class"""
-    with patch("mlex_utils.mlflow_utils.mlflow_model_client.MLflowModelClient") as mock_client_class:
-        mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        yield mock_client
-
-
-@pytest.fixture
 def mock_os_makedirs():
     """Mock os.makedirs to avoid file system errors"""
     with patch("os.makedirs") as mock_makedirs:
@@ -22,18 +13,29 @@ def mock_os_makedirs():
 
 
 @pytest.fixture
-def mlflow_test_client(mock_mlflow_client, mock_os_makedirs):
-    """Create a MLflowModelClient instance with mocked dependencies"""
-    with patch("mlflow.set_tracking_uri"):  # Avoid actually setting tracking URI
-        from mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
+def mock_mlflow_client():
+    """Create a mock MLflow client"""
+    return MagicMock()
 
-        client = MLflowModelClient(
-            tracking_uri="http://mock-mlflow:5000",
-            username="test-user",
-            password="test-password",
-            cache_dir="/tmp/test_mlflow_cache",
-        )
-        return client
+
+@pytest.fixture
+def mlflow_test_client(mock_os_makedirs, mock_mlflow_client):
+    """Create a MLflowModelClient instance with mocked dependencies"""
+    from mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
+    
+    # Patch the MLflowClient class to return our mock
+    with patch("mlex_utils.mlflow_utils.mlflow_model_client.MlflowClient") as mock_mlflow_class:
+        mock_mlflow_class.return_value = mock_mlflow_client
+        
+        with patch("mlex_utils.mlflow_utils.mlflow_model_client.mlflow.set_tracking_uri"):
+            client = MLflowModelClient(
+                tracking_uri="http://mock-mlflow:5000",
+                username="test-user",
+                password="test-password",
+                cache_dir="/tmp/test_mlflow_cache",
+            )
+            
+            yield client
 
 
 # Common fixtures for Redis testing
@@ -116,7 +118,7 @@ def redis_mlflow_mocks():
     mock_dimred.predict.return_value = {"umap_coords": umap_coords}
 
     # Configure the load_model method to return appropriate models
-    mock_mlflow_client.load_model.side_effect = lambda model_name: (
+    mock_mlflow_client.load_model.side_effect = lambda model_name, version=None: (
         mock_autoencoder if model_name == "test_autoencoder" else mock_dimred
     )
 

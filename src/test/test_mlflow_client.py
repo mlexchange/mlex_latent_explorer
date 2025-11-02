@@ -89,9 +89,16 @@ class TestMLflowClient:
         # Verify the result contains the expected parameters
         assert result == {"param1": "value1", "param2": "value2"}
 
-    def test_get_mlflow_models(self, mlflow_test_client, mock_mlflow_client):
+    @patch("mlex_utils.mlflow_utils.mlflow_model_client.get_flow_run_name")
+    @patch("mlex_utils.mlflow_utils.mlflow_model_client.get_flow_run_parent_id")
+    def test_get_mlflow_models(self, mock_get_parent_id, mock_get_flow_name, mlflow_test_client, mock_mlflow_client):
         """Test retrieving MLflow models"""
         client = mlflow_test_client
+        
+        # Configure Prefect mocks
+        mock_get_flow_name.return_value = "Flow Run 1"
+        mock_get_parent_id.return_value = "parent-id"
+        
         # Create mock model versions
         mock_version1 = MagicMock()
         mock_version1.name = "model1"
@@ -119,18 +126,7 @@ class TestMLflowClient:
         # Configure get_run to return our mock runs
         mock_mlflow_client.get_run.side_effect = [mock_run1, mock_run2]
 
-        # Mock the get_flow_run_name and get_flow_run_parent_id functions
-        with (
-            patch(
-                "src.utils.mlflow_utils.get_flow_run_name", return_value="Flow Run 1"
-            ),
-            patch(
-                "src.utils.mlflow_utils.get_flow_run_parent_id",
-                return_value="parent-id",
-            ),
-        ):
-
-            result = client.get_mlflow_models()
+        result = client.get_mlflow_models()
 
         # Verify search_model_versions was called
         mock_mlflow_client.search_model_versions.assert_called_once()
@@ -184,11 +180,18 @@ class TestMLflowClient:
         assert result[0]["label"] == "model1"
         assert result[0]["value"] == "model1"
 
+    @patch("mlex_utils.mlflow_utils.mlflow_model_client.get_flow_run_name")
+    @patch("mlex_utils.mlflow_utils.mlflow_model_client.get_flow_run_parent_id")
     def test_get_mlflow_models_with_model_type(
-        self, mlflow_test_client, mock_mlflow_client
+        self, mock_get_parent_id, mock_get_flow_name, mlflow_test_client, mock_mlflow_client
     ):
         """Test retrieving MLflow models with model_type filter"""
         client = mlflow_test_client
+        
+        # Configure Prefect mocks
+        mock_get_flow_name.return_value = "Flow Run 1"
+        mock_get_parent_id.return_value = "parent-id"
+        
         # Create mock model versions
         mock_version1 = MagicMock()
         mock_version1.name = "model1"
@@ -216,18 +219,7 @@ class TestMLflowClient:
         # Configure get_run to return our mock runs
         mock_mlflow_client.get_run.side_effect = [mock_run1, mock_run2]
 
-        # Mock the get_flow_run_name and get_flow_run_parent_id functions
-        with (
-            patch(
-                "src.utils.mlflow_utils.get_flow_run_parent_id",
-                return_value="parent-id",
-            ),
-            patch(
-                "src.utils.mlflow_utils.get_flow_run_name", return_value="Flow Run 1"
-            ),
-        ):
-
-            result = client.get_mlflow_models(model_type="autoencoder")
+        result = client.get_mlflow_models(model_type="autoencoder")
 
         # Verify the result contains only models with model_type "autoencoder"
         assert len(result) == 1
