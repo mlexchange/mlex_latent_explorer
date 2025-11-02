@@ -3,7 +3,7 @@ import logging
 import os
 from urllib.parse import urljoin
 
-from src.utils.mlflow_utils import MLflowClient
+from mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
 
 # I/O parameters for job execution
 READ_DIR_MOUNT = os.getenv("READ_DIR_MOUNT", None)
@@ -15,20 +15,8 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 MLFLOW_TRACKING_USERNAME = os.getenv("MLFLOW_TRACKING_USERNAME", "")
 MLFLOW_TRACKING_PASSWORD = os.getenv("MLFLOW_TRACKING_PASSWORD", "")
 
-# Flow parameters
-PARTITIONS_CPU = json.loads(os.getenv("PARTITIONS_CPU", "[]"))
-RESERVATIONS_CPU = json.loads(os.getenv("RESERVATIONS_CPU", "[]"))
-MAX_TIME_CPU = os.getenv("MAX_TIME_CPU", "1:00:00")
-PARTITIONS_GPU = json.loads(os.getenv("PARTITIONS_CPU", "[]"))
-RESERVATIONS_GPU = json.loads(os.getenv("RESERVATIONS_CPU", "[]"))
-MAX_TIME_GPU = os.getenv("MAX_TIME_CPU", "1:00:00")
-SUBMISSION_SSH_KEY = os.getenv("SUBMISSION_SSH_KEY", "")
-FORWARD_PORTS = json.loads(os.getenv("FORWARD_PORTS", "[]"))
-CONTAINER_NETWORK = os.getenv("CONTAINER_NETWORK", "")
-FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
-
 logger = logging.getLogger(__name__)
-mlflow_client = MLflowClient()
+mlflow_client = MLflowModelClient()
 
 def parse_tiled_url(url, user, project_name, tiled_base_path="/api/v1/metadata"):
     """
@@ -47,7 +35,6 @@ def parse_job_params(
     model_parameters,
     user,
     project_name,
-    flow_type,
     latent_space_params,
     dim_reduction_params,
     mlflow_model_id=None,
@@ -55,7 +42,6 @@ def parse_job_params(
     """
     Parse training job parameters
     """
-    # TODO: Use model_name to define the conda_env/algorithm to be executed
     data_uris = [dataset.uri for dataset in data_project.datasets]
 
     results_dir = f"{WRITE_DIR}/{user}"
@@ -79,101 +65,30 @@ def parse_job_params(
     auto_params = mlflow_client.get_mlflow_params(mlflow_model_id)
     logger.info(f"Autoencoder parameters: {auto_params}")
 
-    ls_python_file_name_inference = latent_space_params["python_file_name"]["inference"]
-    dm_python_file_name = dim_reduction_params["python_file_name"]
+    # Create a simpler params_list structure with model_name and task_name
+    params_list = [
+        {
+            "model_name": latent_space_params["model_name"],
+            "task_name": "inference",
+            "params": {
+                "io_parameters": io_parameters,
+                "model_parameters": auto_params,
+            },
+        },
+        {
+            "model_name": dim_reduction_params["model_name"],
+            "task_name": "excute",
+            "params": {
+                "io_parameters": io_parameters,
+                "model_parameters": model_parameters,
+            },
+        },
+    ]
 
-    if flow_type == "podman" or "docker":
-        job_params = {
-            "flow_type": flow_type,
-            "params_list": [
-                {
-                    "image_name": latent_space_params["image_name"],
-                    "image_tag": latent_space_params["image_tag"],
-                    "command": f"python {ls_python_file_name_inference}",
-                    "params": {
-                        "io_parameters": io_parameters,
-                        "model_parameters": auto_params,
-                    },
-                    "volumes": [
-                        f"{READ_DIR_MOUNT}:/tiled_storage",
-                    ],
-                    "network": CONTAINER_NETWORK,
-                },
-                {
-                    "image_name": dim_reduction_params["image_name"],
-                    "image_tag": dim_reduction_params["image_tag"],
-                    "command": f"python {dm_python_file_name}",
-                    "params": {
-                        "io_parameters": io_parameters,
-                        "model_parameters": model_parameters,
-                    },
-                    "volumes": [
-                        f"{READ_DIR_MOUNT}:/tiled_storage",
-                    ],
-                    "network": CONTAINER_NETWORK,
-                },
-            ],
-        }
-
-    elif flow_type == "conda":
-        job_params = {
-            "flow_type": "conda",
-            "params_list": [
-                {
-                    "conda_env_name": latent_space_params["conda_env"],
-                    "python_file_name": ls_python_file_name_inference,
-                    "params": {
-                        "io_parameters": io_parameters,
-                        "model_parameters": auto_params,
-                    },
-                },
-                {
-                    "conda_env_name": dim_reduction_params["conda_env"],
-                    "python_file_name": dm_python_file_name,
-                    "params": {
-                        "io_parameters": io_parameters,
-                        "model_parameters": model_parameters,
-                    },
-                },
-            ],
-        }
-
-    else:
-        job_params = {
-            "flow_type": "slurm",
-            "params_list": [
-                {
-                    "job_name": "latent_space_explorer",
-                    "num_nodes": 1,
-                    "partitions": PARTITIONS_CPU,
-                    "reservations": RESERVATIONS_CPU,
-                    "max_time": MAX_TIME_CPU,
-                    "conda_env_name": latent_space_params["conda_env"],
-                    "python_file_name": ls_python_file_name_inference,
-                    "submission_ssh_key": SUBMISSION_SSH_KEY,
-                    "forward_ports": FORWARD_PORTS,
-                    "params": {
-                        "io_parameters": io_parameters,
-                        "model_parameters": auto_params,
-                    },
-                },
-                {
-                    "job_name": "latent_space_explorer",
-                    "num_nodes": 1,
-                    "partitions": PARTITIONS_CPU,
-                    "reservations": RESERVATIONS_CPU,
-                    "max_time": MAX_TIME_CPU,
-                    "conda_env_name": dim_reduction_params["conda_env"],
-                    "python_file_name": dm_python_file_name,
-                    "submission_ssh_key": SUBMISSION_SSH_KEY,
-                    "forward_ports": FORWARD_PORTS,
-                    "params": {
-                        "io_parameters": io_parameters,
-                        "model_parameters": model_parameters,
-                    },
-                },
-            ],
-        }
+    # Keep the job params simplified
+    job_params = {
+        "params_list": params_list,
+    }
 
     return job_params
 
@@ -183,16 +98,11 @@ def parse_clustering_job_params(
     model_parameters,
     user,
     project_name,
-    flow_type,
-    image_name=None,
-    image_tag=None,
-    python_file_name=None,
-    conda_env=None,
+    clustering_params
 ):
     """
-    Parse job parameters
+    Parse job parameters for clustering
     """
-    # TODO: Use model_name to define the conda_env/algorithm to be executed
     data_uris = [dataset.uri for dataset in data_project.datasets]
 
     results_dir = f"{WRITE_DIR}/{user}"
@@ -209,61 +119,22 @@ def parse_clustering_job_params(
         "results_dir": f"{results_dir}",
     }
 
-    if flow_type == "podman" or flow_type == "docker":
-        job_params = {
-            "flow_type": flow_type,
-            "params_list": [
-                {
-                    "image_name": image_name,
-                    "image_tag": image_tag,
-                    "command": f"python {python_file_name}",
-                    "params": {
-                        "io_parameters": io_parameters,
-                        "model_parameters": model_parameters,
-                    },
-                    "volumes": [
-                        f"{READ_DIR_MOUNT}:/tiled_storage",
-                    ],
-                    "network": CONTAINER_NETWORK,
-                }
-            ],
+    # Create a simpler params_list structure with model_name and task_name
+    params_list = [
+        {
+            "model_name": clustering_params["model_name"],
+            "task_name": "excute",
+            "params": {
+                "io_parameters": io_parameters,
+                "model_parameters": model_parameters,
+            },
         }
+    ]
 
-    elif flow_type == "conda":
-        job_params = {
-            "flow_type": "conda",
-            "params_list": [
-                {
-                    "conda_env_name": conda_env,
-                    "python_file_name": python_file_name,
-                    "params": {
-                        "io_parameters": io_parameters,
-                        "model_parameters": model_parameters,
-                    },
-                },
-            ],
-        }
-
-    else:
-        job_params = {
-            "flow_type": "slurm",
-            "params_list": [
-                {
-                    "job_name": "latent_space_explorer",
-                    "num_nodes": 1,
-                    "partitions": PARTITIONS_CPU,
-                    "reservations": RESERVATIONS_CPU,
-                    "max_time": MAX_TIME_CPU,
-                    "conda_env_name": "mlex_dimension_reduction_pca",
-                    "submission_ssh_key": SUBMISSION_SSH_KEY,
-                    "forward_ports": FORWARD_PORTS,
-                    "params": {
-                        "io_parameters": io_parameters,
-                        "model_parameters": model_parameters,
-                    },
-                }
-            ],
-        }
+    # Keep the job params simplified
+    job_params = {
+        "params_list": params_list,
+    }
 
     return job_params
 
@@ -279,7 +150,7 @@ def parse_model_params(model_parameters_html, log, percentiles, mask):
         # param["props"]["children"][0] is the label
         # param["props"]["children"][1] is the input
         parameter_container = param["props"]["children"][1]
-        # The achtual parameter item is the first and only child of the parameter container
+        # The actual parameter item is the first and only child of the parameter container
         parameter_item = parameter_container["props"]["children"]["props"]
         key = parameter_item["id"]["param_key"]
         if "value" in parameter_item:
