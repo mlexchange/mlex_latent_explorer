@@ -13,20 +13,20 @@ class TestMLflowClient:
 
     @pytest.fixture(autouse=True)
     def setup_and_teardown(self):
-        """Reset MLflowClient._model_cache before and after each test"""
+        """Reset MLflowModelClient._model_cache before and after each test"""
         # Save original cache
-        original_cache = MLflowClient._model_cache.copy()
+        original_cache = MLflowModelClient._model_cache.copy()
 
         # Clear cache before test
-        MLflowClient._model_cache = {}
+        MLflowModelClient._model_cache = {}
 
         yield
 
         # Restore original cache after test
-        MLflowClient._model_cache = original_cache
+        MLflowModelClient._model_cache = original_cache
 
     def test_init(self, mlflow_test_client, mock_os_makedirs):
-        """Test initialization of MLflowClient"""
+        """Test initialization of MLflowModelClient"""
         client = mlflow_test_client
         # Verify environment variables were set
         assert os.environ["MLFLOW_TRACKING_USERNAME"] == "test-user"
