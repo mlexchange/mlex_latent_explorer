@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 # Import the MLflowClient class
-from src.utils.mlflow_utils import MLflowClient
+frfrom mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
 from tiled.client import from_uri
 
 from tiled_utils import write_results
@@ -36,7 +36,7 @@ if not hasattr(torch, "get_default_device"):
 
 if __name__ == "__main__":
     # Create MLflow client
-    mlflow_client = MLflowClient(
+    mlflow_client = MLflowModelClient(
         tracking_uri=MLFLOW_TRACKING_URI,
         username=MLFLOW_TRACKING_USERNAME,
         password=MLFLOW_TRACKING_PASSWORD,
