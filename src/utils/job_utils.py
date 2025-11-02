@@ -3,7 +3,7 @@ import logging
 import os
 from urllib.parse import urljoin
 
-from src.utils.mlflow_utils import MLflowClient
+from mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
 
 # I/O parameters for job execution
 READ_DIR_MOUNT = os.getenv("READ_DIR_MOUNT", None)
@@ -16,7 +16,7 @@ MLFLOW_TRACKING_USERNAME = os.getenv("MLFLOW_TRACKING_USERNAME", "")
 MLFLOW_TRACKING_PASSWORD = os.getenv("MLFLOW_TRACKING_PASSWORD", "")
 
 logger = logging.getLogger(__name__)
-mlflow_client = MLflowClient()
+mlflow_client = MLflowModelClient()
 
 def parse_tiled_url(url, user, project_name, tiled_base_path="/api/v1/metadata"):
     """

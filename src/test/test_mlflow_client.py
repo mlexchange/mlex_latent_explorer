@@ -6,7 +6,7 @@ import mlflow
 import pytest
 
 from src.test.test_utils import mlflow_test_client, mock_mlflow_client, mock_os_makedirs
-from src.utils.mlflow_utils import MLflowClient
+from mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
 
 
 class TestMLflowClient:
@@ -251,7 +251,7 @@ class TestMLflowClient:
         client = mlflow_test_client
         # Set up memory cache
         mock_model = MagicMock(name="memory_model")
-        MLflowClient._model_cache = {"test-model": mock_model}
+        MLflowModelClient._model_cache = {"test-model": mock_model}
 
         # Load model
         result = client.load_model("test-model")
@@ -367,13 +367,13 @@ class TestMLflowClient:
     def test_clear_memory_cache(self):
         """Test clearing the memory cache"""
         # Set up memory cache
-        MLflowClient._model_cache = {"test-model": MagicMock()}
+        MLflowModelClient._model_cache = {"test-model": MagicMock()}
 
         # Clear memory cache
-        MLflowClient.clear_memory_cache()
+        MLflowModelClient.clear_memory_cache()
 
         # Verify memory cache is empty
-        assert len(MLflowClient._model_cache) == 0
+        assert len(MLflowModelClient._model_cache) == 0
 
     def test_clear_disk_cache(self, mlflow_test_client):
         """Test clearing the disk cache"""

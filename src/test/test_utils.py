@@ -7,8 +7,8 @@ import pytest
 # Common fixtures for MLflow testing
 @pytest.fixture
 def mock_mlflow_client():
-    """Mock MlflowClient class"""
-    with patch("src.utils.mlflow_utils.MlflowClient") as mock_client_class:
+    """Mock MLflowModelClient class"""
+    with patch("mlex_utils.mlflow_utils.mlflow_model_client.MLflowModelClient") as mock_client_class:
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
         yield mock_client
@@ -23,11 +23,11 @@ def mock_os_makedirs():
 
 @pytest.fixture
 def mlflow_test_client(mock_mlflow_client, mock_os_makedirs):
-    """Create a MLflowClient instance with mocked dependencies"""
+    """Create a MLflowModelClient instance with mocked dependencies"""
     with patch("mlflow.set_tracking_uri"):  # Avoid actually setting tracking URI
-        from src.utils.mlflow_utils import MLflowClient
+        from mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
 
-        client = MLflowClient(
+        client = MLflowModelClient(
             tracking_uri="http://mock-mlflow:5000",
             username="test-user",
             password="test-password",
@@ -87,7 +87,7 @@ def redis_mlflow_mocks():
     """Set up and start Redis and MLflow mocks"""
     # Create the patches
     redis_mock_patch = patch("src.arroyo_reduction.redis_model_store.RedisModelStore")
-    mlflow_client_mock_patch = patch("src.utils.mlflow_utils.MLflowClient")
+    mlflow_client_mock_patch = patch("mlex_utils.mlflow_utils.mlflow_model_client.MLflowModelClient")
 
     # Start all the patches
     redis_mock = redis_mock_patch.start()
@@ -149,7 +149,7 @@ def mock_logger():
 # Add a specific mock for the live_mode MLflow client
 @pytest.fixture
 def mock_live_mode_mlflow_client():
-    """Mock MLflowClient for live_mode callbacks"""
+    """Mock MLflowModelClient for live_mode callbacks"""
     with patch("src.callbacks.live_mode.mlflow_client") as mock_client:
         # Configure check_model_compatibility for testing
         mock_client.check_model_compatibility.side_effect = (

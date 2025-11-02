@@ -1,6 +1,6 @@
 services:
   prefect:
-    image: prefecthq/prefect:2.14-python3.11
+    image: prefecthq/prefect:3.4.2-python3.11
     command: prefect server start
     container_name: prefect-server
     environment:

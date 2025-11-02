@@ -29,7 +29,7 @@ from src.utils.job_utils import (
     parse_job_params,
     parse_model_params,
 )
-from src.utils.mlflow_utils import MLflowClient
+from mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
 from src.utils.plot_utils import generate_notification
 
 MODE = os.getenv("MODE", "")
@@ -43,7 +43,7 @@ REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
 
 logger = logging.getLogger(__name__)
-mlflow_client = MLflowClient()
+mlflow_client = MLflowModelClient()
 
 @callback(
     Output("mlflow-model-dropdown", "options", allow_duplicate=True),
