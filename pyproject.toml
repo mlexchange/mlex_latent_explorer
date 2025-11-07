@@ -32,7 +32,7 @@ lse = [
     "kaleido<=0.2.1",
     "humanhash3",
     "mlex_file_manager@git+https://github.com/mlexchange/mlex_file_manager.git",
-    "mlex_utils[all]@git+https://github.com/mlexchange/mlex_utils.git",
+    "mlex_utils[all]@git+https://github.com/mlexchange/mlex_utils.git@v0.1.0",
     "numpy<2.0.0",
     "pandas",
     "Pillow",
