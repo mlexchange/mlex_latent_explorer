@@ -72,7 +72,7 @@ docker ps
 
 ### 5 Start a Prefect Worker
 
-Open another terminal and start a Prefect worker. Refer to [mlex_prefect_worker](https://github.com/mlexchange/mlex_prefect_worker) for detailed instructions on setting up and running the worker.
+Open another terminal and start a Prefect worker. Refer to [mlex_prefect_worker](https://github.com/mlexchange/mlex_prefect_worker/tree/v0.1.0) for detailed instructions on setting up and running the worker.
 
 
 ### 6 Access the Application
