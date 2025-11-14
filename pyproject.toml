@@ -77,5 +77,8 @@ arroyo = [
     "torchvision==0.17.2",
     "transformers==4.47.1",
     "umap-learn",
-    "joblib==1.4.2"
+    "joblib==1.4.2",
+    "mlflow==2.22.0",
+    "mlex_utils[all]@git+https://github.com/mlexchange/mlex_utils.git",
+    "numpy<2.0.0"
 ]

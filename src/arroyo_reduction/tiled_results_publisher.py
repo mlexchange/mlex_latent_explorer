@@ -24,24 +24,28 @@ USER = os.getenv("USER", "default_user")
 # Constants
 # Timezone for log timestamps
 CALIFORNIA_TZ = pytz.timezone('US/Pacific')
-# Daily run ID that all instances will use
-DAILY_RUN_ID = f"daily_run_{datetime.now(CALIFORNIA_TZ).strftime('%Y-%m-%d')}"
+# REMOVED: Daily run ID that all instances will use
+# DAILY_RUN_ID = f"daily_run_{datetime.now(CALIFORNIA_TZ).strftime('%Y-%m-%d')}"
 # Regex pattern to extract UUID from tiled_url
 UUID_PATTERN = r"([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"
 
 class TiledResultsPublisher(Publisher):
     """Publisher that saves latent space vectors to a Tiled server."""
 
-    def __init__(self, tiled_uri=None, tiled_api_key=None, root_segments=None):
+    def __init__(self, tiled_uri=None, tiled_api_key=None, root_segments=None, tiled_prefix=None):
         super().__init__()
         self.tiled_uri = tiled_uri or RESULTS_TILED_URI
         self.tiled_api_key = tiled_api_key or RESULTS_TILED_API_KEY
+        self.tiled_prefix = tiled_prefix  # NEW: Add prefix support
         self.root_segments = root_segments or ["lse_live_results"]
         self.user = USER  # Get user from environment
         self.client = None
         self.root_container = None
         self.user_container = None  # Add user container
-        self.daily_container = None
+        # CHANGED: Split daily_container into Year/Month/Day hierarchy
+        self.year_container = None
+        self.month_container = None
+        self.day_container = None
         
         # Dictionary to store DataFrames by UUID
         self.uuid_dataframes = {}
@@ -72,13 +76,27 @@ class TiledResultsPublisher(Publisher):
         try:
             self.client = from_uri(self.tiled_uri, api_key=self.tiled_api_key)
             
-            # Navigate to the root container and create the hierarchy
-            self._setup_containers_sync()
+            # NEW: Navigate to prefix first if specified - ERROR if it doesn't exist
+            container = self.client
+            if self.tiled_prefix:
+                prefix_segments = self.tiled_prefix.split('/')
+                for segment in prefix_segments:
+                    if segment:  # Skip empty strings
+                        if segment in container:
+                            logger.info(f"Using existing prefix container: {segment}")
+                            container = container[segment]
+                        else:
+                            # Create the prefix path if it doesn't exist
+                            logger.info(f"Creating prefix container: {segment}")
+                            container = container.create_container(segment)
             
-            # List all existing tables in the daily container
-            if self.daily_container is not None:
-                table_keys = list(self.daily_container)
-                logger.info(f"Found {len(table_keys)} existing tables in daily container")
+            # Navigate to the root container and create the hierarchy
+            self._setup_containers_sync(container)
+            
+            # List all existing tables in the day container (CHANGED from daily_container)
+            if self.day_container is not None:
+                table_keys = list(self.day_container)
+                logger.info(f"Found {len(table_keys)} existing tables in day container")
                 
                 # Add all existing tables to our set of existing UUIDs
                 self.existing_uuids.update(table_keys)
@@ -90,7 +108,10 @@ class TiledResultsPublisher(Publisher):
                     logger.info(f"Examples of existing UUIDs: {', '.join(examples)}")
                     
             logger.info(f"Connected to Tiled server at {self.tiled_uri}")
-            logger.info(f"Using container path: {'/'.join(self.root_segments)}/{self.user}/{DAILY_RUN_ID}")
+            prefix_path = f"{self.tiled_prefix}/" if self.tiled_prefix else ""
+            # CHANGED: Log new path structure
+            now = datetime.now(CALIFORNIA_TZ)
+            logger.info(f"Using container path: {prefix_path}{'/'.join(self.root_segments)}/{self.user}/{now.year}/{now.month:02d}/{now.day:02d}")
         except Exception as e:
             logger.error(f"Error in _start_sync: {e}")
             import traceback
@@ -114,11 +135,13 @@ class TiledResultsPublisher(Publisher):
         logger.debug(f"No UUID found in URL, using default: {self.default_table_name}")
         return self.default_table_name
     
-    def _setup_containers_sync(self):
+    def _setup_containers_sync(self, starting_container=None):
         """Set up the container structure with USER level (synchronous version)."""
         try:
-            # Navigate through root_segments
-            container = self.client
+            # NEW: Start from provided container or client
+            container = starting_container if starting_container is not None else self.client
+            
+            # Navigate through root_segments (these we can create)
             for segment in self.root_segments:
                 if segment in container:
                     logger.info(f"Using existing container: {segment}")
@@ -138,15 +161,36 @@ class TiledResultsPublisher(Publisher):
                 logger.info(f"Creating user container: {self.user}")
                 self.user_container = self.root_container.create_container(self.user)
             
-            # Now create the daily run container inside the user container
-            if DAILY_RUN_ID not in self.user_container:
-                logger.info(f"Creating daily container: {DAILY_RUN_ID}")
-                self.user_container.create_container(DAILY_RUN_ID)
-            else:
-                logger.info(f"Using existing daily container: {DAILY_RUN_ID}")
+            # CHANGED: Replace single daily_run container with Year/Month/Day hierarchy
+            # Get current date components
+            now = datetime.now(CALIFORNIA_TZ)
+            year_str = str(now.year)
+            month_str = f"{now.month:02d}"
+            day_str = f"{now.day:02d}"
             
-            # Store reference to daily container
-            self.daily_container = self.user_container[DAILY_RUN_ID]
+            # Create Year container
+            if year_str not in self.user_container:
+                logger.info(f"Creating year container: {year_str}")
+                self.user_container.create_container(year_str)
+            else:
+                logger.info(f"Using existing year container: {year_str}")
+            self.year_container = self.user_container[year_str]
+            
+            # Create Month container
+            if month_str not in self.year_container:
+                logger.info(f"Creating month container: {month_str}")
+                self.year_container.create_container(month_str)
+            else:
+                logger.info(f"Using existing month container: {month_str}")
+            self.month_container = self.year_container[month_str]
+            
+            # Create Day container
+            if day_str not in self.month_container:
+                logger.info(f"Creating day container: {day_str}")
+                self.month_container.create_container(day_str)
+            else:
+                logger.info(f"Using existing day container: {day_str}")
+            self.day_container = self.month_container[day_str]
             
         except Exception as e:
             logger.error(f"Error setting up containers: {e}")
@@ -160,18 +204,18 @@ class TiledResultsPublisher(Publisher):
             # Use provided experiment_name, or fall back to current, or default
             exp_name = experiment_name or self.current_experiment_name or "default_experiment"
             
-            # Check if experiment container exists in daily container
-            if exp_name not in self.daily_container:
+            # Check if experiment container exists in day container (CHANGED from daily_container)
+            if exp_name not in self.day_container:
                 logger.info(f"Creating experiment container: {exp_name}")
-                self.daily_container.create_container(exp_name)
+                self.day_container.create_container(exp_name)
             
-            return self.daily_container[exp_name]
+            return self.day_container[exp_name]
         except Exception as e:
             logger.error(f"Error getting experiment container: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            # Fallback to daily container
-            return self.daily_container
+            # Fallback to day container (CHANGED from daily_container)
+            return self.day_container
     
     async def publish(self, message):
         """Publish a message to Tiled server."""
@@ -212,9 +256,9 @@ class TiledResultsPublisher(Publisher):
     def _publish_sync(self, message):
         """Synchronous implementation of publish() to be run in a thread."""
         try:
-            # Ensure daily container exists
-            if self.daily_container is None:
-                logger.error("Daily container not initialized, cannot publish")
+            # Ensure day container exists (CHANGED from daily_container)
+            if self.day_container is None:
+                logger.error("Day container not initialized, cannot publish")
                 return None
 
             # Format vector and metadata
@@ -232,19 +276,29 @@ class TiledResultsPublisher(Publisher):
                 # Get experiment container
                 experiment_container = self._get_experiment_container(experiment_name)
                 
-                # Check if this UUID already exists
+                # NEW: Check if UUID container exists (not UUID/feature_vectors table)
                 if uuid in experiment_container:
-                    logger.debug(f"Skipping vector for existing UUID: {uuid}")
-                    return None
+                    uuid_container = experiment_container[uuid]
+                    # Check if feature_vectors table exists inside UUID container
+                    if "feature_vectors" in uuid_container:
+                        logger.debug(f"Skipping vector for existing UUID: {uuid}")
+                        return None
                 
                 # Check if this is a new UUID
                 uuid_to_write = None
                 
                 if self.current_uuid is not None and uuid != self.current_uuid and self.current_uuid in self.uuid_dataframes:
-                    # We have a new UUID, so write the data for the previous UUID (if it's not an existing UUID)
-                    if self.current_uuid not in experiment_container and not self.uuid_dataframes[self.current_uuid].empty:
-                        logger.info(f"New UUID detected, marking previous UUID for writing: {self.current_uuid}")
-                        uuid_to_write = self.current_uuid
+                    # We have a new UUID, so write the data for the previous UUID
+                    if not self.uuid_dataframes[self.current_uuid].empty:
+                        # Check if the previous UUID's feature_vectors already exists
+                        prev_uuid_container = experiment_container.get(self.current_uuid)
+                        should_write = True
+                        if prev_uuid_container and "feature_vectors" in prev_uuid_container:
+                            should_write = False
+                        
+                        if should_write:
+                            logger.info(f"New UUID detected, marking previous UUID for writing: {self.current_uuid}")
+                            uuid_to_write = self.current_uuid
                 
                 # Update current UUID
                 self.current_uuid = uuid
@@ -300,10 +354,12 @@ class TiledResultsPublisher(Publisher):
             # Get experiment container instead of using daily_container
             experiment_container = self._get_experiment_container(self.current_experiment_name)
             
-            # Check if this UUID already exists
+            # NEW: Check if UUID container exists, and if feature_vectors table exists inside it
             if table_key in experiment_container:
-                logger.info(f"Skipping write for existing UUID: {table_key}")
-                return
+                uuid_container = experiment_container[table_key]
+                if "feature_vectors" in uuid_container:
+                    logger.info(f"Skipping write for existing UUID: {table_key} (feature_vectors already exists)")
+                    return
             
             # Get the DataFrame for this UUID
             df = self.uuid_dataframes.get(table_key)
@@ -311,20 +367,27 @@ class TiledResultsPublisher(Publisher):
                 logger.warning(f"No DataFrame found for {table_key}")
                 return
                 
-            # Log DataFrame info for debugging
-            logger.info(f"Writing {len(df)} vectors to new table '{table_key}' in {self.user}/{DAILY_RUN_ID}/{self.current_experiment_name}")
+            # Log DataFrame info for debugging (CHANGED: use current date instead of DAILY_RUN_ID)
+            now = datetime.now(CALIFORNIA_TZ)
+            logger.info(f"Writing {len(df)} vectors to new table '{table_key}/feature_vectors' in {self.user}/{now.year}/{now.month:02d}/{now.day:02d}/{self.current_experiment_name}")
             
             # Check if DataFrame is empty
             if df.empty:
                 logger.warning(f"DataFrame for {table_key} is empty, nothing to write")
                 return
             
-            # Simply write the DataFrame to Tiled
+            # NEW: Create UUID container if it doesn't exist
+            if table_key not in experiment_container:
+                logger.info(f"Creating UUID container: {table_key}")
+                experiment_container.create_container(table_key)
+            
+            uuid_container = experiment_container[table_key]
+            
+            # Write the DataFrame as "feature_vectors" inside the UUID container
             try:
-                # Use write_dataframe with the UUID as the key
-                experiment_container.write_dataframe(df, key=table_key)
+                uuid_container.write_dataframe(df, key="feature_vectors")
                 
-                logger.info(f"Successfully wrote {len(df)} vectors to '{table_key}'")
+                logger.info(f"Successfully wrote {len(df)} vectors to '{table_key}/feature_vectors'")
                 
                 # Add this UUID to our set of existing UUIDs
                 self.existing_uuids.add(table_key)
@@ -373,9 +436,15 @@ class TiledResultsPublisher(Publisher):
             
             # Check if the current UUID needs writing
             if (self.current_uuid is not None and 
-                self.current_uuid not in experiment_container and
                 self.current_uuid in self.uuid_dataframes and 
                 not self.uuid_dataframes[self.current_uuid].empty):
+                
+                # Check if UUID container and feature_vectors table already exist
+                if self.current_uuid in experiment_container:
+                    uuid_container = experiment_container[self.current_uuid]
+                    if "feature_vectors" in uuid_container:
+                        logger.info(f"UUID {self.current_uuid} already has feature_vectors, skipping write")
+                        return None
                 
                 return self.current_uuid
             
@@ -389,4 +458,7 @@ class TiledResultsPublisher(Publisher):
     @classmethod
     def from_settings(cls, settings):
         """Create a TiledResultsPublisher from settings."""
-        return cls(root_segments=settings.get("root_segments"))
+        return cls(
+            root_segments=settings.get("root_segments"),
+            tiled_prefix=settings.get("tiled_prefix")  # NEW: Pass prefix from settings
+        )

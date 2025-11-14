@@ -32,13 +32,46 @@ class LatentSpaceOperator(Operator):
             logger.warning(f"Could not connect to Redis Model Store: {e}")
             self.redis_model_store = None
 
+    def _check_models_selected(self):
+        """
+        Synchronous helper to check if models are selected in Redis.
+        This will be called via asyncio.to_thread() to avoid blocking the event loop.
+        
+        Returns:
+            tuple: (autoencoder_model, dimred_model) or (None, None) if not available
+        """
+        if self.redis_model_store is None:
+            return (None, None)
+        
+        try:
+            autoencoder_model = self.redis_model_store.get_autoencoder_model()
+            dimred_model = self.redis_model_store.get_dimred_model()
+            return (autoencoder_model, dimred_model)
+        except Exception as e:
+            logger.error(f"Error checking model selection in Redis: {e}")
+            return (None, None)
+
     async def process(self, message: SASMessage) -> None:
         # logger.debug("message recvd")
         if isinstance(message, Start):
             logger.info("Received Start Message")
             await self.publish(message)
         elif isinstance(message, RawFrameEvent):
-            await self.publish(message)
+            # NEW: Check if models are selected before publishing RawFrameEvent
+            if self.redis_model_store is not None:
+                # Run Redis check in thread pool to avoid blocking event loop
+                autoencoder_model, dimred_model = await asyncio.to_thread(
+                    self._check_models_selected
+                )
+                
+                if not autoencoder_model or not dimred_model:
+                    logger.info(f"In offline mode - skipping write image {message.frame_number}")
+                else:
+                    await self.publish(message)
+            else:
+                # If redis not available, publish anyway (default behavior)
+                await self.publish(message)
+
             result = await self.dispatch(message)
             if result is not None:  # Only publish if we got a valid result
                 await self.publish(result)
@@ -53,9 +86,10 @@ class LatentSpaceOperator(Operator):
         try:
             # Use the RedisModelStore instead of direct Redis client
             if self.redis_model_store is not None:
-                # Check if processing is disabled (by checking if models are set)
-                autoencoder_model = self.redis_model_store.get_autoencoder_model()
-                dimred_model = self.redis_model_store.get_dimred_model()
+                # Run Redis check in thread pool to avoid blocking event loop
+                autoencoder_model, dimred_model = await asyncio.to_thread(
+                    self._check_models_selected
+                )
                 
                 if not autoencoder_model or not dimred_model:
                     # NEW: Send flush only once when entering offline mode
@@ -73,7 +107,7 @@ class LatentSpaceOperator(Operator):
                         self._flush_sent = True
                         logger.info("Sent flush signal when entering offline mode")
                     
-                    logger.info(f"In offline mode - skipping frame {message.frame_number}")
+                    logger.info(f"In offline mode - skipping dispatch frame {message.frame_number}")
                     return None
                 else:
                     # NEW: Reset flush flag when back in live mode

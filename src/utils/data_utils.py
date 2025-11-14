@@ -91,12 +91,17 @@ def hash_list_of_strings(strings_list):
 
 # ============= UPDATED/NEW FUNCTIONS FOR USER HIERARCHY =============
 
-def get_daily_containers():
+def get_daily_containers(beamline_path=None):
     """
     Retrieve all available daily containers for the current user from Tiled
     
+    CHANGED: Now returns dates in YYYY/MM/DD format instead of daily_run_YYYY-MM-DD
+    
+    Args:
+        beamline_path (str, optional): Path to beamline prefix (e.g., "beamlines/bl931/processed")
+    
     Returns:
-        list: List of dictionaries with {label: container_name, value: container_name}
+        list: List of dictionaries with {label: formatted_date, value: "YYYY/MM/DD"}
     """
     try:
         # Get username from environment
@@ -110,6 +115,16 @@ def get_daily_containers():
         # Get the root container
         container = tiled_results.data_client
         
+        # NEW: Navigate to beamline path if provided
+        if beamline_path:
+            path_parts = beamline_path.split('/')
+            for part in path_parts:
+                if part and part in container:
+                    container = container[part]
+                elif part:
+                    logger.warning(f"Beamline path segment '{part}' not found")
+                    return []
+        
         # Navigate to the lse_live_results/username path
         if "lse_live_results" in container:
             container = container["lse_live_results"]
@@ -121,15 +136,26 @@ def get_daily_containers():
             
             user_container = container[username]
             
-            # Find all daily run containers and sort in reverse chronological order
-            daily_runs = sorted([k for k in user_container.keys() if k.startswith("daily_run_")], reverse=True)
+            # CHANGED: Collect all Year/Month/Day combinations instead of daily_run_* containers
+            date_paths = []
+            for year in user_container.keys():
+                year_container = user_container[year]
+                for month in year_container.keys():
+                    month_container = year_container[month]
+                    for day in month_container.keys():
+                        # Create path as "YYYY/MM/DD"
+                        date_path = f"{year}/{month}/{day}"
+                        date_paths.append(date_path)
             
-            if not daily_runs:
-                logger.warning(f"No daily run containers found for user {username}")
+            if not date_paths:
+                logger.warning(f"No date containers found for user {username}")
                 return []
                 
+            # Sort in reverse chronological order (most recent first)
+            date_paths.sort(reverse=True)
+            
             # Format as dropdown options with human-readable labels
-            return [{"label": format_container_name(run), "value": run} for run in daily_runs]
+            return [{"label": format_container_name(run), "value": run} for run in date_paths]
             
         else:
             logger.warning("lse_live_results container not found")
@@ -141,20 +167,29 @@ def get_daily_containers():
 
 
 def format_container_name(container_name):
-    """Format a container name for display in the dropdown"""
+    """
+    Format a container name for display in the dropdown
+    
+    CHANGED: Now handles both old format (daily_run_YYYY-MM-DD) and new format (YYYY/MM/DD)
+    """
     if container_name.startswith("daily_run_"):
-        # Extract the date part
+        # OLD format: Extract the date part
         date_str = container_name[10:]  # Skip "daily_run_"
         return f"Daily Run {date_str}"
-    return container_name
+    else:
+        # NEW format: YYYY/MM/DD -> YYYY-MM-DD
+        return container_name.replace("/", "-")
 
 
-def get_experiment_names_in_container(container_name):
+def get_experiment_names_in_container(container_name, beamline_path=None):
     """
     Retrieve all available experiment names from a specific daily container for the current user
     
+    CHANGED: container_name can now be "YYYY/MM/DD" format instead of "daily_run_YYYY-MM-DD"
+    
     Args:
-        container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20")
+        container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20" or "2025/01/15")
+        beamline_path (str, optional): Path to beamline prefix (e.g., "beamlines/bl931/processed")
         
     Returns:
         list: List of dictionaries with {label: experiment_name, value: experiment_name}
@@ -171,7 +206,17 @@ def get_experiment_names_in_container(container_name):
         # Get the root container
         container = tiled_results.data_client
         
-        # Navigate to the lse_live_results/username/container_name path
+        # NEW: Navigate to beamline path if provided
+        if beamline_path:
+            path_parts = beamline_path.split('/')
+            for part in path_parts:
+                if part and part in container:
+                    container = container[part]
+                elif part:
+                    logger.warning(f"Beamline path segment '{part}' not found")
+                    return []
+        
+        # Navigate to the lse_live_results/username path
         if "lse_live_results" not in container:
             logger.warning("lse_live_results container not found")
             return []
@@ -184,11 +229,40 @@ def get_experiment_names_in_container(container_name):
         
         user_container = container[username]
         
-        if container_name not in user_container:
-            logger.warning(f"Container {container_name} not found for user {username}")
-            return []
+        # CHANGED: Check if this is new format (YYYY/MM/DD) or old format (daily_run_*)
+        if "/" in container_name:
+            # NEW format: Navigate through Year/Month/Day hierarchy
+            date_parts = container_name.split('/')
+            if len(date_parts) != 3:
+                logger.warning(f"Invalid date path format: {container_name}")
+                return []
             
-        daily_container = user_container[container_name]
+            year, month, day = date_parts
+            
+            if year not in user_container:
+                logger.warning(f"Year {year} not found for user {username}")
+                return []
+            
+            year_container = user_container[year]
+            
+            if month not in year_container:
+                logger.warning(f"Month {month} not found in year {year}")
+                return []
+            
+            month_container = year_container[month]
+            
+            if day not in month_container:
+                logger.warning(f"Day {day} not found in month {month}")
+                return []
+            
+            daily_container = month_container[day]
+        else:
+            # OLD format: Direct access to daily_run_* container
+            if container_name not in user_container:
+                logger.warning(f"Container {container_name} not found for user {username}")
+                return []
+                
+            daily_container = user_container[container_name]
         
         # Get all experiment names (containers) in this daily container
         experiment_names = [key for key in daily_container.keys()]
@@ -205,13 +279,16 @@ def get_experiment_names_in_container(container_name):
         return []
 
 
-def get_uuids_in_experiment(container_name, experiment_name):
+def get_uuids_in_experiment(container_name, experiment_name, beamline_path=None):
     """
     Retrieve all available experiment UUIDs from a specific experiment for the current user
     
+    CHANGED: container_name can now be "YYYY/MM/DD" format instead of "daily_run_YYYY-MM-DD"
+    
     Args:
-        container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20")
+        container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20" or "2025/01/15")
         experiment_name (str): The name of the experiment (user-entered name)
+        beamline_path (str, optional): Path to beamline prefix (e.g., "beamlines/bl931/processed")
         
     Returns:
         list: List of dictionaries with {label: uuid, value: uuid}
@@ -228,7 +305,17 @@ def get_uuids_in_experiment(container_name, experiment_name):
         # Get the root container
         container = tiled_results.data_client
         
-        # Navigate to the lse_live_results/username/container_name/experiment_name path
+        # NEW: Navigate to beamline path if provided
+        if beamline_path:
+            path_parts = beamline_path.split('/')
+            for part in path_parts:
+                if part and part in container:
+                    container = container[part]
+                elif part:
+                    logger.warning(f"Beamline path segment '{part}' not found")
+                    return []
+        
+        # Navigate to the lse_live_results/username path
         if "lse_live_results" not in container:
             logger.warning("lse_live_results container not found")
             return []
@@ -241,11 +328,40 @@ def get_uuids_in_experiment(container_name, experiment_name):
         
         user_container = container[username]
         
-        if container_name not in user_container:
-            logger.warning(f"Container {container_name} not found for user {username}")
-            return []
+        # CHANGED: Check if this is new format (YYYY/MM/DD) or old format (daily_run_*)
+        if "/" in container_name:
+            # NEW format: Navigate through Year/Month/Day hierarchy
+            date_parts = container_name.split('/')
+            if len(date_parts) != 3:
+                logger.warning(f"Invalid date path format: {container_name}")
+                return []
             
-        daily_container = user_container[container_name]
+            year, month, day = date_parts
+            
+            if year not in user_container:
+                logger.warning(f"Year {year} not found for user {username}")
+                return []
+            
+            year_container = user_container[year]
+            
+            if month not in year_container:
+                logger.warning(f"Month {month} not found in year {year}")
+                return []
+            
+            month_container = year_container[month]
+            
+            if day not in month_container:
+                logger.warning(f"Day {day} not found in month {month}")
+                return []
+            
+            daily_container = month_container[day]
+        else:
+            # OLD format: Direct access to daily_run_* container
+            if container_name not in user_container:
+                logger.warning(f"Container {container_name} not found for user {username}")
+                return []
+                
+            daily_container = user_container[container_name]
         
         if experiment_name not in daily_container:
             logger.warning(f"Experiment {experiment_name} not found in {username}/{container_name}")
@@ -268,14 +384,17 @@ def get_uuids_in_experiment(container_name, experiment_name):
         return []
 
 
-def get_experiment_dataframe(container_name, experiment_name, uuid):
+def get_experiment_dataframe(container_name, experiment_name, uuid, beamline_path=None):
     """
     Retrieve the DataFrame for a specific UUID from an experiment
     
+    CHANGED: container_name can now be "YYYY/MM/DD" format instead of "daily_run_YYYY-MM-DD"
+    
     Args:
-        container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20")
+        container_name (str): The name of the daily container (e.g., "daily_run_2025-08-20" or "2025/01/15")
         experiment_name (str): The name of the experiment
         uuid (str): The UUID of the specific table to retrieve
+        beamline_path (str, optional): Path to beamline prefix (e.g., "beamlines/bl931/processed")
         
     Returns:
         pandas.DataFrame or None: The DataFrame containing the experiment data, or None if not found
@@ -292,7 +411,17 @@ def get_experiment_dataframe(container_name, experiment_name, uuid):
         # Get the root container
         container = tiled_results.data_client
         
-        # Navigate to the lse_live_results/username/container_name/experiment_name path
+        # NEW: Navigate to beamline path if provided
+        if beamline_path:
+            path_parts = beamline_path.split('/')
+            for part in path_parts:
+                if part and part in container:
+                    container = container[part]
+                elif part:
+                    logger.warning(f"Beamline path segment '{part}' not found")
+                    return None
+        
+        # Navigate to the lse_live_results/username path
         if "lse_live_results" not in container:
             logger.warning("lse_live_results container not found")
             return None
@@ -305,11 +434,40 @@ def get_experiment_dataframe(container_name, experiment_name, uuid):
         
         user_container = container[username]
         
-        if container_name not in user_container:
-            logger.warning(f"Container {container_name} not found for user {username}")
-            return None
+        # CHANGED: Check if this is new format (YYYY/MM/DD) or old format (daily_run_*)
+        if "/" in container_name:
+            # NEW format: Navigate through Year/Month/Day hierarchy
+            date_parts = container_name.split('/')
+            if len(date_parts) != 3:
+                logger.warning(f"Invalid date path format: {container_name}")
+                return None
             
-        daily_container = user_container[container_name]
+            year, month, day = date_parts
+            
+            if year not in user_container:
+                logger.warning(f"Year {year} not found for user {username}")
+                return None
+            
+            year_container = user_container[year]
+            
+            if month not in year_container:
+                logger.warning(f"Month {month} not found in year {year}")
+                return None
+            
+            month_container = year_container[month]
+            
+            if day not in month_container:
+                logger.warning(f"Day {day} not found in month {month}")
+                return None
+            
+            daily_container = month_container[day]
+        else:
+            # OLD format: Direct access to daily_run_* container
+            if container_name not in user_container:
+                logger.warning(f"Container {container_name} not found for user {username}")
+                return None
+                
+            daily_container = user_container[container_name]
         
         if experiment_name not in daily_container:
             logger.warning(f"Experiment {experiment_name} not found in {username}/{container_name}")
@@ -321,13 +479,20 @@ def get_experiment_dataframe(container_name, experiment_name, uuid):
             logger.warning(f"UUID {uuid} not found in {username}/{container_name}/{experiment_name}")
             return None
         
-        # Get and return the DataFrame
-        df = experiment_container[uuid].read()
+        # NEW: UUID is now a container, get the feature_vectors table inside it
+        uuid_container = experiment_container[uuid]
+        
+        if "feature_vectors" not in uuid_container:
+            logger.warning(f"feature_vectors table not found in {username}/{container_name}/{experiment_name}/{uuid}")
+            return None
+        
+        # Get and return the DataFrame from feature_vectors table
+        df = uuid_container["feature_vectors"].read()
         
         if df is not None and not df.empty:
-            logger.info(f"Successfully loaded DataFrame with shape {df.shape} from {username}/{container_name}/{experiment_name}/{uuid}")
+            logger.info(f"Successfully loaded DataFrame with shape {df.shape} from {username}/{container_name}/{experiment_name}/{uuid}/feature_vectors")
         else:
-            logger.warning(f"DataFrame is empty for {username}/{container_name}/{experiment_name}/{uuid}")
+            logger.warning(f"DataFrame is empty for {username}/{container_name}/{experiment_name}/{uuid}/feature_vectors")
             
         return df
         
