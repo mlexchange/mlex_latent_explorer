@@ -22,14 +22,17 @@ RESULTS_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
 # REMOVED: Get USER from environment
 # Constants
 # Timezone for log timestamps
-CALIFORNIA_TZ = pytz.timezone('US/Pacific')
+CALIFORNIA_TZ = pytz.timezone("US/Pacific")
 # Regex pattern to extract UUID from tiled_url
 UUID_PATTERN = r"([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"
+
 
 class TiledResultsPublisher(Publisher):
     """Publisher that saves latent space vectors to a Tiled server."""
 
-    def __init__(self, tiled_uri=None, tiled_api_key=None, root_segments=None, tiled_prefix=None):
+    def __init__(
+        self, tiled_uri=None, tiled_api_key=None, root_segments=None, tiled_prefix=None
+    ):
         super().__init__()
         self.tiled_uri = tiled_uri or RESULTS_TILED_URI
         self.tiled_api_key = tiled_api_key or RESULTS_TILED_API_KEY
@@ -43,7 +46,7 @@ class TiledResultsPublisher(Publisher):
         self.year_container = None
         self.month_container = None
         self.day_container = None
-        
+
         # Dictionary to store DataFrames by UUID
         self.uuid_dataframes = {}
         # Set to track UUIDs that already exist in Tiled
@@ -52,10 +55,10 @@ class TiledResultsPublisher(Publisher):
         self.default_table_name = "feature_vectors"
         # Keep track of the current UUID
         self.current_uuid = None
-        
+
         # Track current experiment name (will be set from message)
         self.current_experiment_name = "default_experiment"
-        
+
         logger.info(f"Initialized publisher with UUID-based table grouping")
 
     async def start(self):
@@ -66,17 +69,18 @@ class TiledResultsPublisher(Publisher):
         except Exception as e:
             logger.error(f"Failed to initialize Tiled client: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
 
     def _start_sync(self):
         """Synchronous implementation of start() to be run in a thread."""
         try:
             self.client = from_uri(self.tiled_uri, api_key=self.tiled_api_key)
-            
+
             # NEW: Navigate to prefix first if specified - ERROR if it doesn't exist
             container = self.client
             if self.tiled_prefix:
-                prefix_segments = self.tiled_prefix.split('/')
+                prefix_segments = self.tiled_prefix.split("/")
                 for segment in prefix_segments:
                     if segment:  # Skip empty strings
                         if segment in container:
@@ -86,58 +90,63 @@ class TiledResultsPublisher(Publisher):
                             # Create the prefix path if it doesn't exist
                             logger.info(f"Creating prefix container: {segment}")
                             container = container.create_container(segment)
-            
+
             # Navigate to the root container and create the hierarchy
             self._setup_containers_sync(container)
-            
+
             # List all existing tables in the day container (CHANGED from daily_container)
             if self.day_container is not None:
                 table_keys = list(self.day_container)
                 logger.info(f"Found {len(table_keys)} existing tables in day container")
-                
+
                 # Add all existing tables to our set of existing UUIDs
                 self.existing_uuids.update(table_keys)
                 logger.info(f"Tracking {len(self.existing_uuids)} existing UUIDs")
-                
+
                 # Log some examples of existing UUIDs for debugging
                 if self.existing_uuids:
                     examples = list(self.existing_uuids)[:3]
                     logger.info(f"Examples of existing UUIDs: {', '.join(examples)}")
-                    
+
             logger.info(f"Connected to Tiled server at {self.tiled_uri}")
             prefix_path = f"{self.tiled_prefix}/" if self.tiled_prefix else ""
             # CHANGED: Remove user from path, log new path structure
             now = datetime.now(CALIFORNIA_TZ)
-            logger.info(f"Using container path: {prefix_path}{'/'.join(self.root_segments)}/{now.year}/{now.month:02d}/{now.day:02d}")
+            logger.info(
+                f"Using container path: {prefix_path}{'/'.join(self.root_segments)}/{now.year}/{now.month:02d}/{now.day:02d}"
+            )
         except Exception as e:
             logger.error(f"Error in _start_sync: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             raise
-    
+
     def _extract_uuid_from_url(self, url):
         """Extract UUID from tiled_url."""
         if not url:
             return self.default_table_name
-        
+
         # Log the URL for debugging
         logger.debug(f"Extracting UUID from URL: {url}")
-        
+
         match = re.search(UUID_PATTERN, url)
         if match:
             uuid = match.group(1)
             logger.debug(f"Extracted UUID: {uuid}")
             return uuid
-        
+
         logger.debug(f"No UUID found in URL, using default: {self.default_table_name}")
         return self.default_table_name
-    
+
     def _setup_containers_sync(self, starting_container=None):
         """Set up the container structure without USER level (synchronous version)."""
         try:
             # NEW: Start from provided container or client
-            container = starting_container if starting_container is not None else self.client
-            
+            container = (
+                starting_container if starting_container is not None else self.client
+            )
+
             # Navigate through root_segments (these we can create)
             for segment in self.root_segments:
                 if segment in container:
@@ -146,19 +155,19 @@ class TiledResultsPublisher(Publisher):
                 else:
                     logger.info(f"Creating container: {segment}")
                     container = container.create_container(segment)
-            
+
             # Store reference to the root container
             self.root_container = container
-            
+
             # REMOVED: Create or navigate to USER container
-            
+
             # CHANGED: Replace single daily_run container with Year/Month/Day hierarchy
             # Get current date components
             now = datetime.now(CALIFORNIA_TZ)
             year_str = str(now.year)
             month_str = f"{now.month:02d}"
             day_str = f"{now.day:02d}"
-            
+
             # Create Year container
             if year_str not in self.root_container:
                 logger.info(f"Creating year container: {year_str}")
@@ -166,7 +175,7 @@ class TiledResultsPublisher(Publisher):
             else:
                 logger.info(f"Using existing year container: {year_str}")
             self.year_container = self.root_container[year_str]
-            
+
             # Create Month container
             if month_str not in self.year_container:
                 logger.info(f"Creating month container: {month_str}")
@@ -174,7 +183,7 @@ class TiledResultsPublisher(Publisher):
             else:
                 logger.info(f"Using existing month container: {month_str}")
             self.month_container = self.year_container[month_str]
-            
+
             # Create Day container
             if day_str not in self.month_container:
                 logger.info(f"Creating day container: {day_str}")
@@ -182,68 +191,75 @@ class TiledResultsPublisher(Publisher):
             else:
                 logger.info(f"Using existing day container: {day_str}")
             self.day_container = self.month_container[day_str]
-            
+
         except Exception as e:
             logger.error(f"Error setting up containers: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             raise
-    
+
     def _get_experiment_container(self, experiment_name=None):
         """Get or create the experiment container based on experiment name"""
         try:
             # Use provided experiment_name, or fall back to current, or default
-            exp_name = experiment_name or self.current_experiment_name or "default_experiment"
-            
+            exp_name = (
+                experiment_name or self.current_experiment_name or "default_experiment"
+            )
+
             # Check if experiment container exists in day container (CHANGED from daily_container)
             if exp_name not in self.day_container:
                 logger.info(f"Creating experiment container: {exp_name}")
                 self.day_container.create_container(exp_name)
-            
+
             return self.day_container[exp_name]
         except Exception as e:
             logger.error(f"Error getting experiment container: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             # Fallback to day container (CHANGED from daily_container)
             return self.day_container
-    
+
     async def publish(self, message):
         """Publish a message to Tiled server."""
-        
+
         # Check for flush signal
         if isinstance(message, LatentSpaceEvent):
             if message.tiled_url == "FLUSH_SIGNAL":
                 logger.info("Received flush signal - writing pending data")
-                if (self.current_uuid and 
-                    self.current_uuid in self.uuid_dataframes and 
-                    not self.uuid_dataframes[self.current_uuid].empty):
+                if (
+                    self.current_uuid
+                    and self.current_uuid in self.uuid_dataframes
+                    and not self.uuid_dataframes[self.current_uuid].empty
+                ):
                     await self.write_table_to_tiled(self.current_uuid)
                     logger.info(f"Flushed data for UUID {self.current_uuid}")
                     self.current_uuid = None
                 return
-        
+
         if isinstance(message, SASStop):
             logger.info("Received Stop message, writing any remaining data to Tiled")
             await self.stop()
             return
-        
+
         if not isinstance(message, LatentSpaceEvent):
             return
 
         try:
             # Run the entire publish operation in a separate thread
             uuid_to_write = await asyncio.to_thread(self._publish_sync, message)
-            
+
             # If there's a UUID to write, write it
             if uuid_to_write:
                 await self.write_table_to_tiled(uuid_to_write)
-                
+
         except Exception as e:
             logger.error(f"Error publishing to Tiled: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
-    
+
     def _publish_sync(self, message):
         """Synchronous implementation of publish() to be run in a thread."""
         try:
@@ -258,15 +274,15 @@ class TiledResultsPublisher(Publisher):
                 # Extract UUID from tiled_url
                 tiled_url = getattr(message, "tiled_url", None)
                 uuid = self._extract_uuid_from_url(tiled_url)
-                
+
                 # Get experiment name from message
                 experiment_name = getattr(message, "experiment_name", None)
                 if experiment_name:
                     self.current_experiment_name = experiment_name
-                
+
                 # Get experiment container
                 experiment_container = self._get_experiment_container(experiment_name)
-                
+
                 # NEW: Check if UUID container exists (not UUID/feature_vectors table)
                 if uuid in experiment_container:
                     uuid_container = experiment_container[uuid]
@@ -274,61 +290,79 @@ class TiledResultsPublisher(Publisher):
                     if "feature_vectors" in uuid_container:
                         logger.debug(f"Skipping vector for existing UUID: {uuid}")
                         return None
-                
+
                 # Check if this is a new UUID
                 uuid_to_write = None
-                
-                if self.current_uuid is not None and uuid != self.current_uuid and self.current_uuid in self.uuid_dataframes:
+
+                if (
+                    self.current_uuid is not None
+                    and uuid != self.current_uuid
+                    and self.current_uuid in self.uuid_dataframes
+                ):
                     # We have a new UUID, so write the data for the previous UUID
                     if not self.uuid_dataframes[self.current_uuid].empty:
                         # Check if the previous UUID's feature_vectors already exists
-                        prev_uuid_container = experiment_container.get(self.current_uuid)
+                        prev_uuid_container = experiment_container.get(
+                            self.current_uuid
+                        )
                         should_write = True
-                        if prev_uuid_container and "feature_vectors" in prev_uuid_container:
+                        if (
+                            prev_uuid_container
+                            and "feature_vectors" in prev_uuid_container
+                        ):
                             should_write = False
-                        
+
                         if should_write:
-                            logger.info(f"New UUID detected, marking previous UUID for writing: {self.current_uuid}")
+                            logger.info(
+                                f"New UUID detected, marking previous UUID for writing: {self.current_uuid}"
+                            )
                             uuid_to_write = self.current_uuid
-                
+
                 # Update current UUID
                 self.current_uuid = uuid
-                
+
                 # Initialize tracking for this UUID if needed
                 if uuid not in self.uuid_dataframes:
                     self.uuid_dataframes[uuid] = pd.DataFrame()
-                
+
                 # Create a record with metadata and the vector
                 record = {
                     "tiled_url": tiled_url,
                     "autoencoder_model": getattr(message, "autoencoder_model", None),
                     "dimred_model": getattr(message, "dimred_model", None),
                     "timestamp": getattr(message, "timestamp", time.time()),
-                    "total_processing_time": getattr(message, "total_processing_time", None),
+                    "total_processing_time": getattr(
+                        message, "total_processing_time", None
+                    ),
                     "autoencoder_time": getattr(message, "autoencoder_time", None),
-                    "dimred_time": getattr(message, "dimred_time", None)
+                    "dimred_time": getattr(message, "dimred_time", None),
                 }
-                
+
                 # Add vector elements as columns (limit to first 20 to keep it manageable)
                 for i, val in enumerate(vector[:20]):
                     record[f"feature_{i}"] = float(val)
-                
+
                 # Append to DataFrame for this UUID
                 new_row = pd.DataFrame([record])
-                self.uuid_dataframes[uuid] = pd.concat([self.uuid_dataframes[uuid], new_row], ignore_index=True)
-                
+                self.uuid_dataframes[uuid] = pd.concat(
+                    [self.uuid_dataframes[uuid], new_row], ignore_index=True
+                )
+
                 logger.debug(f"Added vector to table '{uuid}'")
-                
+
                 return uuid_to_write
             else:
-                logger.warning(f"Received vector with unexpected dimensions: {vector.shape}")
+                logger.warning(
+                    f"Received vector with unexpected dimensions: {vector.shape}"
+                )
                 return None
         except Exception as e:
             logger.error(f"Error in _publish_sync: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             return None
-    
+
     async def write_table_to_tiled(self, table_key):
         """Write the collected vectors for a specific UUID to Tiled."""
         try:
@@ -337,63 +371,74 @@ class TiledResultsPublisher(Publisher):
         except Exception as e:
             logger.error(f"Error in write_table_to_tiled for {table_key}: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
-    
+
     def _write_table_to_tiled_sync(self, table_key):
         """Synchronous implementation of write_table_to_tiled to be run in a thread."""
         try:
             # Get experiment container instead of using daily_container
-            experiment_container = self._get_experiment_container(self.current_experiment_name)
-            
+            experiment_container = self._get_experiment_container(
+                self.current_experiment_name
+            )
+
             # NEW: Check if UUID container exists, and if feature_vectors table exists inside it
             if table_key in experiment_container:
                 uuid_container = experiment_container[table_key]
                 if "feature_vectors" in uuid_container:
-                    logger.info(f"Skipping write for existing UUID: {table_key} (feature_vectors already exists)")
+                    logger.info(
+                        f"Skipping write for existing UUID: {table_key} (feature_vectors already exists)"
+                    )
                     return
-            
+
             # Get the DataFrame for this UUID
             df = self.uuid_dataframes.get(table_key)
             if df is None:
                 logger.warning(f"No DataFrame found for {table_key}")
                 return
-                
+
             # Log DataFrame info for debugging (CHANGED: use current date instead of user)
             now = datetime.now(CALIFORNIA_TZ)
-            logger.info(f"Writing {len(df)} vectors to new table '{table_key}/feature_vectors' in {now.year}/{now.month:02d}/{now.day:02d}/{self.current_experiment_name}")
-            
+            logger.info(
+                f"Writing {len(df)} vectors to new table '{table_key}/feature_vectors' in {now.year}/{now.month:02d}/{now.day:02d}/{self.current_experiment_name}"
+            )
+
             # Check if DataFrame is empty
             if df.empty:
                 logger.warning(f"DataFrame for {table_key} is empty, nothing to write")
                 return
-            
+
             # NEW: Create UUID container if it doesn't exist
             if table_key not in experiment_container:
                 logger.info(f"Creating UUID container: {table_key}")
                 experiment_container.create_container(table_key)
-            
+
             uuid_container = experiment_container[table_key]
-            
+
             # Write the DataFrame as "feature_vectors" inside the UUID container
             try:
                 uuid_container.write_dataframe(df, key="feature_vectors")
-                
-                logger.info(f"Successfully wrote {len(df)} vectors to '{table_key}/feature_vectors'")
-                
+
+                logger.info(
+                    f"Successfully wrote {len(df)} vectors to '{table_key}/feature_vectors'"
+                )
+
                 # Add this UUID to our set of existing UUIDs
                 self.existing_uuids.add(table_key)
-                
+
                 # Clear the DataFrame for this UUID
                 self.uuid_dataframes[table_key] = pd.DataFrame()
-                
+
             except Exception as e:
                 logger.error(f"Error writing DataFrame for {table_key}: {e}")
                 import traceback
+
                 logger.error(traceback.format_exc())
-                
+
         except Exception as e:
             logger.error(f"Error in _write_table_to_tiled_sync for {table_key}: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
 
     async def stop(self):
@@ -401,48 +446,56 @@ class TiledResultsPublisher(Publisher):
         try:
             # Run the stopping operation in a separate thread to get UUID to write
             uuid_to_write = await asyncio.to_thread(self._stop_sync)
-            
+
             # If there's a UUID to write, write it
             if uuid_to_write:
                 logger.info(f"Writing final data for UUID: {uuid_to_write}")
                 await self.write_table_to_tiled(uuid_to_write)
-                
+
             logger.info("Publisher stopped")
         except Exception as e:
             logger.error(f"Error stopping publisher: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
-    
+
     def _stop_sync(self):
         """Synchronous implementation of stop() to be run in a thread.
-        
+
         Returns:
             str or None: UUID that needs to be written, or None if no writing needed
         """
         try:
             logger.info("Publisher stopping, checking if current UUID needs writing")
-            
+
             # Get experiment container to check existing UUIDs
-            experiment_container = self._get_experiment_container(self.current_experiment_name)
-            
+            experiment_container = self._get_experiment_container(
+                self.current_experiment_name
+            )
+
             # Check if the current UUID needs writing
-            if (self.current_uuid is not None and 
-                self.current_uuid in self.uuid_dataframes and 
-                not self.uuid_dataframes[self.current_uuid].empty):
-                
+            if (
+                self.current_uuid is not None
+                and self.current_uuid in self.uuid_dataframes
+                and not self.uuid_dataframes[self.current_uuid].empty
+            ):
+
                 # Check if UUID container and feature_vectors table already exist
                 if self.current_uuid in experiment_container:
                     uuid_container = experiment_container[self.current_uuid]
                     if "feature_vectors" in uuid_container:
-                        logger.info(f"UUID {self.current_uuid} already has feature_vectors, skipping write")
+                        logger.info(
+                            f"UUID {self.current_uuid} already has feature_vectors, skipping write"
+                        )
                         return None
-                
+
                 return self.current_uuid
-            
+
             return None
         except Exception as e:
             logger.error(f"Error in _stop_sync: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             return None
 
@@ -451,5 +504,5 @@ class TiledResultsPublisher(Publisher):
         """Create a TiledResultsPublisher from settings."""
         return cls(
             root_segments=settings.get("root_segments"),
-            tiled_prefix=settings.get("tiled_prefix")  # NEW: Pass prefix from settings
+            tiled_prefix=settings.get("tiled_prefix"),  # NEW: Pass prefix from settings
         )

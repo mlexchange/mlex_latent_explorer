@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 import numpy as np
 import pytz
 from arroyopy.publisher import Publisher
-from arroyosas.schemas import SASStop, RawFrameEvent
+from arroyosas.schemas import RawFrameEvent, SASStop
 from tiled.client import from_uri
 from tiled.client.array import ArrayClient
 
@@ -17,7 +17,7 @@ logger = logging.getLogger("arroyo_reduction.xps_tiled_local_image_publisher")
 # API key for Tiled authentication
 LOCAL_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
 # Timezone for date components
-CALIFORNIA_TZ = pytz.timezone('US/Pacific')
+CALIFORNIA_TZ = pytz.timezone("US/Pacific")
 
 
 class XPSTiledLocalImagePublisher(Publisher):
@@ -60,24 +60,24 @@ class XPSTiledLocalImagePublisher(Publisher):
 
     def _parse_path_from_url(self, url):
         """Extract the container path from tiled_url.
-        
+
         Example URL (old): http://tiled:8000/api/v1/array/full/prefix/lse_live_results/user/daily_run/exp/uuid/xps_averaged_heatmaps?slice=...
         Example URL (new): http://tiled:8000/api/v1/array/full/prefix/lse_live_results/2025/01/15/exp/uuid/xps_averaged_heatmaps?slice=...
         Returns: ['prefix', 'lse_live_results', '2025', '01', '15', 'exp', 'uuid']
         """
         parsed_url = urlparse(url)
         path = parsed_url.path
-        
+
         # Remove '/api/v1/array/full/' prefix and '/xps_averaged_heatmaps' suffix
-        path = path.replace('/api/v1/array/full/', '')
-        
+        path = path.replace("/api/v1/array/full/", "")
+
         # Remove 'xps_averaged_heatmaps' from the end if present
-        if path.endswith('/xps_averaged_heatmaps'):
-            path = path[:-len('/xps_averaged_heatmaps')]
-        
+        if path.endswith("/xps_averaged_heatmaps"):
+            path = path[: -len("/xps_averaged_heatmaps")]
+
         # Split into segments and filter out empty strings
-        segments = [s for s in path.split('/') if s]
-        
+        segments = [s for s in path.split("/") if s]
+
         return segments
 
     def _get_or_create_array_client(self, tiled_url, first_frame_image):
@@ -94,12 +94,12 @@ class XPSTiledLocalImagePublisher(Publisher):
         # Create new array client
         try:
             client = self._get_client(tiled_url)
-            
+
             # Parse the path from tiled_url to get all container segments
             path_segments = self._parse_path_from_url(tiled_url)
-            
+
             logger.info(f"Parsed path segments from URL: {path_segments}")
-            
+
             # Navigate/create the container hierarchy
             container = client
             for segment in path_segments:
@@ -109,26 +109,30 @@ class XPSTiledLocalImagePublisher(Publisher):
                     else:
                         logger.info(f"Creating container: {segment}")
                         container = container.create_container(segment)
-            
+
             # Create the 3D array with first frame: (1, height, width)
             initial_array = first_frame_image[None, :, :]
-            
-            logger.info(f"Creating 3D array with shape: {initial_array.shape}, dtype: {initial_array.dtype}")
-            
-            array_client = container.write_array(
-                initial_array,
-                key="xps_averaged_heatmaps"
+
+            logger.info(
+                f"Creating 3D array with shape: {initial_array.shape}, dtype: {initial_array.dtype}"
             )
-            
+
+            array_client = container.write_array(
+                initial_array, key="xps_averaged_heatmaps"
+            )
+
             # Cache the array client
             self.array_clients[uuid] = array_client
-            logger.info(f"Created new 3D array client for UUID: {uuid} at path: {'/'.join(path_segments)}/xps_averaged_heatmaps")
-            
+            logger.info(
+                f"Created new 3D array client for UUID: {uuid} at path: {'/'.join(path_segments)}/xps_averaged_heatmaps"
+            )
+
             return array_client
-            
+
         except Exception as e:
             logger.error(f"Error creating array client: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             return None
 
@@ -137,32 +141,37 @@ class XPSTiledLocalImagePublisher(Publisher):
         try:
             shape = array_client.shape  # Current shape: (n_frames, height, width)
             num_frames = shape[0]
-            
+
             logger.info(f"[PATCH] Current shape: {shape}, num_frames: {num_frames}")
-            
+
             # Ensure array is 2D (height, width)
             if array.ndim != 2:
                 logger.error(f"Expected 2D array, got shape: {array.shape}")
                 return
-            
+
             # Add dimension to make it (1, height, width) for patching
             frame_to_append = array[None, :, :]
-            logger.info(f"[PATCH] Frame to append shape: {frame_to_append.shape}, dtype: {frame_to_append.dtype}")
-            
+            logger.info(
+                f"[PATCH] Frame to append shape: {frame_to_append.shape}, dtype: {frame_to_append.dtype}"
+            )
+
             # Only specify offset for the growing dimension (axis 0)
             offset = (num_frames,)
             logger.info(f"[PATCH] Patching at offset: {offset}")
-            
+
             # Patch the array - extend=True allows growing along axis 0
             array_client.patch(frame_to_append, offset=offset, extend=True)
-            
+
             # Verify the patch worked
             new_shape = array_client.shape
-            logger.info(f"[PATCH SUCCESS] New shape: {new_shape} (expected: ({num_frames + 1}, {shape[1]}, {shape[2]}))")
-            
+            logger.info(
+                f"[PATCH SUCCESS] New shape: {new_shape} (expected: ({num_frames + 1}, {shape[1]}, {shape[2]}))"
+            )
+
         except Exception as e:
             logger.error(f"[PATCH ERROR] Error patching Tiled array: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
 
     async def publish(self, message):
@@ -179,15 +188,17 @@ class XPSTiledLocalImagePublisher(Publisher):
             # Extract image data from message
             image_array = message.image.array  # Shape: (height, width)
             tiled_url = message.tiled_url
-            frame_number = message.frame_number if hasattr(message, 'frame_number') else 0
+            frame_number = (
+                message.frame_number if hasattr(message, "frame_number") else 0
+            )
 
-            logger.info(f"[PUBLISH] Received frame {frame_number}, shape={image_array.shape}, dtype={image_array.dtype}")
+            logger.info(
+                f"[PUBLISH] Received frame {frame_number}, shape={image_array.shape}, dtype={image_array.dtype}"
+            )
 
             # Get or create array client for this UUID
             array_client = await asyncio.to_thread(
-                self._get_or_create_array_client,
-                tiled_url,
-                image_array
+                self._get_or_create_array_client, tiled_url, image_array
             )
 
             if not array_client:
@@ -201,11 +212,7 @@ class XPSTiledLocalImagePublisher(Publisher):
 
             # Patch (append) the new frame
             logger.info(f"[FRAME {frame_number}] About to patch...")
-            await asyncio.to_thread(
-                self._patch_tiled_array,
-                array_client,
-                image_array
-            )
+            await asyncio.to_thread(self._patch_tiled_array, array_client, image_array)
 
             logger.info(f"[FRAME {frame_number}] Successfully patched to 3D array")
             return tiled_url
@@ -213,6 +220,7 @@ class XPSTiledLocalImagePublisher(Publisher):
         except Exception as e:
             logger.error(f"Error publishing XPS data to Tiled: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             return None
 
