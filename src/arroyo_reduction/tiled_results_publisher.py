@@ -19,13 +19,10 @@ logger = logging.getLogger("arroyo_reduction.tiled_results_publisher")
 # Environment variables for Tiled connections
 RESULTS_TILED_URI = os.getenv("RESULTS_TILED_URI", "http://tiled:8000")
 RESULTS_TILED_API_KEY = os.getenv("RESULTS_TILED_API_KEY", "")
-# Get USER from environment
-USER = os.getenv("USER", "default_user")
+# REMOVED: Get USER from environment
 # Constants
 # Timezone for log timestamps
 CALIFORNIA_TZ = pytz.timezone('US/Pacific')
-# REMOVED: Daily run ID that all instances will use
-# DAILY_RUN_ID = f"daily_run_{datetime.now(CALIFORNIA_TZ).strftime('%Y-%m-%d')}"
 # Regex pattern to extract UUID from tiled_url
 UUID_PATTERN = r"([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"
 
@@ -38,10 +35,10 @@ class TiledResultsPublisher(Publisher):
         self.tiled_api_key = tiled_api_key or RESULTS_TILED_API_KEY
         self.tiled_prefix = tiled_prefix  # NEW: Add prefix support
         self.root_segments = root_segments or ["lse_live_results"]
-        self.user = USER  # Get user from environment
+        # REMOVED: self.user = USER
         self.client = None
         self.root_container = None
-        self.user_container = None  # Add user container
+        # REMOVED: self.user_container = None
         # CHANGED: Split daily_container into Year/Month/Day hierarchy
         self.year_container = None
         self.month_container = None
@@ -59,7 +56,7 @@ class TiledResultsPublisher(Publisher):
         # Track current experiment name (will be set from message)
         self.current_experiment_name = "default_experiment"
         
-        logger.info(f"Initialized publisher with UUID-based table grouping for user: {self.user}")
+        logger.info(f"Initialized publisher with UUID-based table grouping")
 
     async def start(self):
         """Connect to Tiled server and initialize containers."""
@@ -109,9 +106,9 @@ class TiledResultsPublisher(Publisher):
                     
             logger.info(f"Connected to Tiled server at {self.tiled_uri}")
             prefix_path = f"{self.tiled_prefix}/" if self.tiled_prefix else ""
-            # CHANGED: Log new path structure
+            # CHANGED: Remove user from path, log new path structure
             now = datetime.now(CALIFORNIA_TZ)
-            logger.info(f"Using container path: {prefix_path}{'/'.join(self.root_segments)}/{self.user}/{now.year}/{now.month:02d}/{now.day:02d}")
+            logger.info(f"Using container path: {prefix_path}{'/'.join(self.root_segments)}/{now.year}/{now.month:02d}/{now.day:02d}")
         except Exception as e:
             logger.error(f"Error in _start_sync: {e}")
             import traceback
@@ -136,7 +133,7 @@ class TiledResultsPublisher(Publisher):
         return self.default_table_name
     
     def _setup_containers_sync(self, starting_container=None):
-        """Set up the container structure with USER level (synchronous version)."""
+        """Set up the container structure without USER level (synchronous version)."""
         try:
             # NEW: Start from provided container or client
             container = starting_container if starting_container is not None else self.client
@@ -153,13 +150,7 @@ class TiledResultsPublisher(Publisher):
             # Store reference to the root container
             self.root_container = container
             
-            # Create or navigate to USER container
-            if self.user in self.root_container:
-                logger.info(f"Using existing user container: {self.user}")
-                self.user_container = self.root_container[self.user]
-            else:
-                logger.info(f"Creating user container: {self.user}")
-                self.user_container = self.root_container.create_container(self.user)
+            # REMOVED: Create or navigate to USER container
             
             # CHANGED: Replace single daily_run container with Year/Month/Day hierarchy
             # Get current date components
@@ -169,12 +160,12 @@ class TiledResultsPublisher(Publisher):
             day_str = f"{now.day:02d}"
             
             # Create Year container
-            if year_str not in self.user_container:
+            if year_str not in self.root_container:
                 logger.info(f"Creating year container: {year_str}")
-                self.user_container.create_container(year_str)
+                self.root_container.create_container(year_str)
             else:
                 logger.info(f"Using existing year container: {year_str}")
-            self.year_container = self.user_container[year_str]
+            self.year_container = self.root_container[year_str]
             
             # Create Month container
             if month_str not in self.year_container:
@@ -367,9 +358,9 @@ class TiledResultsPublisher(Publisher):
                 logger.warning(f"No DataFrame found for {table_key}")
                 return
                 
-            # Log DataFrame info for debugging (CHANGED: use current date instead of DAILY_RUN_ID)
+            # Log DataFrame info for debugging (CHANGED: use current date instead of user)
             now = datetime.now(CALIFORNIA_TZ)
-            logger.info(f"Writing {len(df)} vectors to new table '{table_key}/feature_vectors' in {self.user}/{now.year}/{now.month:02d}/{now.day:02d}/{self.current_experiment_name}")
+            logger.info(f"Writing {len(df)} vectors to new table '{table_key}/feature_vectors' in {now.year}/{now.month:02d}/{now.day:02d}/{self.current_experiment_name}")
             
             # Check if DataFrame is empty
             if df.empty:

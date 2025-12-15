@@ -131,8 +131,7 @@ class XPSWebSocketListener(Listener):
         experiment_name = await asyncio.to_thread(self._get_experiment_name)
         logger.debug(f"Using experiment name: {experiment_name}")
         
-        # Get USER from environment
-        username = os.getenv("USER", "default_user")
+        # REMOVED: Get USER from environment
         
         # Get current date components for Year/Month/Day hierarchy
         now = datetime.now(CALIFORNIA_TZ)
@@ -141,13 +140,13 @@ class XPSWebSocketListener(Listener):
         day_str = f"{now.day:02d}"
         
         # Construct tiled_url pointing to the new structure
-        # OLD: {prefix}/lse_live_results/{USER}/daily_run_{YYYY-MM-DD}/{experiment_name}/{UUID}/xps_averaged_heatmaps
-        # NEW: {prefix}/lse_live_results/{USER}/{YYYY}/{MM}/{DD}/{experiment_name}/{UUID}/xps_averaged_heatmaps
+        # OLD: {prefix}/lse_live_results/{USER}/{YYYY}/{MM}/{DD}/{experiment_name}/{UUID}/xps_averaged_heatmaps
+        # NEW: {prefix}/lse_live_results/{YYYY}/{MM}/{DD}/{experiment_name}/{UUID}/xps_averaged_heatmaps
         prefix_path = f"{self.tiled_prefix}/" if self.tiled_prefix else ""
         
         tiled_url = (
             f"{self.tiled_base_uri}/api/v1/array/full/{prefix_path}"
-            f"lse_live_results/{username}/{year_str}/{month_str}/{day_str}/{experiment_name}/{self.current_uuid}/xps_averaged_heatmaps"
+            f"lse_live_results/{year_str}/{month_str}/{day_str}/{experiment_name}/{self.current_uuid}/xps_averaged_heatmaps"
             f"?slice={self.frame_counter}:{self.frame_counter+1},0:{height},0:{width}"
         )
         

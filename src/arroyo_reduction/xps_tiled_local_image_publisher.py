@@ -62,8 +62,8 @@ class XPSTiledLocalImagePublisher(Publisher):
         """Extract the container path from tiled_url.
         
         Example URL (old): http://tiled:8000/api/v1/array/full/prefix/lse_live_results/user/daily_run/exp/uuid/xps_averaged_heatmaps?slice=...
-        Example URL (new): http://tiled:8000/api/v1/array/full/prefix/lse_live_results/user/2025/01/15/exp/uuid/xps_averaged_heatmaps?slice=...
-        Returns: ['prefix', 'lse_live_results', 'user', '2025', '01', '15', 'exp', 'uuid']
+        Example URL (new): http://tiled:8000/api/v1/array/full/prefix/lse_live_results/2025/01/15/exp/uuid/xps_averaged_heatmaps?slice=...
+        Returns: ['prefix', 'lse_live_results', '2025', '01', '15', 'exp', 'uuid']
         """
         parsed_url = urlparse(url)
         path = parsed_url.path
