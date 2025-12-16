@@ -264,19 +264,25 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                             id="experiment-replay-controls",
                             title="Experiment Replay",
                             children=[
-                                # First dropdown for daily container selection
+                                # CHANGED: Replace dropdown with DatePickerSingle
                                 ControlItem(
-                                    "Daily Container",
-                                    "daily-container-title",
+                                    "Select Date",
+                                    "date-picker-title",
                                     html.Div([
                                         dbc.Row([
                                             dbc.Col(
-                                                dbc.Select(
-                                                    id="daily-container-dropdown",
-                                                    options=[],
-                                                    value=None,
-                                                    placeholder="Select a daily container",
-                                                ),
+                                                html.Div([
+                                                    dcc.DatePickerSingle(
+                                                        id="replay-date-picker",
+                                                        placeholder="Select a date",
+                                                        display_format="YYYY-MM-DD",
+                                                        date=None,
+                                                        disabled=False,
+                                                        calendar_orientation="horizontal",
+                                                        with_portal=False,
+                                                        number_of_months_shown=1,
+                                                    ),
+                                                ], style={"width": "100%"}, id="datepicker-wrapper"),
                                                 width=10,
                                             ),
                                             dbc.Col(
@@ -286,7 +292,7 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                                         width=18,
                                                         height=18,
                                                     ),
-                                                    id="refresh-daily-containers",
+                                                    id="refresh-available-dates",
                                                     color="light",
                                                     size="sm",
                                                     className="rounded-circle",
@@ -296,10 +302,12 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                                 style={"padding-left": "0"},
                                             ),
                                         ], className="align-items-center"),
+                                        # CHANGED: Add store for available dates
+                                        dcc.Store(id="available-dates-store", data=[]),
                                     ]),
                                 ),
                                 html.P(),
-                                # NEW: Experiment Name dropdown
+                                # Experiment Name dropdown
                                 ControlItem(
                                     "Experiment Name",
                                     "experiment-name-title",
@@ -334,7 +342,7 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                     ]),
                                 ),
                                 html.P(),
-                                # Second dropdown for UUID selection within the selected container
+                                # UUID dropdown
                                 ControlItem(
                                     "Experiment UUID",
                                     "experiment-uuid-title",
@@ -365,11 +373,11 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                                 width=1,
                                                 style={"padding-left": "0"},
                                             ),
-                                        ], className="align-items-center"),  # Add this class to align row items
+                                        ], className="align-items-center"),
                                     ]),
                                 ),
                                 html.P(),
-                                # Change from Data Percentage to Data Range
+                                # Data Range slider
                                 ControlItem(
                                     "Data Range",
                                     "replay-data-range-title",
@@ -377,8 +385,8 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                         id="replay-data-range",
                                         min=0,
                                         max=100,
-                                        step=1,  # Add this to enforce integer steps
-                                        marks={i: str(i) for i in range(0, 101, 20)},  # Add default marks at intervals of 20
+                                        step=1,
+                                        marks={i: str(i) for i in range(0, 101, 20)},
                                         tooltip={
                                             "placement": "bottom",
                                             "always_visible": True,
@@ -386,7 +394,6 @@ def sidebar(file_explorer, job_manager, clustering_job_manager):
                                         value=[0, 100],
                                     ),
                                 ),
-                                # Then add the button separately below
                                 html.Div(style={"height": "20px"}),
                                 dbc.Button(
                                     "Load Experiment",
@@ -428,7 +435,7 @@ def create_show_sidebar_affix():
             "position": "fixed",
             "bottom": "60px",
             "right": "10px",
-            "zIndex": 9999,  # Note: zIndex is unitless
+            "zIndex": 9999,
             "opacity": "0.8",
         },
     )

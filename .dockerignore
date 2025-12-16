@@ -1,8 +1,80 @@
+# Environment and secrets
 .env
+.env.*
 .secrets
+.venv
+venv/
+ENV/
+
+# Data and models (IMPORTANT - this saves GBs!)
 data/
+data**
 cache/
-*code-workspace*
+**cache**
+persist/
+models/
+results/
+basic_auth.ini
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyc
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.pytest_cache/
+.coverage
+.cache
+
+# Notebooks and test files
+**.ipynb
+**.pkl
+test.py
+.ipynb_checkpoints/
+
+# IDE and editor
 .vscode/
+.vscode-server/
+*code-workspace*
+.idea/
+.spyderproject/
+.spyproject/
+.ropeproject/
+
+# Logs and databases
 *.log
-.egg-info
+*.db
+*.sqlite3
+db.sqlite3-journal
+pip-log.txt
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Docker files (no need to copy these into image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# OS files
+.DS_Store
+*.swp
+*.swo
+
+# Other
+workspace/
+.dotnet/
+.gnupg/
+.ssh/
