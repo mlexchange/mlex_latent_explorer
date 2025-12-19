@@ -254,15 +254,18 @@ class RedisModelStore:
             logger.error(f"Error publishing model update to Redis: {e}")
             return False
     
-    def subscribe_to_model_updates(self, callback):
+    def subscribe_to_updates(self, callback):
         """
-        Subscribe to model update notifications from Redis
+        Subscribe to update notifications from Redis (models and experiment names)
         
         Args:
-            callback: Function to call when a model update is received
+            callback: Function to call when an update is received.
+                     The callback will receive a dict with either:
+                     - Model update: {"model_type": str, "model_name": str, "timestamp": float}
+                     - Experiment update: {"update_type": "experiment_name", "experiment_name": str, "timestamp": float}
         """
         if self.redis_client is None:
-            logger.warning("Redis client not available for subscribing to model updates")
+            logger.warning("Redis client not available for subscribing to updates")
             return
         
         # Create a new thread for listening to Redis Pub/Sub
@@ -286,12 +289,12 @@ class RedisModelStore:
                                 data = message.get("data")
                                 if isinstance(data, str):
                                     payload = json.loads(data)
-                                    logger.debug(f"Received model update: {payload}")
+                                    logger.debug(f"Received update: {payload}")
                                     callback(payload)
                             except json.JSONDecodeError:
-                                logger.warning(f"Received invalid JSON in model update: {message}")
+                                logger.warning(f"Received invalid JSON in update: {message}")
                             except Exception as e:
-                                logger.error(f"Error processing model update: {e}")
+                                logger.error(f"Error processing update: {e}")
                                 # Continue processing other messages even if one fails
                 
                 except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
@@ -300,7 +303,7 @@ class RedisModelStore:
                     time.sleep(5)
                     
                 except Exception as e:
-                    logger.error(f"Unexpected error in model update listener: {e}")
+                    logger.error(f"Unexpected error in update listener: {e}")
                     # For unexpected errors, wait a bit longer before retrying
                     time.sleep(10)
                     # Don't break out of the loop - keep trying to reconnect
@@ -308,7 +311,7 @@ class RedisModelStore:
         # Start the listener thread
         thread = threading.Thread(target=listener_thread, daemon=True)
         thread.start()
-        logger.info("Started model update listener thread")
+        logger.info("Started update listener thread")
 
     def get_model_loading_state(self):
         """
