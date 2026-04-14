@@ -47,8 +47,10 @@ class TiledResultsPublisher(Publisher):
         self.month_container = None
         self.day_container = None
 
-        # Dictionary to store DataFrames by UUID
-        self.uuid_dataframes = {}
+        # NEW: Dictionary to store dataframe clients by UUID (for immediate writes)
+        self.array_clients = {}  # {uuid: DataFrameClient}
+        # NEW: Dictionary to track row counts locally (avoid read-per-frame)
+        self.array_client_lengths = {}  # {uuid: int}
         # Set to track UUIDs that already exist in Tiled
         self.existing_uuids = set()
         # Default table name if no UUID is available
@@ -214,6 +216,81 @@ class TiledResultsPublisher(Publisher):
             # Fallback to day container (CHANGED from daily_container)
             return self.day_container
 
+    def _get_or_create_dataframe_client(self, uuid, experiment_name, first_record):
+        """Get or create a dataframe client for the UUID."""
+        if uuid in self.array_clients:
+            return self.array_clients[uuid]
+
+        try:
+            experiment_container = self._get_experiment_container(experiment_name)
+
+            # Create UUID container if it doesn't exist
+            if uuid not in experiment_container:
+                logger.info(f"Creating UUID container: {uuid}")
+                experiment_container.create_container(uuid)
+
+            uuid_container = experiment_container[uuid]
+
+            # Check if feature_vectors already exists - load it if so
+            if "feature_vectors" in uuid_container:
+                logger.info(f"Loading existing dataframe for UUID: {uuid}")
+                df_client = uuid_container["feature_vectors"]
+                self.array_clients[uuid] = df_client
+                # Read current length from Tiled since we are reconnecting
+                self.array_client_lengths[uuid] = len(df_client.read())
+                return df_client
+
+            # Create initial DataFrame with first record
+            df = pd.DataFrame([first_record])
+            logger.info(
+                f"Creating new table with {len(df.columns)} columns for UUID: {uuid}"
+            )
+
+            # Write initial DataFrame
+            df_client = uuid_container.write_dataframe(df, key="feature_vectors")
+
+            # Cache the dataframe client and track length locally
+            self.array_clients[uuid] = df_client
+            self.array_client_lengths[uuid] = 1  # first record already written
+            self.existing_uuids.add(uuid)
+            logger.info(f"Created new table for UUID: {uuid}")
+
+            return df_client
+
+        except Exception as e:
+            logger.error(f"Error creating dataframe client: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+            return None
+
+    def _append_to_dataframe(self, df_client, record, uuid):
+        """Append new row to existing Tiled DataFrame by rewriting."""
+        try:
+            # Read existing data
+            existing_df = df_client.read()
+
+            # Append new row
+            new_row = pd.DataFrame([record])
+            updated_df = pd.concat([existing_df, new_row], ignore_index=True)
+
+            logger.debug(
+                f"[REWRITE] Current rows: {len(existing_df)}, writing {len(updated_df)} rows"
+            )
+
+            # Rewrite the entire DataFrame
+            df_client.write(updated_df)
+
+            # Increment local count
+            self.array_client_lengths[uuid] += 1
+            logger.debug(f"[REWRITE SUCCESS] Now has {len(updated_df)} rows")
+
+        except Exception as e:
+            logger.error(f"[REWRITE ERROR] Error rewriting Tiled dataframe: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+
     async def publish(self, message):
         """Publish a message to Tiled server."""
 
@@ -228,20 +305,15 @@ class TiledResultsPublisher(Publisher):
         # Check for flush signal
         if isinstance(message, LatentSpaceEvent):
             if message.tiled_url == "FLUSH_SIGNAL":
-                logger.info("Received flush signal - writing pending data")
-                if (
-                    self.current_uuid
-                    and self.current_uuid in self.uuid_dataframes
-                    and not self.uuid_dataframes[self.current_uuid].empty
-                ):
-                    await self.write_table_to_tiled(self.current_uuid)
-                    logger.info(f"Flushed data for UUID {self.current_uuid}")
-                    self.current_uuid = None
+                logger.info("Received flush signal - clearing dataframe clients cache")
+                self.array_clients.clear()
+                self.array_client_lengths.clear()
                 return
 
         if isinstance(message, SASStop):
-            logger.info("Received Stop message, writing any remaining data to Tiled")
-            await self.stop()
+            logger.info("Received Stop message, clearing dataframe clients cache")
+            self.array_clients.clear()
+            self.array_client_lengths.clear()
             return
 
         if not isinstance(message, LatentSpaceEvent):
@@ -249,11 +321,7 @@ class TiledResultsPublisher(Publisher):
 
         try:
             # Run the entire publish operation in a separate thread
-            uuid_to_write = await asyncio.to_thread(self._publish_sync, message)
-
-            # If there's a UUID to write, write it
-            if uuid_to_write:
-                await self.write_table_to_tiled(uuid_to_write)
+            await asyncio.to_thread(self._publish_sync, message)
 
         except Exception as e:
             logger.error(f"Error publishing to Tiled: {e}")
@@ -281,50 +349,8 @@ class TiledResultsPublisher(Publisher):
                 if experiment_name:
                     self.current_experiment_name = experiment_name
 
-                # Get experiment container
-                experiment_container = self._get_experiment_container(experiment_name)
-
-                # NEW: Check if UUID container exists (not UUID/feature_vectors table)
-                if uuid in experiment_container:
-                    uuid_container = experiment_container[uuid]
-                    # Check if feature_vectors table exists inside UUID container
-                    if "feature_vectors" in uuid_container:
-                        logger.debug(f"Skipping vector for existing UUID: {uuid}")
-                        return None
-
-                # Check if this is a new UUID
-                uuid_to_write = None
-
-                if (
-                    self.current_uuid is not None
-                    and uuid != self.current_uuid
-                    and self.current_uuid in self.uuid_dataframes
-                ):
-                    # We have a new UUID, so write the data for the previous UUID
-                    if not self.uuid_dataframes[self.current_uuid].empty:
-                        # Check if the previous UUID's feature_vectors already exists
-                        prev_uuid_container = experiment_container.get(
-                            self.current_uuid
-                        )
-                        should_write = True
-                        if (
-                            prev_uuid_container
-                            and "feature_vectors" in prev_uuid_container
-                        ):
-                            should_write = False
-
-                        if should_write:
-                            logger.info(
-                                f"New UUID detected, marking previous UUID for writing: {self.current_uuid}"
-                            )
-                            uuid_to_write = self.current_uuid
-
                 # Update current UUID
                 self.current_uuid = uuid
-
-                # Initialize tracking for this UUID if needed
-                if uuid not in self.uuid_dataframes:
-                    self.uuid_dataframes[uuid] = pd.DataFrame()
 
                 # Create a record with metadata and the vector
                 record = {
@@ -343,15 +369,25 @@ class TiledResultsPublisher(Publisher):
                 for i, val in enumerate(vector[:20]):
                     record[f"feature_{i}"] = float(val)
 
-                # Append to DataFrame for this UUID
-                new_row = pd.DataFrame([record])
-                self.uuid_dataframes[uuid] = pd.concat(
-                    [self.uuid_dataframes[uuid], new_row], ignore_index=True
+                # Track whether this is a new UUID before calling _get_or_create
+                is_new = uuid not in self.array_clients
+
+                # Get or create dataframe client - writes first record if new
+                df_client = self._get_or_create_dataframe_client(
+                    uuid, experiment_name, record
                 )
 
-                logger.debug(f"Added vector to table '{uuid}'")
+                if not df_client:
+                    logger.warning(f"Failed to get dataframe client for UUID {uuid}")
+                    return None
 
-                return uuid_to_write
+                # If not new, append immediately (first record already written on create)
+                if not is_new:
+                    self._append_to_dataframe(df_client, record, uuid)
+                    logger.debug(f"Appended vector to table '{uuid}'")
+                else:
+                    logger.debug(f"First vector already written for '{uuid}'")
+
             else:
                 logger.warning(
                     f"Received vector with unexpected dimensions: {vector.shape}"
@@ -364,141 +400,18 @@ class TiledResultsPublisher(Publisher):
             logger.error(traceback.format_exc())
             return None
 
-    async def write_table_to_tiled(self, table_key):
-        """Write the collected vectors for a specific UUID to Tiled."""
-        try:
-            # Run the write operation in a separate thread
-            await asyncio.to_thread(self._write_table_to_tiled_sync, table_key)
-        except Exception as e:
-            logger.error(f"Error in write_table_to_tiled for {table_key}: {e}")
-            import traceback
-
-            logger.error(traceback.format_exc())
-
-    def _write_table_to_tiled_sync(self, table_key):
-        """Synchronous implementation of write_table_to_tiled to be run in a thread."""
-        try:
-            # Get experiment container instead of using daily_container
-            experiment_container = self._get_experiment_container(
-                self.current_experiment_name
-            )
-
-            # NEW: Check if UUID container exists, and if feature_vectors table exists inside it
-            if table_key in experiment_container:
-                uuid_container = experiment_container[table_key]
-                if "feature_vectors" in uuid_container:
-                    logger.info(
-                        f"Skipping write for existing UUID: {table_key} (feature_vectors already exists)"
-                    )
-                    return
-
-            # Get the DataFrame for this UUID
-            df = self.uuid_dataframes.get(table_key)
-            if df is None:
-                logger.warning(f"No DataFrame found for {table_key}")
-                return
-
-            # Log DataFrame info for debugging (CHANGED: use current date instead of user)
-            now = datetime.now(CALIFORNIA_TZ)
-            logger.info(
-                f"Writing {len(df)} vectors to new table '{table_key}/feature_vectors' in {now.year}/{now.month:02d}/{now.day:02d}/{self.current_experiment_name}"
-            )
-
-            # Check if DataFrame is empty
-            if df.empty:
-                logger.warning(f"DataFrame for {table_key} is empty, nothing to write")
-                return
-
-            # NEW: Create UUID container if it doesn't exist
-            if table_key not in experiment_container:
-                logger.info(f"Creating UUID container: {table_key}")
-                experiment_container.create_container(table_key)
-
-            uuid_container = experiment_container[table_key]
-
-            # Write the DataFrame as "feature_vectors" inside the UUID container
-            try:
-                uuid_container.write_dataframe(df, key="feature_vectors")
-
-                logger.info(
-                    f"Successfully wrote {len(df)} vectors to '{table_key}/feature_vectors'"
-                )
-
-                # Add this UUID to our set of existing UUIDs
-                self.existing_uuids.add(table_key)
-
-                # Clear the DataFrame for this UUID
-                self.uuid_dataframes[table_key] = pd.DataFrame()
-
-            except Exception as e:
-                logger.error(f"Error writing DataFrame for {table_key}: {e}")
-                import traceback
-
-                logger.error(traceback.format_exc())
-
-        except Exception as e:
-            logger.error(f"Error in _write_table_to_tiled_sync for {table_key}: {e}")
-            import traceback
-
-            logger.error(traceback.format_exc())
-
     async def stop(self):
-        """Write any remaining data for new UUIDs before stopping."""
+        """Clear dataframe clients cache before stopping."""
         try:
-            # Run the stopping operation in a separate thread to get UUID to write
-            uuid_to_write = await asyncio.to_thread(self._stop_sync)
-
-            # If there's a UUID to write, write it
-            if uuid_to_write:
-                logger.info(f"Writing final data for UUID: {uuid_to_write}")
-                await self.write_table_to_tiled(uuid_to_write)
-
+            logger.info("Publisher stopping, clearing dataframe clients cache")
+            self.array_clients.clear()
+            self.array_client_lengths.clear()
             logger.info("Publisher stopped")
         except Exception as e:
             logger.error(f"Error stopping publisher: {e}")
             import traceback
 
             logger.error(traceback.format_exc())
-
-    def _stop_sync(self):
-        """Synchronous implementation of stop() to be run in a thread.
-
-        Returns:
-            str or None: UUID that needs to be written, or None if no writing needed
-        """
-        try:
-            logger.info("Publisher stopping, checking if current UUID needs writing")
-
-            # Get experiment container to check existing UUIDs
-            experiment_container = self._get_experiment_container(
-                self.current_experiment_name
-            )
-
-            # Check if the current UUID needs writing
-            if (
-                self.current_uuid is not None
-                and self.current_uuid in self.uuid_dataframes
-                and not self.uuid_dataframes[self.current_uuid].empty
-            ):
-
-                # Check if UUID container and feature_vectors table already exist
-                if self.current_uuid in experiment_container:
-                    uuid_container = experiment_container[self.current_uuid]
-                    if "feature_vectors" in uuid_container:
-                        logger.info(
-                            f"UUID {self.current_uuid} already has feature_vectors, skipping write"
-                        )
-                        return None
-
-                return self.current_uuid
-
-            return None
-        except Exception as e:
-            logger.error(f"Error in _stop_sync: {e}")
-            import traceback
-
-            logger.error(traceback.format_exc())
-            return None
 
     @classmethod
     def from_settings(cls, settings):
