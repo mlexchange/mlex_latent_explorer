@@ -6,6 +6,6 @@ COPY . /app/work
 RUN pip install --upgrade pip
 RUN pip install .[lse]
 
-ENV HOME /app/work
+ENV HOME=/app/work
 
 CMD ["python", "frontend.py"]

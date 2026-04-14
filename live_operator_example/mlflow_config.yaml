@@ -1,6 +1,6 @@
 # Common settings
 common:
-  dataset: "trs"  # "smi" or "trs" - determines which dataset config to use
+  dataset: "timepix"  # "smi" or "trs" - determines which dataset config to use
   autoencoder_type: "VAE"  # use VIT or VAE
   dimred_type: "neural" #use joblib or neural
 
@@ -42,6 +42,20 @@ models:
     dr_weights_path: "../models/trs_vae/pca_model.joblib"
     dr_neural_weights_path: "../models/trs_vae/neural_pca_model.pth"
     dr_neural_scaler_path: "../models/trs_vae/scaler.pkl"
+    latent_dim: 256
+    image_size: [128, 128]
+
+  # ============= Timepix Dataset Models =============
+  timepix_vae:
+    experiment_name: "timepix_exp_vae"
+    auto_model_name: "timepix_auto_vae"
+    dr_model_name: "timepix_dr_pca_vae"
+    dr_neural_model_name: "timepix_dr_neural_pca_vae"
+    weights_path: "../models/timepix_vae/vae_model_128_weights.npz"
+    code_path: "../models/vae/vae.py"
+    dr_weights_path: "../models/timepix_vae/pca_model.joblib"
+    dr_neural_weights_path: "../models/timepix_vae/neural_pca_model.pth"
+    dr_neural_scaler_path: "../models/timepix_vae/scaler.pkl"
     latent_dim: 256
     image_size: [128, 128]
 
