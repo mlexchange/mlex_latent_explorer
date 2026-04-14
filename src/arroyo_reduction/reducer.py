@@ -12,7 +12,7 @@ import torchvision.transforms as transforms
 from arroyosas.schemas import RawFrameEvent
 from PIL import Image
 
-from src.utils.mlflow_utils import MLflowClient
+from mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
 
 from .redis_model_store import RedisModelStore
 
@@ -88,7 +88,7 @@ class LatentSpaceReducer(Reducer):
         self.device = device
         
         # Load models from MLflow
-        mlflow_client = MLflowClient()
+        mlflow_client = MLflowModelClient()
         self.mlflow_client = mlflow_client  # Store for later use
         
         # Set loading flags before loading models

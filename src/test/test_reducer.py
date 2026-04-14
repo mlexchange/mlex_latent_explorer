@@ -98,7 +98,7 @@ class TestReducer:
             patch(
                 "src.arroyo_reduction.redis_model_store.RedisModelStore", autospec=True
             ) as redis_class_mock,
-            patch("src.utils.mlflow_utils.MLflowClient") as mlflow_client_mock,
+            patch("mlex_utils.mlflow_utils.mlflow_model_client.MLflowModelClient") as mlflow_client_mock,
             patch(
                 "src.arroyo_reduction.reducer.LatentSpaceReducer._subscribe_to_model_updates"
             ),
@@ -173,7 +173,7 @@ class TestReducer:
 
         # Create the patch for MLflowClient and redis before importing anything
         with (
-            patch("src.utils.mlflow_utils.MLflowClient") as mlflow_client_mock,
+            patch("mlex_utils.mlflow_utils.mlflow_model_client.MLflowModelClient") as mlflow_client_mock,
             patch(
                 "src.arroyo_reduction.redis_model_store.RedisModelStore"
             ) as redis_mock,
@@ -264,7 +264,7 @@ class TestReducer:
         """Test handling duplicate model update notifications with version"""
         # Create the patch for MLflowClient and redis before importing anything
         with (
-            patch("src.utils.mlflow_utils.MLflowClient") as mlflow_client_mock,
+            patch("mlex_utils.mlflow_utils.mlflow_model_client.MLflowModelClient") as mlflow_client_mock,
             patch(
                 "src.arroyo_reduction.redis_model_store.RedisModelStore"
             ) as redis_mock,
@@ -325,7 +325,7 @@ class TestReducer:
         """Test that loading flags are set and reset correctly during model update"""
         # Create the patch for MLflowClient and redis before importing anything
         with (
-            patch("src.utils.mlflow_utils.MLflowClient") as mlflow_client_mock,
+            patch("mlex_utils.mlflow_utils.mlflow_model_client.MLflowModelClient") as mlflow_client_mock,
             patch(
                 "src.arroyo_reduction.redis_model_store.RedisModelStore"
             ) as redis_mock,
@@ -391,7 +391,7 @@ class TestReducer:
         with (
             patch("threading.Thread", return_value=mock_thread) as mock_thread_class,
             patch("src.arroyo_reduction.redis_model_store.RedisModelStore"),
-            patch("src.utils.mlflow_utils.MLflowClient"),
+            patch("mlex_utils.mlflow_utils.mlflow_model_client.MLflowModelClient"),
         ):
 
             # Import the real class but patch the __init__ to avoid complex initialization

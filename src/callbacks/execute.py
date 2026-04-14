@@ -29,7 +29,7 @@ from src.utils.job_utils import (
     parse_job_params,
     parse_model_params,
 )
-from src.utils.mlflow_utils import MLflowClient
+from mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
 from src.utils.plot_utils import generate_notification
 
 MODE = os.getenv("MODE", "")
@@ -37,14 +37,13 @@ TIMEZONE = os.getenv("TIMEZONE", "US/Pacific")
 FLOW_NAME = os.getenv("FLOW_NAME", "")
 PREFECT_TAGS = json.loads(os.getenv("PREFECT_TAGS", '["latent-space-explorer"]'))
 RESULTS_DIR = os.getenv("RESULTS_DIR", "")
-FLOW_TYPE = os.getenv("FLOW_TYPE", "conda")
 
 # Initialize Redis model store instead of direct Redis client
 REDIS_HOST = os.getenv("REDIS_HOST", "kvrocks")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
 
 logger = logging.getLogger(__name__)
-mlflow_client = MLflowClient()
+mlflow_client = MLflowModelClient()
 
 @callback(
     Output("mlflow-model-dropdown", "options", allow_duplicate=True),
@@ -189,7 +188,6 @@ def run_latent_space(
             model_parameters,
             USER,
             project_name,
-            FLOW_TYPE,
             latent_space_params,
             dim_reduction_params,
             mlflow_model_id,
@@ -459,17 +457,13 @@ def run_clustering(
             api_key=tiled_results.data_tiled_api_key,
         )
 
-        model_exec_params = clustering_models[model_name]
+        clustering_params = clustering_models[model_name]
         job_params = parse_clustering_job_params(
             data_project_fvec,
             model_parameters,
             USER,
             project_name,
-            FLOW_TYPE,
-            model_exec_params["image_name"],
-            model_exec_params["image_tag"],
-            model_exec_params["python_file_name"],
-            model_exec_params["conda_env"],
+            clustering_params
         )
 
         if MODE == "dev":

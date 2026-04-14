@@ -20,7 +20,7 @@ from dash_iconify import DashIconify
 from src.arroyo_reduction.redis_model_store import (
     RedisModelStore,
 )  # Import the RedisModelStore class
-from src.utils.mlflow_utils import MLflowClient
+from mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
 from src.utils.plot_utils import (
     generate_scatter_data,
     plot_empty_heatmap,
@@ -33,7 +33,7 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", 6666))
 redis_model_store = RedisModelStore(host=REDIS_HOST, port=REDIS_PORT)
 
 logger = logging.getLogger("lse.live_mode")
-mlflow_client = MLflowClient()
+mlflow_client = MLflowModelClient()
 
 
 @callback(

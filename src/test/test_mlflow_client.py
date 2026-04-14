@@ -6,27 +6,27 @@ import mlflow
 import pytest
 
 from src.test.test_utils import mlflow_test_client, mock_mlflow_client, mock_os_makedirs
-from src.utils.mlflow_utils import MLflowClient
+from mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
 
 
 class TestMLflowClient:
 
     @pytest.fixture(autouse=True)
     def setup_and_teardown(self):
-        """Reset MLflowClient._model_cache before and after each test"""
+        """Reset MLflowModelClient._model_cache before and after each test"""
         # Save original cache
-        original_cache = MLflowClient._model_cache.copy()
+        original_cache = MLflowModelClient._model_cache.copy()
 
         # Clear cache before test
-        MLflowClient._model_cache = {}
+        MLflowModelClient._model_cache = {}
 
         yield
 
         # Restore original cache after test
-        MLflowClient._model_cache = original_cache
+        MLflowModelClient._model_cache = original_cache
 
     def test_init(self, mlflow_test_client, mock_os_makedirs):
-        """Test initialization of MLflowClient"""
+        """Test initialization of MLflowModelClient"""
         client = mlflow_test_client
         # Verify environment variables were set
         assert os.environ["MLFLOW_TRACKING_USERNAME"] == "test-user"
@@ -89,9 +89,16 @@ class TestMLflowClient:
         # Verify the result contains the expected parameters
         assert result == {"param1": "value1", "param2": "value2"}
 
-    def test_get_mlflow_models(self, mlflow_test_client, mock_mlflow_client):
+    @patch("mlex_utils.mlflow_utils.mlflow_model_client.get_flow_run_name")
+    @patch("mlex_utils.mlflow_utils.mlflow_model_client.get_flow_run_parent_id")
+    def test_get_mlflow_models(self, mock_get_parent_id, mock_get_flow_name, mlflow_test_client, mock_mlflow_client):
         """Test retrieving MLflow models"""
         client = mlflow_test_client
+        
+        # Configure Prefect mocks
+        mock_get_flow_name.return_value = "Flow Run 1"
+        mock_get_parent_id.return_value = "parent-id"
+        
         # Create mock model versions
         mock_version1 = MagicMock()
         mock_version1.name = "model1"
@@ -119,18 +126,7 @@ class TestMLflowClient:
         # Configure get_run to return our mock runs
         mock_mlflow_client.get_run.side_effect = [mock_run1, mock_run2]
 
-        # Mock the get_flow_run_name and get_flow_run_parent_id functions
-        with (
-            patch(
-                "src.utils.mlflow_utils.get_flow_run_name", return_value="Flow Run 1"
-            ),
-            patch(
-                "src.utils.mlflow_utils.get_flow_run_parent_id",
-                return_value="parent-id",
-            ),
-        ):
-
-            result = client.get_mlflow_models()
+        result = client.get_mlflow_models()
 
         # Verify search_model_versions was called
         mock_mlflow_client.search_model_versions.assert_called_once()
@@ -184,11 +180,18 @@ class TestMLflowClient:
         assert result[0]["label"] == "model1"
         assert result[0]["value"] == "model1"
 
+    @patch("mlex_utils.mlflow_utils.mlflow_model_client.get_flow_run_name")
+    @patch("mlex_utils.mlflow_utils.mlflow_model_client.get_flow_run_parent_id")
     def test_get_mlflow_models_with_model_type(
-        self, mlflow_test_client, mock_mlflow_client
+        self, mock_get_parent_id, mock_get_flow_name, mlflow_test_client, mock_mlflow_client
     ):
         """Test retrieving MLflow models with model_type filter"""
         client = mlflow_test_client
+        
+        # Configure Prefect mocks
+        mock_get_flow_name.return_value = "Flow Run 1"
+        mock_get_parent_id.return_value = "parent-id"
+        
         # Create mock model versions
         mock_version1 = MagicMock()
         mock_version1.name = "model1"
@@ -216,18 +219,7 @@ class TestMLflowClient:
         # Configure get_run to return our mock runs
         mock_mlflow_client.get_run.side_effect = [mock_run1, mock_run2]
 
-        # Mock the get_flow_run_name and get_flow_run_parent_id functions
-        with (
-            patch(
-                "src.utils.mlflow_utils.get_flow_run_parent_id",
-                return_value="parent-id",
-            ),
-            patch(
-                "src.utils.mlflow_utils.get_flow_run_name", return_value="Flow Run 1"
-            ),
-        ):
-
-            result = client.get_mlflow_models(model_type="autoencoder")
+        result = client.get_mlflow_models(model_type="autoencoder")
 
         # Verify the result contains only models with model_type "autoencoder"
         assert len(result) == 1
@@ -251,7 +243,7 @@ class TestMLflowClient:
         client = mlflow_test_client
         # Set up memory cache
         mock_model = MagicMock(name="memory_model")
-        MLflowClient._model_cache = {"test-model": mock_model}
+        MLflowModelClient._model_cache = {"test-model": mock_model}
 
         # Load model
         result = client.load_model("test-model")
@@ -367,13 +359,13 @@ class TestMLflowClient:
     def test_clear_memory_cache(self):
         """Test clearing the memory cache"""
         # Set up memory cache
-        MLflowClient._model_cache = {"test-model": MagicMock()}
+        MLflowModelClient._model_cache = {"test-model": MagicMock()}
 
         # Clear memory cache
-        MLflowClient.clear_memory_cache()
+        MLflowModelClient.clear_memory_cache()
 
         # Verify memory cache is empty
-        assert len(MLflowClient._model_cache) == 0
+        assert len(MLflowModelClient._model_cache) == 0
 
     def test_clear_disk_cache(self, mlflow_test_client):
         """Test clearing the disk cache"""
