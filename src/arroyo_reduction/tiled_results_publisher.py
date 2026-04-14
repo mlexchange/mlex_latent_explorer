@@ -62,15 +62,8 @@ class TiledResultsPublisher(Publisher):
         logger.info(f"Initialized publisher with UUID-based table grouping")
 
     async def start(self):
-        """Connect to Tiled server and initialize containers."""
-        try:
-            # Run the entire initialization in a separate thread
-            await asyncio.to_thread(self._start_sync)
-        except Exception as e:
-            logger.error(f"Failed to initialize Tiled client: {e}")
-            import traceback
-
-            logger.error(traceback.format_exc())
+        """Connection happens lazily on first publish."""
+        logger.info("TiledResultsPublisher ready - will connect on first publish")
 
     def _start_sync(self):
         """Synchronous implementation of start() to be run in a thread."""
@@ -223,6 +216,14 @@ class TiledResultsPublisher(Publisher):
 
     async def publish(self, message):
         """Publish a message to Tiled server."""
+
+        # Lazy connection - connect on first publish
+        if self.client is None:
+            try:
+                await asyncio.to_thread(self._start_sync)
+            except Exception as e:
+                logger.error(f"Failed to connect to Tiled: {e}")
+                return
 
         # Check for flush signal
         if isinstance(message, LatentSpaceEvent):
