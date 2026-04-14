@@ -31,6 +31,7 @@ lse = [
     "Flask-Caching",
     "kaleido<=0.2.1",
     "humanhash3",
+    "tiled[client]==0.1.0b13",
     "mlex_file_manager@git+https://github.com/mlexchange/mlex_file_manager.git",
     "mlex_utils[all]@git+https://github.com/xiaoyachong/mlex_utils.git@xiaoya-update-prefect3",
     "numpy<2.0.0",
