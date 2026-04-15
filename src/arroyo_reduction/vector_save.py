@@ -1,14 +1,15 @@
-import logging
 import json
+import logging
 import time
-import aiosqlite
 
+import aiosqlite
 from arroyopy.operator import Operator
 from arroyopy.publisher import Publisher
 
 from .schemas import LatentSpaceEvent
 
 logger = logging.getLogger("arroyo_reduction.vector_save")
+
 
 class VectorSavePublisher(Publisher):
     def __init__(self, db_path="vector_results.db"):
@@ -26,7 +27,7 @@ class VectorSavePublisher(Publisher):
         if not self._db_initialized:
             if self.db is None:
                 self.db = await aiosqlite.connect(self.db_path)
-            await self.db.execute('''
+            await self.db.execute("""
                 CREATE TABLE IF NOT EXISTS vectors (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     tiled_url TEXT NOT NULL,
@@ -39,28 +40,39 @@ class VectorSavePublisher(Publisher):
                     autoencoder_time REAL,
                     dimred_time REAL
                 )
-            ''')
+            """)
             await self.db.commit()
             self._db_initialized = True
 
     async def save_vector(
-            self,
-            tiled_url: str,
-            feature_vector: list[float],
-            autoencoder_model: str,
-            dimred_model: str,
-            experiment_name: str = None,  # Add parameter
-            timestamp: float = None,
-            total_processing_time: float = None,
-            autoencoder_time: float = None,
-            dimred_time: float = None):
+        self,
+        tiled_url: str,
+        feature_vector: list[float],
+        autoencoder_model: str,
+        dimred_model: str,
+        experiment_name: str = None,  # Add parameter
+        timestamp: float = None,
+        total_processing_time: float = None,
+        autoencoder_time: float = None,
+        dimred_time: float = None,
+    ):
         await self._init_db()
         # Convert numpy array to JSON string for storage
         vector_str = json.dumps(feature_vector)
 
         await self.db.execute(
             "INSERT INTO vectors (tiled_url, feature_vector, autoencoder_model, dimred_model, experiment_name, timestamp, total_processing_time, autoencoder_time, dimred_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (tiled_url, vector_str, autoencoder_model, dimred_model, experiment_name, timestamp, total_processing_time, autoencoder_time, dimred_time)
+            (
+                tiled_url,
+                vector_str,
+                autoencoder_model,
+                dimred_model,
+                experiment_name,
+                timestamp,
+                total_processing_time,
+                autoencoder_time,
+                dimred_time,
+            ),
         )
         await self.db.commit()
 
@@ -72,12 +84,20 @@ class VectorSavePublisher(Publisher):
         feature_vector = message.feature_vector
         autoencoder_model = message.autoencoder_model
         dimred_model = message.dimred_model
-        experiment_name = getattr(message, "experiment_name", None)  # Get experiment name
+        experiment_name = getattr(
+            message, "experiment_name", None
+        )  # Get experiment name
         timestamp = message.timestamp if hasattr(message, "timestamp") else time.time()
-        total_processing_time = message.total_processing_time if hasattr(message, "total_processing_time") else None
-        autoencoder_time = message.autoencoder_time if hasattr(message, "autoencoder_time") else None
+        total_processing_time = (
+            message.total_processing_time
+            if hasattr(message, "total_processing_time")
+            else None
+        )
+        autoencoder_time = (
+            message.autoencoder_time if hasattr(message, "autoencoder_time") else None
+        )
         dimred_time = message.dimred_time if hasattr(message, "dimred_time") else None
-        
+
         await self.save_vector(
             tiled_url=tiled_url,
             feature_vector=feature_vector,
@@ -87,5 +107,10 @@ class VectorSavePublisher(Publisher):
             timestamp=timestamp,
             total_processing_time=total_processing_time,
             autoencoder_time=autoencoder_time,
-            dimred_time=dimred_time
+            dimred_time=dimred_time,
         )
+
+
+def vector_save_publisher_factory(db_path: str = "vector_results.db"):
+    publisher = VectorSavePublisher(db_path=db_path)
+    return publisher

@@ -77,6 +77,17 @@ class XPSWebSocketListener(Listener):
         logger.info(f"Using Tiled prefix: {self.tiled_prefix}")
 
         while not self.should_stop:
+            # Wait for models to be selected before connecting
+            if self.redis_model_store:
+                autoencoder_model = self.redis_model_store.get_autoencoder_model()
+                dimred_model = self.redis_model_store.get_dimred_model()
+                if not autoencoder_model or not dimred_model:
+                    logger.debug(
+                        "Models not selected - waiting before connecting to XPS websocket..."
+                    )
+                    await asyncio.sleep(2)
+                    continue
+
             try:
                 async with websockets.connect(self.websocket_url) as websocket:
                     logger.info("Connected to XPS websocket")
@@ -186,3 +197,9 @@ class XPSWebSocketListener(Listener):
         tiled_prefix = settings.get("tiled_prefix", "beamlines/bl931/processed")
         logger.info(f"Listening for XPS frames on {websocket_url}")
         return cls(operator, websocket_url, tiled_prefix)
+
+
+def xps_ws_listener_factory(
+    operator, websocket_url: str, tiled_prefix: str = "beamlines/bl931/processed"
+):
+    return XPSWebSocketListener(operator, websocket_url, tiled_prefix)

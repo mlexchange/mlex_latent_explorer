@@ -420,3 +420,9 @@ class TiledResultsPublisher(Publisher):
             root_segments=settings.get("root_segments"),
             tiled_prefix=settings.get("tiled_prefix"),  # NEW: Pass prefix from settings
         )
+
+
+def tiled_results_publisher_factory(
+    tiled_prefix: str = None, root_segments: list = None
+):
+    return TiledResultsPublisher(tiled_prefix=tiled_prefix, root_segments=root_segments)

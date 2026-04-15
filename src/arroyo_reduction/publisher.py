@@ -30,7 +30,9 @@ class LSEWSResultPublisher(Publisher):
         self.host = host
         self.port = port
         self.path = path
-        logger.info(f"Initialized LSEWSResultPublisher on {self.host}:{self.port}{self.path}")
+        logger.info(
+            f"Initialized LSEWSResultPublisher on {self.host}:{self.port}{self.path}"
+        )
 
     async def start(
         self,
@@ -78,7 +80,7 @@ class LSEWSResultPublisher(Publisher):
 
     async def websocket_handler(self, websocket):
         logger.info(f"New connection from {websocket.remote_address}")
-        
+
         self.connected_clients.add(websocket)
         try:
             # Keep the connection open and do nothing until the client disconnects
@@ -91,3 +93,9 @@ class LSEWSResultPublisher(Publisher):
     @classmethod
     def from_settings(cls, settings: dict) -> "LSEWSResultPublisher":
         return cls(settings.host, settings.port)
+
+
+def lse_ws_result_publisher_factory(host: str = "0.0.0.0", port: int = 8765):
+    logger.info(f"Creating LSEWSResultPublisher on {host}:{port}")
+    publisher = LSEWSResultPublisher(host=host, port=port)
+    return publisher

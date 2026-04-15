@@ -9,5 +9,4 @@ RUN pip install .[arroyo]
 
 ENV HOME /app
 
-# Use app_xps.py for XPS data processing
-CMD ["python", "-m", "src.arroyo_reduction.app_xps"]
+CMD ["arroyo", "run", "block_configs/lse_xps_operator_block.yaml"]

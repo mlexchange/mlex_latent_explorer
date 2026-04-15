@@ -228,3 +228,7 @@ class XPSTiledLocalImagePublisher(Publisher):
     def from_settings(cls, settings):
         """Create an XPSTiledLocalImagePublisher from settings."""
         return cls(tiled_prefix=settings.get("tiled_prefix"))
+
+
+def xps_tiled_local_image_publisher_factory(tiled_prefix: str = None):
+    return XPSTiledLocalImagePublisher(tiled_prefix=tiled_prefix)
