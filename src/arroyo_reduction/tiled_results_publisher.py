@@ -11,6 +11,8 @@ import pytz
 from arroyopy.publisher import Publisher
 from arroyosas.schemas import SASStop
 from tiled.client import from_uri
+from tiled.structures.data_source import DataSource
+from tiled.structures.table import TableStructure
 
 from .schemas import LatentSpaceEvent
 
@@ -246,8 +248,20 @@ class TiledResultsPublisher(Publisher):
                 f"Creating new table with {len(df.columns)} columns for UUID: {uuid}"
             )
 
-            # Write initial DataFrame
-            df_client = uuid_container.write_dataframe(df, key="feature_vectors")
+            # Use new() with explicit CSV mimetype to enable append_partition
+            structure = TableStructure.from_pandas(df)
+            df_client = uuid_container.new(
+                "table",
+                [
+                    DataSource(
+                        structure_family="table",
+                        structure=structure,
+                        mimetype="text/csv",
+                    ),
+                ],
+                key="feature_vectors",
+            )
+            df_client.write(df)
 
             # Cache the dataframe client and track length locally
             self.array_clients[uuid] = df_client
@@ -267,26 +281,18 @@ class TiledResultsPublisher(Publisher):
     def _append_to_dataframe(self, df_client, record, uuid):
         """Append new row to existing Tiled DataFrame by rewriting."""
         try:
-            # Read existing data
-            existing_df = df_client.read()
-
-            # Append new row
+            # Use append_partition instead of read→concat→rewrite
             new_row = pd.DataFrame([record])
-            updated_df = pd.concat([existing_df, new_row], ignore_index=True)
-
-            logger.debug(
-                f"[REWRITE] Current rows: {len(existing_df)}, writing {len(updated_df)} rows"
-            )
-
-            # Rewrite the entire DataFrame
-            df_client.write(updated_df)
+            df_client.append_partition(new_row, 0)
 
             # Increment local count
             self.array_client_lengths[uuid] += 1
-            logger.debug(f"[REWRITE SUCCESS] Now has {len(updated_df)} rows")
+            logger.debug(
+                f"[APPEND] Appended row, total now {self.array_client_lengths[uuid]}"
+            )
 
         except Exception as e:
-            logger.error(f"[REWRITE ERROR] Error rewriting Tiled dataframe: {e}")
+            logger.error(f"[APPEND ERROR] Error appending to Tiled dataframe: {e}")
             import traceback
 
             logger.error(traceback.format_exc())
