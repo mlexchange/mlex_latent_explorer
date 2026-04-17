@@ -194,6 +194,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_arroyo
+    command: "block_configs/lse_sas_operator_block.yaml"
     container_name: arroyo
     profiles:
       - arroyo
@@ -232,7 +233,8 @@ services:
   arroyo_xps:
     build:
       context: .
-      dockerfile: Dockerfile_arroyo_xps
+      dockerfile: Dockerfile_arroyo
+    command: "block_configs/lse_xps_operator_block.yaml"
     container_name: arroyo_xps
     profiles:
       - arroyo_xps

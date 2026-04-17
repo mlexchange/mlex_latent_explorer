@@ -9,4 +9,4 @@ RUN pip install .[arroyo]
 
 ENV HOME /app
 
-CMD ["arroyo", "run", "block_configs/lse_sas_operator_block.yaml"]
+ENTRYPOINT ["arroyo", "run"]
