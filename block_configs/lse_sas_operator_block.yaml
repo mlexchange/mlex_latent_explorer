@@ -1,0 +1,25 @@
+blocks:
+  - name: LSE SAS Operator
+    description: 2D latent space operator for SAS Data
+
+    operator:
+      class: src.arroyo_reduction.operator.build_lse_operator
+
+    listeners:
+      - class: arroyosas.zmq.ZMQFrameListener
+        kwargs:
+          address: "tcp://sim_unified:5000"
+
+    publishers:
+      - class: src.arroyo_reduction.publisher.lse_ws_result_publisher_factory
+        kwargs:
+          host: "0.0.0.0"
+          port: 8765
+      - class: src.arroyo_reduction.vector_save.vector_save_publisher_factory
+        kwargs:
+          db_path: "/data/vector_save/latent_vectors.db"
+      - class: src.arroyo_reduction.tiled_results_publisher.tiled_results_publisher_factory
+        kwargs:
+          root_segments:
+            - lse_live_results
+          tiled_prefix: "beamlines/bl931/processed"

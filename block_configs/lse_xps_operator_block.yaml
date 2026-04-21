@@ -1,0 +1,30 @@
+blocks:
+  - name: LSE XPS Operator
+    description: 2D latent space operator for XPS Data
+
+    operator:
+      class: src.arroyo_reduction.operator.build_lse_operator
+
+    listeners:
+      - class: src.arroyo_reduction.xps_websocket_listener.xps_ws_listener_factory
+        kwargs:
+          #websocket_url: "ws://sim_xps:8001/simImages"  #xps websocket simulator
+          websocket_url: "ws://timepix_processor:8001/xps_operator"  #splash simulator
+          tiled_prefix: "beamlines/bl931/processed"
+
+    publishers:
+      - class: src.arroyo_reduction.publisher.lse_ws_result_publisher_factory
+        kwargs:
+          host: "0.0.0.0"
+          port: 8765
+      - class: src.arroyo_reduction.vector_save.vector_save_publisher_factory
+        kwargs:
+          db_path: "/data/vector_save/latent_vectors.db"
+      - class: src.arroyo_reduction.tiled_results_publisher.tiled_results_publisher_factory
+        kwargs:
+          root_segments:
+            - lse_live_results
+          tiled_prefix: "beamlines/bl931/processed"
+      - class: src.arroyo_reduction.xps_tiled_local_image_publisher.xps_tiled_local_image_publisher_factory
+        kwargs:
+          tiled_prefix: "beamlines/bl931/processed"

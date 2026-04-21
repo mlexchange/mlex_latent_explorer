@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import uuid
 from datetime import datetime
 
@@ -22,6 +23,11 @@ RESULTS_TILED_URI = os.getenv("RESULTS_TILED_URI", "http://tiled:8000")
 
 # Timezone for daily run ID
 CALIFORNIA_TZ = pytz.timezone("US/Pacific")
+
+# Finds a full UUID36 anywhere in a string
+UUID_PATTERN = re.compile(
+    r"[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"
+)
 
 
 class XPSWebSocketListener(Listener):
@@ -77,6 +83,17 @@ class XPSWebSocketListener(Listener):
         logger.info(f"Using Tiled prefix: {self.tiled_prefix}")
 
         while not self.should_stop:
+            # Wait for models to be selected before connecting
+            if self.redis_model_store:
+                autoencoder_model = self.redis_model_store.get_autoencoder_model()
+                dimred_model = self.redis_model_store.get_dimred_model()
+                if not autoencoder_model or not dimred_model:
+                    logger.debug(
+                        "Models not selected - waiting before connecting to XPS websocket..."
+                    )
+                    await asyncio.sleep(2)
+                    continue
+
             try:
                 async with websockets.connect(self.websocket_url) as websocket:
                     logger.info("Connected to XPS websocket")
@@ -103,15 +120,36 @@ class XPSWebSocketListener(Listener):
             data = json.loads(message)
             logger.debug(f"Received XPS metadata: {data}")
 
-            # Extract UUID from scan_name if this is a start message
-            if data.get("msg_type") == "start":
+            msg_type = data.get("msg_type")
+
+            if msg_type == "start":
                 scan_name = data.get("scan_name", "")
-                # Extract UUID from "temp name {uuid}" format
-                self.current_uuid = scan_name.replace("temp name ", "").strip()
+                # Extract UUID36 if present anywhere in scan_name
+                # (e.g. LabVIEW sends "temp name <uuid>").
+                # If not found (e.g. Timepix "acquisition_..." with no full UUID),
+                # generate a fresh one so all sources use the same id format.
+                match = UUID_PATTERN.search(scan_name)
+                if match:
+                    self.current_uuid = match.group()
+                    logger.info(
+                        f"Starting new XPS run, extracted UUID from "
+                        f"'{scan_name}': {self.current_uuid}"
+                    )
+                else:
+                    self.current_uuid = str(uuid.uuid4())
+                    logger.info(
+                        f"scan_name '{scan_name}' contains no UUID36 — "
+                        f"generated new UUID: {self.current_uuid}"
+                    )
                 self.frame_counter = 0
+
+            elif msg_type == "stop":
                 logger.info(
-                    f"Starting new XPS run with UUID from scan_name: {self.current_uuid}"
+                    f"XPS run stopped: scan_name={data.get('scan_name')} "
+                    f"frames={self.frame_counter}"
                 )
+                self.current_uuid = None
+                self.frame_counter = 0
 
             return
 
@@ -137,8 +175,6 @@ class XPSWebSocketListener(Listener):
         # Get experiment name from Redis (non-blocking)
         experiment_name = await asyncio.to_thread(self._get_experiment_name)
         logger.debug(f"Using experiment name: {experiment_name}")
-
-        # REMOVED: Get USER from environment
 
         # Get current date components for Year/Month/Day hierarchy
         now = datetime.now(CALIFORNIA_TZ)
@@ -186,3 +222,9 @@ class XPSWebSocketListener(Listener):
         tiled_prefix = settings.get("tiled_prefix", "beamlines/bl931/processed")
         logger.info(f"Listening for XPS frames on {websocket_url}")
         return cls(operator, websocket_url, tiled_prefix)
+
+
+def xps_ws_listener_factory(
+    operator, websocket_url: str, tiled_prefix: str = "beamlines/bl931/processed"
+):
+    return XPSWebSocketListener(operator, websocket_url, tiled_prefix)

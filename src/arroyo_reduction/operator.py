@@ -7,42 +7,47 @@ from arroyopy.operator import Operator
 from arroyopy.schemas import Start, Stop
 from arroyosas.schemas import RawFrameEvent, SASMessage
 
+from .redis_model_store import RedisModelStore  # Import the RedisModelStore class
 from .reducer import LatentSpaceReducer, Reducer
 from .schemas import LatentSpaceEvent
-from .redis_model_store import RedisModelStore  # Import the RedisModelStore class
 
 logger = logging.getLogger("arroyo_reduction.operator")
 
 
+def setup_logger(log_level: str = "INFO"):
+    formatter = logging.Formatter("%(levelname)s: (%(name)s)  %(message)s ")
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    # Set up parent logger to capture all arroyo_reduction.* loggers
+    root_logger = logging.getLogger("arroyo_reduction")
+    root_logger.addHandler(handler)
+    root_logger.setLevel(log_level.upper())
+
+
+setup_logger(os.getenv("LOGGING_LEVEL", "DEBUG"))
+
+
 class LatentSpaceOperator(Operator):
-    def __init__(self, reducer: Reducer):
+    def __init__(self, reducer: Reducer, redis_model_store: RedisModelStore = None):
         super().__init__()
         self.reducer = reducer
-        
+
         # NEW: Track if flush was already sent
         self._flush_sent = False
-        
-        # Initialize RedisModelStore instead of direct Redis client
-        try:
-            self.redis_host = os.getenv("REDIS_HOST", "kvrocks")
-            self.redis_port = int(os.getenv("REDIS_PORT", 6666))
-            self.redis_model_store = RedisModelStore(host=self.redis_host, port=self.redis_port)
-            logger.info(f"Connected to Redis Model Store at {self.redis_host}:{self.redis_port}")
-        except Exception as e:
-            logger.warning(f"Could not connect to Redis Model Store: {e}")
-            self.redis_model_store = None
+
+        self.redis_model_store = redis_model_store
 
     def _check_models_selected(self):
         """
         Synchronous helper to check if models are selected in Redis.
         This will be called via asyncio.to_thread() to avoid blocking the event loop.
-        
+
         Returns:
             tuple: (autoencoder_model, dimred_model) or (None, None) if not available
         """
         if self.redis_model_store is None:
             return (None, None)
-        
+
         try:
             autoencoder_model = self.redis_model_store.get_autoencoder_model()
             dimred_model = self.redis_model_store.get_dimred_model()
@@ -63,9 +68,11 @@ class LatentSpaceOperator(Operator):
                 autoencoder_model, dimred_model = await asyncio.to_thread(
                     self._check_models_selected
                 )
-                
+
                 if not autoencoder_model or not dimred_model:
-                    logger.info(f"In offline mode - skipping write image {message.frame_number}")
+                    logger.info(
+                        f"In offline mode - skipping write image {message.frame_number}"
+                    )
                 else:
                     await self.publish(message)
             else:
@@ -90,7 +97,7 @@ class LatentSpaceOperator(Operator):
                 autoencoder_model, dimred_model = await asyncio.to_thread(
                     self._check_models_selected
                 )
-                
+
                 if not autoencoder_model or not dimred_model:
                     # NEW: Send flush only once when entering offline mode
                     if not self._flush_sent:
@@ -101,59 +108,76 @@ class LatentSpaceOperator(Operator):
                             autoencoder_model="",
                             dimred_model="",
                             experiment_name="",
-                            timestamp=time.time()
+                            timestamp=time.time(),
                         )
                         await self.publish(flush_event)
                         self._flush_sent = True
                         logger.info("Sent flush signal when entering offline mode")
-                    
-                    logger.info(f"In offline mode - skipping dispatch frame {message.frame_number}")
+
+                    logger.info(
+                        f"In offline mode - skipping dispatch frame {message.frame_number}"
+                    )
                     return None
                 else:
                     # NEW: Reset flush flag when back in live mode
                     self._flush_sent = False
             else:
                 # Model store couldn't be initialized, log a warning but continue processing
-                logger.debug("Redis Model Store not available, proceeding with processing")
-                
+                logger.debug(
+                    "Redis Model Store not available, proceeding with processing"
+                )
+
             # Existing loading check
-            if hasattr(self.reducer, 'is_loading_model') and self.reducer.is_loading_model:
+            if (
+                hasattr(self.reducer, "is_loading_model")
+                and self.reducer.is_loading_model
+            ):
                 loading_type = self.reducer.loading_model_type or "unknown"
-                logger.info(f"Waiting for {loading_type} model to finish loading before processing frame {message.frame_number}...")
+                logger.info(
+                    f"Waiting for {loading_type} model to finish loading before processing frame {message.frame_number}..."
+                )
                 return None
-            
+
             # Record timing information
             start_time = time.time()
-            
+
             # Pass message to reducer with timing information tracking
-            feature_vector, timing_info = await asyncio.to_thread(self.reducer.reduce, message)
-            
+            feature_vector, timing_info = await asyncio.to_thread(
+                self.reducer.reduce, message
+            )
+
             # Calculate total processing time
             end_time = time.time()
             total_processing_time = end_time - start_time
-            
+
             if feature_vector is None:
-                logger.info(f"Skipping frame {message.frame_number} due to processing error or model transition")
+                logger.info(
+                    f"Skipping frame {message.frame_number} due to processing error or model transition"
+                )
                 return None
-            
+
             # Get the current model names from the reducer
             current_autoencoder = self.reducer.autoencoder_model_name
             current_dimred = self.reducer.dimred_model_name
-            
+
             # NEW: Get experiment name from the reducer
             experiment_name = self.reducer.experiment_name
-            
+
             response = LatentSpaceEvent(
                 tiled_url=message.tiled_url,
                 feature_vector=feature_vector[0].tolist(),
                 index=message.frame_number,
                 autoencoder_model=current_autoencoder,  # Add autoencoder model name
-                dimred_model=current_dimred,            # Add dimension reduction model name
-                experiment_name=experiment_name,        # NEW: Add experiment name
-                timestamp=start_time,                   # Add start timestamp
+                dimred_model=current_dimred,  # Add dimension reduction model name
+                experiment_name=experiment_name,  # NEW: Add experiment name
+                timestamp=start_time,  # Add start timestamp
                 total_processing_time=total_processing_time,  # Add total processing time
-                autoencoder_time=timing_info.get('autoencoder_time'),  # Add autoencoder processing time
-                dimred_time=timing_info.get('dimred_time'),            # Add dimension reduction processing time
+                autoencoder_time=timing_info.get(
+                    "autoencoder_time"
+                ),  # Add autoencoder processing time
+                dimred_time=timing_info.get(
+                    "dimred_time"
+                ),  # Add dimension reduction processing time
             )
             return response
         except Exception as e:
@@ -161,10 +185,18 @@ class LatentSpaceOperator(Operator):
             return None
 
 
-    @classmethod
-    def from_settings(cls, settings, reducer_settings=None):
+def build_lse_operator(
+    redis_host: str = None, redis_port: int = None
+) -> LatentSpaceOperator:
+    # Initialize RedisModelStore instead of direct Redis client
+    try:
+        redis_host = redis_host or os.getenv("REDIS_HOST", "kvrocks")
+        redis_port = redis_port or int(os.getenv("REDIS_PORT", 6666))
+        redis_model_store = RedisModelStore(host=redis_host, port=redis_port)
+        logger.info(f"Connected to Redis Model Store at {redis_host}:{redis_port}")
+    except Exception as e:
+        logger.warning(f"Could not connect to Redis Model Store: {e}")
+        redis_model_store = None
 
-        # socket.connect(settings.zmq_broker.router_address)
-        # logger.info(f"Connected to broker at {settings.zmq_broker.router_address}")
-        reducer = LatentSpaceReducer()
-        return cls(reducer)
+    reducer = LatentSpaceReducer(redis_model_store)
+    return LatentSpaceOperator(reducer, redis_model_store)
