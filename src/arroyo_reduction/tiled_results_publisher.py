@@ -363,12 +363,6 @@ class TiledResultsPublisher(Publisher):
                     "tiled_url": tiled_url,
                     "autoencoder_model": getattr(message, "autoencoder_model", None),
                     "dimred_model": getattr(message, "dimred_model", None),
-                    "timestamp": getattr(message, "timestamp", time.time()),
-                    "total_processing_time": getattr(
-                        message, "total_processing_time", None
-                    ),
-                    "autoencoder_time": getattr(message, "autoencoder_time", None),
-                    "dimred_time": getattr(message, "dimred_time", None),
                 }
 
                 # Add vector elements as columns (limit to first 20 to keep it manageable)

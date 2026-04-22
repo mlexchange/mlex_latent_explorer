@@ -3,6 +3,7 @@ import logging
 import os
 import time
 
+from arroyopy import traced
 from arroyopy.operator import Operator
 from arroyopy.schemas import Start, Stop
 from arroyosas.schemas import RawFrameEvent, SASMessage
@@ -24,18 +25,17 @@ def setup_logger(log_level: str = "INFO"):
     root_logger.setLevel(log_level.upper())
 
 
-setup_logger(os.getenv("LOGGING_LEVEL", "DEBUG"))
+
 
 
 class LatentSpaceOperator(Operator):
     def __init__(self, reducer: Reducer, redis_model_store: RedisModelStore = None):
         super().__init__()
         self.reducer = reducer
-
         # NEW: Track if flush was already sent
         self._flush_sent = False
-
         self.redis_model_store = redis_model_store
+        
 
     def _check_models_selected(self):
         """
@@ -55,7 +55,8 @@ class LatentSpaceOperator(Operator):
         except Exception as e:
             logger.error(f"Error checking model selection in Redis: {e}")
             return (None, None)
-
+    
+    @traced(span_name="process", attributes={"component": "xps_processor"})
     async def process(self, message: SASMessage) -> None:
         # logger.debug("message recvd")
         if isinstance(message, Start):
@@ -78,7 +79,6 @@ class LatentSpaceOperator(Operator):
             else:
                 # If redis not available, publish anyway (default behavior)
                 await self.publish(message)
-
             result = await self.dispatch(message)
             if result is not None:  # Only publish if we got a valid result
                 await self.publish(result)
@@ -142,7 +142,7 @@ class LatentSpaceOperator(Operator):
             start_time = time.time()
 
             # Pass message to reducer with timing information tracking
-            feature_vector, timing_info = await asyncio.to_thread(
+            feature_vector = await asyncio.to_thread(
                 self.reducer.reduce, message
             )
 
@@ -170,14 +170,6 @@ class LatentSpaceOperator(Operator):
                 autoencoder_model=current_autoencoder,  # Add autoencoder model name
                 dimred_model=current_dimred,  # Add dimension reduction model name
                 experiment_name=experiment_name,  # NEW: Add experiment name
-                timestamp=start_time,  # Add start timestamp
-                total_processing_time=total_processing_time,  # Add total processing time
-                autoencoder_time=timing_info.get(
-                    "autoencoder_time"
-                ),  # Add autoencoder processing time
-                dimred_time=timing_info.get(
-                    "dimred_time"
-                ),  # Add dimension reduction processing time
             )
             return response
         except Exception as e:
@@ -190,6 +182,7 @@ def build_lse_operator(
 ) -> LatentSpaceOperator:
     # Initialize RedisModelStore instead of direct Redis client
     try:
+        setup_logger(os.getenv("LOGGING_LEVEL", "DEBUG"))
         redis_host = redis_host or os.getenv("REDIS_HOST", "kvrocks")
         redis_port = redis_port or int(os.getenv("REDIS_PORT", 6666))
         redis_model_store = RedisModelStore(host=redis_host, port=redis_port)

@@ -9,6 +9,7 @@ import numpy as np
 import redis
 import torch
 import torchvision.transforms as transforms
+from arroyopy import traced
 from arroyosas.schemas import RawFrameEvent
 from mlex_utils.mlflow_utils.mlflow_model_client import MLflowModelClient
 from PIL import Image
@@ -63,6 +64,7 @@ class LatentSpaceReducer(Reducer):
     latent space, and reducing it to 2D
     """
 
+    @traced(span_name="init_reducer", attributes={"component": "LatentSpaceReducer"})
     def __init__(self, redis_model_store: RedisModelStore = None):
         """Initialize the reducer with models from Redis"""
         # Initialize model loading status flags
@@ -157,19 +159,21 @@ class LatentSpaceReducer(Reducer):
         except Exception as e:
             logger.error(f"Error updating loading state in Redis: {e}")
 
-    def reduce(self, message: RawFrameEvent) -> tuple[np.ndarray, dict]:
+    @traced(span_name="reduce", attributes={"component": "LatentSpaceReducer"})
+    def reduce(self, message: RawFrameEvent) -> np.ndarray:
         """Process an image through the models to get feature vectors with timing information"""
+        latent_array = self.create_latent_space(message)
+        return self.create_dimreduction(latent_array)
 
-        # Initialize timing dictionary
-        timing_info = {"autoencoder_time": None, "dimred_time": None}
-
+    @traced(span_name="create_latent_space", attributes={"component": "LatentSpaceReducer"})
+    def create_latent_space(self, message: RawFrameEvent) -> np.ndarray:
         # Check if models are currently being loading
         if self.is_loading_model:
             logger.info(
                 f"Waiting for {self.loading_model_type} model to finish loading..."
             )
             # Return a placeholder while models are loading
-            return None, timing_info
+            return None
 
         try:
             # Get numpy array from message
@@ -179,11 +183,13 @@ class LatentSpaceReducer(Reducer):
             logger.info(
                 f"Get input image shape: {img_array.shape}, dtype: {img_array.dtype}. Image min: {img_array.min()}, max: {img_array.max()}"
             )
-
+            return img_array
         except Exception as e:
             logger.error(f"Error in image preparation: {e}")
-            return None, timing_info
+            return None
 
+    @traced(span_name="create_dimreduction", attributes={"component": "LatentSpaceReducer"})
+    def create_dimreduction(self, img_array: np.ndarray) -> np.ndarray:
         # Process with autoencoder to get latent features with timing
         try:
             # Start timing autoencoder processing
@@ -195,15 +201,13 @@ class LatentSpaceReducer(Reducer):
 
             # End timing autoencoder processing
             autoencoder_end = time.time()
-            timing_info["autoencoder_time"] = autoencoder_end - autoencoder_start
-
             logger.info(
-                f"Latent features shape: {latent_features.shape}, processing time: {timing_info['autoencoder_time']:.4f}s"
+                f"Latent features shape: {latent_features.shape}, processing time: {autoencoder_end - autoencoder_start:.4f}s"
             )
 
         except Exception as e:
             logger.error(f"Error in autoencoder processing: {e}")
-            return None, timing_info
+            return None
 
         # Apply dimension reduction directly with latent features with timing
         try:
@@ -215,16 +219,14 @@ class LatentSpaceReducer(Reducer):
 
             # End timing dimension reduction processing
             dimred_end = time.time()
-            timing_info["dimred_time"] = dimred_end - dimred_start
 
             logger.info(
-                f"Feature vector shape: {f_vec.shape}, processing time: {timing_info['dimred_time']:.4f}s"
+                f"Feature vector shape: {f_vec.shape}, processing time: {dimred_end - dimred_start:.4f}s"
             )
-
-            return f_vec, timing_info
+            return f_vec
         except Exception as e:
             logger.error(f"Error in dimension reduction: {e}")
-            return None, timing_info
+            return None
 
     def _subscribe_to_model_updates(self):
         """
