@@ -72,7 +72,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           flavor: |
-            suffix=-arroyo,onlatest=true
+            suffix=-arroyo,on-latest=true
 
       - name: Build and push Arroyo Docker image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
@@ -89,7 +89,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           flavor: |
-            suffix=-arroyo-xps,onlatest=true
+            suffix=-arroyo-xps,on-latest=true
 
       - name: Build and push XPS Docker image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc

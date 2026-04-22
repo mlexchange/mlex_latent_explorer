@@ -1509,6 +1509,7 @@ lse = [
     { name = "redis" },
     { name = "requests" },
     { name = "scikit-learn" },
+    { name = "setuptools" },
     { name = "tiled", extra = ["client"] },
 ]
 simulator = [
@@ -1520,10 +1521,11 @@ simulator = [
 requires-dist = [
     { name = "aio-pika", marker = "extra == 'simulator'" },
     { name = "aiosqlite", marker = "extra == 'arroyo'" },
+    { name = "aiosqlite", extras = ["arroyo"], marker = "extra == 'arroyo'", specifier = ">=0.22.1" },
     { name = "arroyopy", marker = "extra == 'arroyo'", specifier = "==0.3.1a0" },
     { name = "arroyosas", marker = "extra == 'arroyo'", git = "https://github.com/als-computing/arroyosas.git" },
     { name = "black", marker = "extra == 'dev'", specifier = "==24.2.0" },
-    { name = "dash", marker = "extra == 'lse'", specifier = "==2.9.3" },
+    { name = "dash", marker = "extra == 'lse'", specifier = ">=2.9.3" },
     { name = "dash-bootstrap-components", marker = "extra == 'lse'", specifier = ">=1.1.0" },
     { name = "dash-core-components", marker = "extra == 'lse'", specifier = "==2.0.0" },
     { name = "dash-extensions", marker = "extra == 'lse'", specifier = "==0.0.71" },
@@ -1562,7 +1564,8 @@ requires-dist = [
     { name = "requests", marker = "extra == 'lse'" },
     { name = "scikit-learn", marker = "extra == 'arroyo'", specifier = "==1.3.0" },
     { name = "scikit-learn", marker = "extra == 'lse'", specifier = "==1.3.0" },
-    { name = "setuptools", marker = "extra == 'dev'", specifier = ">=82.0.1" },
+    { name = "setuptools", marker = "extra == 'dev'", specifier = "<75.0" },
+    { name = "setuptools", marker = "extra == 'lse'", specifier = "<75.0" },
     { name = "tiled", extras = ["client"], marker = "extra == 'arroyo'", specifier = "==0.2.8" },
     { name = "tiled", extras = ["client"], marker = "extra == 'lse'", specifier = "==0.2.8" },
     { name = "torch", marker = "extra == 'arroyo'", specifier = ">=2.0.0" },
@@ -3154,11 +3157,11 @@ wheels = [
 
 [[package]]
 name = "setuptools"
-version = "82.0.1"
+version = "74.1.3"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4f/db/cfac1baf10650ab4d1c111714410d2fbb77ac5a616db26775db562c8fab2/setuptools-82.0.1.tar.gz", hash = "sha256:7d872682c5d01cfde07da7bccc7b65469d3dca203318515ada1de5eda35efbf9", size = 1152316, upload-time = "2026-03-09T12:47:17.221Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/01/e30d66bbb6403b7d41ac1ac0e3c51727c5e8f3558d8f9a9efe4282e90308/setuptools-74.1.3.tar.gz", hash = "sha256:fbb126f14b0b9ffa54c4574a50ae60673bbe8ae0b1645889d10b3b14f5891d28", size = 1356471, upload-time = "2024-09-15T15:00:26.33Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/76/f789f7a86709c6b087c5a2f52f911838cad707cc613162401badc665acfe/setuptools-82.0.1-py3-none-any.whl", hash = "sha256:a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb", size = 1006223, upload-time = "2026-03-09T12:47:15.026Z" },
+    { url = "https://files.pythonhosted.org/packages/14/37/166aba5a70924e574eb0aec9f7ec227ac0d7ae72dd2f823675365172120d/setuptools-74.1.3-py3-none-any.whl", hash = "sha256:1cfd66bfcf197bce344da024c8f5b35acc4dcb7ca5202246a75296b4883f6851", size = 1262070, upload-time = "2024-09-15T15:00:24.357Z" },
 ]
 
 [[package]]
