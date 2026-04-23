@@ -164,17 +164,16 @@ class LatentSpaceReducer(Reducer):
         """Process an image through the models to get feature vectors with timing information"""
         # Initialize timing dictionary
         timing_info = {"autoencoder_time": None, "dimred_time": None}
-        
-        latent_array = self.create_latent_space(message)
+        image_array = self.get_image_array(message)
         # Return None early if models are loading or there was an error
-        if latent_array is None:
+        if image_array is None:
             return None, timing_info
         
-        result, timing_info = self.create_dimreduction(latent_array)
+        result, timing_info = self.create_dimreduction(image_array)
         return result, timing_info
 
     @traced(span_name="create_latent_space", attributes={"component": "LatentSpaceReducer"})
-    def create_latent_space(self, message: RawFrameEvent) -> np.ndarray:
+    def get_image_array(self, message: RawFrameEvent) -> np.ndarray:
         # Check if models are currently being loading
         if self.is_loading_model:
             logger.info(
