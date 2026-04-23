@@ -56,20 +56,18 @@ def mock_redis_store():
 @pytest.fixture
 def redis_test_store(mock_redis_client):
     """Create a RedisModelStore with a mock Redis client"""
-    # Patch redis.Redis to return our mock
-    with patch("redis.Redis", return_value=mock_redis_client):
-        from src.arroyo_reduction.redis_model_store import RedisModelStore
+    from src.arroyo_reduction.redis_model_store import RedisModelStore
 
-        # Create the store - this will use our patched Redis
-        store = RedisModelStore(host="localhost", port=6379)
+    # Create the store - in TESTING mode, redis_client will be None
+    store = RedisModelStore(host="localhost", port=6379)
 
-        # Make sure our mock was used
-        assert store.redis_client is mock_redis_client
+    # Inject our mock redis client to replace the None
+    store.redis_client = mock_redis_client
 
-        # Store the mock for tests to use
-        store._mock_client = mock_redis_client
+    # Store the mock for tests to use
+    store._mock_client = mock_redis_client
 
-        yield store
+    yield store
 
 
 # Common fixtures for reducer testing

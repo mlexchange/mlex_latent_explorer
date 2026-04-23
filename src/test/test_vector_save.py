@@ -39,7 +39,7 @@ async def test_vector_save_listener(tmp_path):
                 tiled_url, 
                 feature_vector, 
                 autoencoder_model, 
-                dimred_model,
+                dimred_model
             FROM vectors
         """) as cursor:
             rows = await cursor.fetchall()

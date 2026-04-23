@@ -163,6 +163,9 @@ class LatentSpaceReducer(Reducer):
     def reduce(self, message: RawFrameEvent) -> np.ndarray:
         """Process an image through the models to get feature vectors with timing information"""
         latent_array = self.create_latent_space(message)
+        # Return None early if models are loading or there was an error
+        if latent_array is None:
+            return None
         return self.create_dimreduction(latent_array)
 
     @traced(span_name="create_latent_space", attributes={"component": "LatentSpaceReducer"})
@@ -233,6 +236,11 @@ class LatentSpaceReducer(Reducer):
         Subscribe to model update notifications through Redis PubSub
         This runs in a separate thread to listen for model updates
         """
+        # Skip Redis subscription during testing
+        if os.getenv("TESTING") == "1":
+            logger.info("Skipping Redis subscription during testing")
+            return
+            
         try:
             import threading
 

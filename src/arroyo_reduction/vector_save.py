@@ -34,7 +34,7 @@ class VectorSavePublisher(Publisher):
                     feature_vector TEXT NOT NULL,
                     autoencoder_model TEXT,
                     dimred_model TEXT,
-                    experiment_name TEXT,
+                    experiment_name TEXT
                 )
             """)
             await self.db.commit()
@@ -54,7 +54,7 @@ class VectorSavePublisher(Publisher):
         vector_str = json.dumps(feature_vector)
 
         await self.db.execute(
-            "INSERT INTO vectors (tiled_url, feature_vector, autoencoder_model, dimred_model, experiment_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO vectors (tiled_url, feature_vector, autoencoder_model, dimred_model, experiment_name) VALUES (?, ?, ?, ?, ?)",
             (
                 tiled_url,
                 vector_str,
