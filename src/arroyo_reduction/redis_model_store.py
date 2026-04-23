@@ -37,6 +37,12 @@ class RedisModelStore:
         self.host = host or os.getenv("REDIS_HOST", "kvrocks")
         self.port = port or int(os.getenv("REDIS_PORT", 6666))
 
+        # Skip Redis connection during testing
+        if os.getenv("TESTING") == "1":
+            self.redis_client = None
+            logger.info("Skipping Redis connection during testing")
+            return
+
         # Initialize Redis client
         try:
             self.redis_client = redis.Redis(

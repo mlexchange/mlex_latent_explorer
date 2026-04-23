@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import os
 import pytest
 import torch
 
@@ -69,8 +70,8 @@ class TestReducer:
         
         # 4. Verify timing info is returned
         assert isinstance(timing_info, dict)
-        assert 'autoencoder_time' in timing_info
-        assert 'dimred_time' in timing_info
+        assert "autoencoder_time" in timing_info
+        assert "dimred_time" in timing_info
 
     def test_reduce_during_model_loading(self, reducer, mock_event):
         """Test that reduce() returns None when models are loading"""
@@ -85,6 +86,7 @@ class TestReducer:
 
         # Verify result is None when models are loading
         assert result is None
+        # Verify timing_info is returned but empty
         assert isinstance(timing_info, dict)
         
         # Models should not be called
@@ -392,6 +394,7 @@ class TestReducer:
             patch("threading.Thread", return_value=mock_thread) as mock_thread_class,
             patch("src.arroyo_reduction.redis_model_store.RedisModelStore"),
             patch("mlex_utils.mlflow_utils.mlflow_model_client.MLflowModelClient"),
+            patch("os.getenv", side_effect=lambda key, default=None: None if key == "TESTING" else os.getenv(key, default)),
         ):
 
             # Import the real class but patch the __init__ to avoid complex initialization
