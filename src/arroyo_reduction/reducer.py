@@ -160,13 +160,18 @@ class LatentSpaceReducer(Reducer):
             logger.error(f"Error updating loading state in Redis: {e}")
 
     @traced(span_name="reduce", attributes={"component": "LatentSpaceReducer"})
-    def reduce(self, message: RawFrameEvent) -> np.ndarray:
+    def reduce(self, message: RawFrameEvent) -> tuple[np.ndarray, dict]:
         """Process an image through the models to get feature vectors with timing information"""
+        # Initialize timing dictionary
+        timing_info = {"autoencoder_time": None, "dimred_time": None}
+        
         latent_array = self.create_latent_space(message)
         # Return None early if models are loading or there was an error
         if latent_array is None:
-            return None
-        return self.create_dimreduction(latent_array)
+            return None, timing_info
+        
+        result, timing_info = self.create_dimreduction(latent_array)
+        return result, timing_info
 
     @traced(span_name="create_latent_space", attributes={"component": "LatentSpaceReducer"})
     def create_latent_space(self, message: RawFrameEvent) -> np.ndarray:
@@ -192,7 +197,10 @@ class LatentSpaceReducer(Reducer):
             return None
 
     @traced(span_name="create_dimreduction", attributes={"component": "LatentSpaceReducer"})
-    def create_dimreduction(self, img_array: np.ndarray) -> np.ndarray:
+    def create_dimreduction(self, img_array: np.ndarray) -> tuple[np.ndarray, dict]:
+        # Initialize timing dictionary
+        timing_info = {"autoencoder_time": None, "dimred_time": None}
+        
         # Process with autoencoder to get latent features with timing
         try:
             # Start timing autoencoder processing
@@ -204,13 +212,15 @@ class LatentSpaceReducer(Reducer):
 
             # End timing autoencoder processing
             autoencoder_end = time.time()
+            timing_info["autoencoder_time"] = autoencoder_end - autoencoder_start
+            
             logger.info(
-                f"Latent features shape: {latent_features.shape}, processing time: {autoencoder_end - autoencoder_start:.4f}s"
+                f"Latent features shape: {latent_features.shape}, processing time: {timing_info['autoencoder_time']:.4f}s"
             )
 
         except Exception as e:
             logger.error(f"Error in autoencoder processing: {e}")
-            return None
+            return None, timing_info
 
         # Apply dimension reduction directly with latent features with timing
         try:
@@ -222,14 +232,16 @@ class LatentSpaceReducer(Reducer):
 
             # End timing dimension reduction processing
             dimred_end = time.time()
+            timing_info["dimred_time"] = dimred_end - dimred_start
 
             logger.info(
-                f"Feature vector shape: {f_vec.shape}, processing time: {dimred_end - dimred_start:.4f}s"
+                f"Feature vector shape: {f_vec.shape}, processing time: {timing_info['dimred_time']:.4f}s"
             )
-            return f_vec
+            
+            return f_vec, timing_info
         except Exception as e:
             logger.error(f"Error in dimension reduction: {e}")
-            return None
+            return None, timing_info
 
     def _subscribe_to_model_updates(self):
         """

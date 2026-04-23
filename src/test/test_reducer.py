@@ -52,7 +52,7 @@ class TestReducer:
         # Mock logger to prevent logging issues
         with patch("src.arroyo_reduction.reducer.logger"):
             # Call reduce()
-            result = reducer.reduce(mock_event)
+            result, timing_info = reducer.reduce(mock_event)
 
         # Verify the processing flow
 
@@ -67,6 +67,11 @@ class TestReducer:
         assert result.shape == (1, 2)  # Check expected shape of dimensionality reduction coordinates
         # Verify it's actually the same array we created
         np.testing.assert_array_equal(result, dimred_coords)  # CHANGED: umap_coords -> dimred_coords
+        
+        # 4. Verify timing info is returned
+        assert isinstance(timing_info, dict)
+        assert "autoencoder_time" in timing_info
+        assert "dimred_time" in timing_info
 
     def test_reduce_during_model_loading(self, reducer, mock_event):
         """Test that reduce() returns None when models are loading"""
@@ -77,10 +82,12 @@ class TestReducer:
         # Mock logger to prevent logging issues
         with patch("src.arroyo_reduction.reducer.logger"):
             # Call reduce()
-            result = reducer.reduce(mock_event)
+            result, timing_info = reducer.reduce(mock_event)
 
         # Verify result is None when models are loading
         assert result is None
+        # Verify timing_info is returned but empty
+        assert isinstance(timing_info, dict)
         
         # Models should not be called
         reducer.current_torch_model.predict.assert_not_called()

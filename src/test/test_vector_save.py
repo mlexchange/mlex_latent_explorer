@@ -26,6 +26,10 @@ async def test_vector_save_listener(tmp_path):
         "index": 0,
         "autoencoder_model": "model_v1:3",  # ← CHANGED: added version
         "dimred_model": "model_v2:2",        # ← CHANGED: added version
+        "timestamp": current_time,
+        "total_processing_time": 0.1234,
+        "autoencoder_time": 0.0789,
+        "dimred_time": 0.0445
     }
     message = LatentSpaceEvent(**message)
     
@@ -39,7 +43,11 @@ async def test_vector_save_listener(tmp_path):
                 tiled_url, 
                 feature_vector, 
                 autoencoder_model, 
-                dimred_model
+                dimred_model,
+                timestamp,
+                total_processing_time,
+                autoencoder_time,
+                dimred_time
             FROM vectors
         """) as cursor:
             rows = await cursor.fetchall()
@@ -48,6 +56,10 @@ async def test_vector_save_listener(tmp_path):
             assert rows[0][1] == json.dumps(message.feature_vector)
             assert rows[0][2] == message.autoencoder_model  # Now contains "model_v1:3"
             assert rows[0][3] == message.dimred_model        # Now contains "model_v2:2"
+            assert rows[0][4] == current_time
+            assert rows[0][5] == 0.1234
+            assert rows[0][6] == 0.0789
+            assert rows[0][7] == 0.0445
 
     # Explicitly close the database connection
     if publisher.db is not None:
