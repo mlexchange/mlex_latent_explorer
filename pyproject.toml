@@ -67,7 +67,7 @@ arroyo = [
     "aiosqlite",
     "tiled[client]==0.2.8",
     "arroyopy @ git+https://github.com/als-computing/arroyopy.git",
-    "arroyosas @ git+https://github.com/als-computing/arroyosas.git@move_lse",
+    "arroyosas @ git+https://github.com/als-computing/arroyosas.git@upgrade_arroyopy",
     "dynaconf",
     "msgpack",
     "redis",
