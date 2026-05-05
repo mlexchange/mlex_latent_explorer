@@ -8,7 +8,7 @@ blocks:
     listeners:
       - class: arroyosas.zmq.create_zmq_frame_listener
         kwargs:
-          zmq_address: "tcp://timepix_processor:5000"
+          zmq_address: "tcp://tiled_processor:5000"
 
     publishers:
       - class: src.arroyo_reduction.publisher.lse_ws_result_publisher_factory
