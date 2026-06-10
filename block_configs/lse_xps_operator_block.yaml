@@ -6,11 +6,9 @@ blocks:
       class: src.arroyo_reduction.operator.build_lse_operator
 
     listeners:
-      - class: src.arroyo_reduction.xps_websocket_listener.xps_ws_listener_factory
+      - class: arroyosas.zmq.create_zmq_frame_listener
         kwargs:
-          #websocket_url: "ws://sim_xps:8001/simImages"  #xps websocket simulator
-          websocket_url: "ws://timepix_processor:8001/xps_operator"  #splash simulator
-          tiled_prefix: "beamlines/bl931/processed"
+          zmq_address: "tcp://tiled_processor:5000"
 
     publishers:
       - class: src.arroyo_reduction.publisher.lse_ws_result_publisher_factory
@@ -24,7 +22,4 @@ blocks:
         kwargs:
           root_segments:
             - lse_live_results
-          tiled_prefix: "beamlines/bl931/processed"
-      - class: src.arroyo_reduction.xps_tiled_local_image_publisher.xps_tiled_local_image_publisher_factory
-        kwargs:
           tiled_prefix: "beamlines/bl931/processed"
