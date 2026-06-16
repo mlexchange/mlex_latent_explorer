@@ -1,6 +1,6 @@
 # Common settings
 common:
-  dataset: "timepix"  # "smi" or "trs" - determines which dataset config to use
+  dataset: "smi"  # "smi" or "trs" - determines which dataset config to use
   autoencoder_type: "VAE"  # use VIT or VAE
   dimred_type: "neural" #use joblib or neural
 

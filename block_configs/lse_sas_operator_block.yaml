@@ -6,9 +6,9 @@ blocks:
       class: src.arroyo_reduction.operator.build_lse_operator
 
     listeners:
-      - class: arroyosas.zmq.ZMQFrameListener
+      - class: arroyosas.zmq.create_zmq_frame_listener
         kwargs:
-          address: "tcp://sim_unified:5000"
+          zmq_address: "tcp://sim_unified:5000"
 
     publishers:
       - class: src.arroyo_reduction.publisher.lse_ws_result_publisher_factory
