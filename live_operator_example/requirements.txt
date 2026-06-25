@@ -1,0 +1,23 @@
+# Core MLflow
+mlflow==2.22.0
+cryptography==41.0.7
+
+# PyTorch - for VAE/ViT wrappers
+torch==2.2.2
+torchvision
+
+# Image processing - for VAE/ViT predict()
+Pillow
+
+# Numerical
+numpy==1.26.4
+scipy==1.15.1
+scikit-learn==1.6.1
+joblib==1.4.2
+numba==0.61.0
+umap-learn==0.5.7
+
+
+# Config / env
+python-dotenv
+pyyaml
