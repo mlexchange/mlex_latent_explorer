@@ -182,6 +182,9 @@ There are two main types of simulators available:
 ```sh
 source .env
 cd live_operator_example
+conda create -n mlflow_client python==3.11
+conda activate mlflow_client
+pip install -r requirements.txt
 python save_mlflow_wrapper.py
 ```
 
